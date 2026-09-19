@@ -39,10 +39,11 @@ uclient-fetch -O install.sh https://raw.githubusercontent.com/DJONvl/ZESP_deskto
 ```
 
 ```sh
-echo -e "GET /DJONvl/ZESP_desktop/master/install/install.sh HTTP/1.0\nHost: raw.githubusercontent.com\n" | openssl s_client -quiet -connect raw.githubusercontent.com:443 -servername raw.githubusercontent.com 2>/dev/null | sed '1,/^\r$/d' | sh
+printf 'GET /DJONvl/ZESP_desktop/master/install/install.sh HTTP/1.0\r\nHost: raw.githubusercontent.com\r\nConnection: close\r\n\r\n' | openssl s_client -quiet -connect raw.githubusercontent.com:443 -servername raw.githubusercontent.com 2>/dev/null | sed '1,/^\r$/d' > install.sh
+grep -q '^REPO=' install.sh && sh install.sh || echo DOWNLOAD FAILED
 ```
 
-(второй — через `openssl` как TLS-трубу, если он есть, а качалок нет; заметь `| sh`, не `| bash` — bash'а на OpenWrt нет)
+(второй — через `openssl` как TLS-трубу, если он есть, а качалок нет; заметь `| sh`, не `| bash` — bash'а на OpenWrt нет. Вставлять строго одной строкой: разорванная вставка — главная причина молчаливых fails. Проверка `grep` не даст запустить пустой файл)
 
 **Совсем нет качалок** — закинь два файла с ПК в `/tmp` железки (по scp/WinSCP) и запусти офлайн:
 
