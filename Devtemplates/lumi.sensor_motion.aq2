@@ -1,0 +1,57 @@
+{
+  "Device": "F7F7",
+  "Name": "",
+  "IEEE": "00158D0002E9FAE6",
+  "ModelId": "lumi.sensor_motion.aq2",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "FFFF",
+        "0406",
+        "0400",
+        "0500",
+        "0001",
+        "0003"
+      ],
+      "ClO": [
+        "0000",
+        "0019"
+      ]
+    }
+  },
+  "Report": {
+    "0104000000": {
+      "label": "illuminance",
+      "val": "0x02E2",
+      "mat": "1",
+      "role": "sensor",
+      "parsed": "0x02E2",
+      "class": {}
+    },
+    "0104060000": {
+      "label": "OCCUPANCY_SENSING",
+      "val": "0x01",
+      "mat": "1",
+      "role": "binary_sensor",
+      "class": {
+        "device_class": "motion",
+        "off_delay": "60",
+        "payload_on": "1",
+        "payload_off": "0"
+      },
+      "parsed": "0x01"
+    },
+    "010000FF01": {
+      "label": "Battery",
+      "val": "3.02",
+      "mat": "[{\"label\":\"Battery\",\"sig\":\"0121\",\"dl\":\"2\",\"mat\":\"0.001\",\"role\":\"sensor\"}]",
+      "role": "sensor",
+      "class": {
+        "device_class": "battery",
+        "unit_of_measurement": "V"
+      }
+    }
+  }
+}

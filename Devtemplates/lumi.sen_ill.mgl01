@@ -1,0 +1,41 @@
+{
+  "Device": "",
+  "Name": "lumi.sen_ill.mgl01",
+  "IEEE": "",
+  "ModelId": "lumi.sen_ill.mgl01",
+  "Location": "Home",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": ["0000", "0400", "0003", "0001"],
+      "ClO": ["0003"]
+    }
+  },
+  "DevType": "ZED",
+  "Report": {
+    "0104000000": {
+      "label": "01Illuminance_Measurement_0000",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {"device_class": "illuminance", "unit_of_measurement": "lx"},
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "retain": "0",
+      "ya_rep": "none"
+    },
+    "0100010020": {
+      "label": "Power_cfg",
+      "val": "",
+      "mat": "[{\"label\":\"Battery\",\"sig\":\"0121\",\"dl\":\"2\",\"mat\":\"0.001\",\"role\":\"sensor\",\"per\":\"1\"}]",
+      "role": "sensor",
+      "class": {"device_class": "battery", "unit_of_measurement": "%"},
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "retain": "0",
+      "ya_rep": "none"
+    }
+  },
+  "type": "devices.types.other",
+  "ClusterToBind": ["010400", "010001"]
+}

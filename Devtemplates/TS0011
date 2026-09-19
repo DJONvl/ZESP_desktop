@@ -1,0 +1,46 @@
+{
+  "Device": "9322",
+  "IEEE": "A4C138D4F7E26289",
+  "ModelId": "TS0011",
+  "ManufName": "_TZ3000_ji4araar",
+  "Name": "TS0011",
+  "PwrSrc": "",
+  "Location": "Дом",
+  "DevType": "ZED",
+  "leave": 0,
+  "type": "devices.types.switch",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0003",
+        "0004",
+        "0005",
+        "0006",
+        "E000",
+        "E001",
+        "0000"
+      ],
+      "ClO": [
+        "0019",
+        "000A"
+      ]
+    }
+  },
+  "Report": {
+    "0100060000": {
+      "label": "Свет",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "retain": "0",
+      "ya_rep": "{\"capabilities\":[{\"type\":\"devices.capabilities.on_off\",\"retrievable\":true,\"reportable\":true,\"state\":{\"instance\":\"on\",\"value\":false}}]}",
+      "class": {
+        "off_toggle_on": "off_toggle_on",
+        "device_class": "none"
+      }
+    }
+  },
+  "lastSeen": 1729680325363
+}

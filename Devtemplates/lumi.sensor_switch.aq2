@@ -1,0 +1,57 @@
+{
+  "Device": "EADB",
+  "Name": "lumi.sensor_switch.aq2",
+  "IEEE": "00158D00017142A0",
+  "ModelId": "lumi.sensor_switch.aq2",
+  "Location": "зал",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "FFFF",
+        "0006"
+      ],
+      "ClO": [
+        "0000",
+        "0004",
+        "FFFF"
+      ]
+    }
+  },
+  "DevType": "ZED",
+  "Report": {
+    "0100068000": {
+      "label": "Multiclick",
+      "val": "03",
+      "mat": "1",
+      "role": "sensor",
+      "class": {
+        "force_update": true
+      },
+      "parsed": "03"
+    },
+    "0100060000": {
+      "label": "Btn_state",
+      "val": "01",
+      "mat": "1",
+      "role": "binary_sensor",
+      "class": {
+        "payload_on": "0",
+        "payload_off": "1"
+      },
+      "parsed": "01"
+    },
+    "010000FF01": {
+      "label": "Battery",
+      "val": "0421A8130A2100006F",
+      "mat": "[{\"label\":\"Battery\",\"sig\":\"0121\",\"dl\":\"2\",\"mat\":\"0.0001\",\"role\":\"sensor\"}]",
+      "role": "sensor",
+      "class": {
+        "device_class": "battery",
+        "unit_of_measurement": "V"
+      },
+      "parsed": "0421A8130A2100006F"
+    }
+  }
+}

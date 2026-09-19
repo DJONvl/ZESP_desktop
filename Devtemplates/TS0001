@@ -1,0 +1,37 @@
+{
+  "Device": "AF30",
+  "Name": "TS0001",
+  "IEEE": "A4C138447313B04C",
+  "ModelId": "TS0001",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0003",
+        "0004",
+        "0005",
+        "0006"
+      ],
+      "ClO": [
+        "0019"
+      ]
+    }
+  },
+  "Report": {
+    "0100060000": {
+      "label": "ON_OFF",
+      "val": "0x00",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "0",
+      "retain": "0",
+      "ya_rep": "none",
+      "class": {}
+    },
+    "Location": ""
+  },
+  "type": "devices.types.other",
+  "Location": "Кухня",
+  "DevType": "ZR"
+}

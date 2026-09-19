@@ -1,0 +1,100 @@
+{
+  "Device": "",
+  "Name": "lumi.remote.b686opcn01",
+  "IEEE": "",
+  "ModelId": "lumi.remote.b686opcn01",
+  "Location": "Зал",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": ["0000", "0003", "0001"],
+      "ClO": ["0003", "0006", "0008", "0300"]
+    },
+    "02": {
+      "PrfId": "0104",
+      "ClI": ["0003"],
+      "ClO": ["0006", "0003"]
+    },
+    "03": {
+      "PrfId": "",
+      "ClI": [],
+      "ClO": []
+    },
+    "04": {
+      "PrfId": "",
+      "ClI": [],
+      "ClO": []
+    },
+    "05": {
+      "PrfId": "",
+      "ClI": [],
+      "ClO": []
+    },
+    "06": {
+      "PrfId": "",
+      "ClI": [],
+      "ClO": []
+    }
+  },
+  "DevType": "ZED",
+  "Report": {
+    "0100120055": {
+      "label": "Key1_1",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {"force_update": true},
+      "parsed": ""
+    },
+    "0200120055": {
+      "label": "Key1_2",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {"force_update": true},
+      "parsed": ""
+    },
+    "0300120055": {
+      "label": "Key2_1",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {"force_update": true},
+      "parsed": ""
+    },
+    "0400120055": {
+      "label": "Key2_2",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {"force_update": true},
+      "parsed": ""
+    },
+    "0500120055": {
+      "label": "Key3_1",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {"force_update": true},
+      "parsed": ""
+    },
+    "0600120055": {
+      "label": "Key3_2",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {"force_update": true},
+      "parsed": ""
+    },
+    "0100010020": {
+      "label": "Battery",
+      "val": "",
+      "mat": "0.1",
+      "role": "sensor",
+      "class": {"device_class": "battery", "unit_of_measurement": "V"},
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}"
+    }
+  },
+  "ClusterToBind": ["010001", "010006", "010008", "010300"]
+}

@@ -1,0 +1,21 @@
+{
+  "ui.title": "Settings",
+  "ui.label": "Settings",
+  "ui.save": "Save",
+  "ui.save_title": "Save",
+  "ya.qr": "QR code",
+  "ya.cookie": "Cookie",
+  "ya.close": "✕",
+  "ya.qr_title": "QR authorization",
+  "ya.cookie_title": "Cookie authorization",
+  "ya.qr_wait": "Loading QR code…",
+  "ya.qr_scan": "Scan the QR in the Yandex app",
+  "ya.qr_pending": "Waiting for scan…",
+  "ya.cookie_step1": "Open https://yandex.ru/iot and sign in",
+  "ya.cookie_step2": "F12 → Application → Storage → Cookies → https://yandex.ru",
+  "ya.cookie_step3": "Copy Session_id and paste below",
+  "ya.sess_placeholder": "Session_id",
+  "ya.ok": "OK",
+  "ya.err_sess": "Session_id is invalid",
+  "ya.err_reg": "enable ya_Enable 1, fill ac_id/ac_login/ac_pass and save"
+}

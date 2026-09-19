@@ -1,0 +1,67 @@
+{
+  "Device": "1BE1",
+  "Name": "Drivent",
+  "IEEE": "00124B001BABF215",
+  "ModelId": "Drivent",
+  "Location": "Зал",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0003",
+        "0004",
+        "0005",
+        "0006",
+        "0008"
+      ],
+      "ClO": [
+        "0000"
+      ]
+    },
+    "02": {
+      "PrfId": "0104",
+      "ClI": [
+        "0008",
+        "0030"
+      ],
+      "ClO": [
+        "0006"
+      ]
+    }
+  },
+  "Report": {
+    "0100060000": {
+      "label": "ON_OFF",
+      "val": "0x01",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "0x01",
+      "class": {}
+    },
+    "0200060000": {
+      "label": "ON_OFF",
+      "val": "0x01",
+      "mat": "1",
+      "role": "binary_sensor",
+      "parsed": "0x01",
+      "class": {}
+    },
+    "0100080000": {
+      "label": "LEVEL_CONTROL",
+      "val": "0x28",
+      "mat": "1",
+      "role": "cover",
+      "parsed": "0x28",
+      "class": {}
+    },
+    "0200080000": {
+      "label": "LEVEL_CONTROL",
+      "val": "0x46",
+      "mat": "1",
+      "role": "cover",
+      "parsed": "0x46",
+      "class": {}
+    }
+  }
+}

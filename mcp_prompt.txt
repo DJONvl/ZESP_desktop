@@ -1,0 +1,24 @@
+## Формат сценариев ZESP
+
+Сценарий — JSON объект: id (строка), name (строка), enabled (bool), entries (массив).
+Entry: { trigger, actions[], conditions[]?, conditionsMode?, throttle_ms? }
+
+### Триггеры:
+- time: {"type":"time","time":"HH:MM","daysOfWeek":"*"}
+- device: {"type":"device","ieee":"...","attribute":"...","operator":"EQ","value":"1"} (операторы: EQ,NEQ,GT,GTE,LT,LTE)
+- on_event: {"type":"on_event","ieee":"..."}
+- on_change: {"type":"on_change","ieee":"...","attribute":"..."}
+- on_msg: {"type":"on_msg","chatId":"...","msgFilter":"..."}
+- on_topic: {"type":"on_topic","topic":"...","topicFilter":"..."}
+
+### Действия:
+- send_cmd: {"type":"send_cmd","ieee":"...","obj":"...","value":"..."}
+- delay: {"type":"delay","delay_ms":1000}
+- group: {"type":"group","children":[...]}
+- if: {"type":"if","conditions":[{...}],"then_actions":[...],"else_actions":[...]}
+- mqtt: {"type":"mqtt","topic":"...","message":"..."}
+- telegram: {"type":"telegram","text":"..."}
+- http: {"type":"http","url":"..."}
+- speaker_tts: {"type":"speaker_tts","speaker_id":"...","text":"..."}
+
+Пример: {"id":"s_ex","name":"Пример","enabled":true,"entries":[{"trigger":{"type":"device","ieee":"IEEE","attribute":"01OBJ0000","operator":"EQ","value":"1"},"actions":[{"type":"send_cmd","ieee":"IEEE2","obj":"01OBJ20000","value":"1"}]}]}

@@ -1,0 +1,11 @@
+﻿*.pyc
+__pycache__/
+Devices/
+devicesjs.txt
+jsconfig.txt
+
+# персональные данные пользователя
+scenes.json
+groups.json
+location.json
+workspace.xml

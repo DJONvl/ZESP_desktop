@@ -1,0 +1,103 @@
+{
+  "Device": "",
+  "Name": "VOC_Sensor",
+  "IEEE": "",
+  "ModelId": "VOC_Sensor",
+  "Location": "Дом",
+  "DevType": "ZED",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0001",
+        "0003",
+        "0201",
+        "0402",
+        "0405"
+      ],
+      "ClO": []
+    }
+  },
+  "Report": {
+    "0100010021": {
+      "label": "Battery",
+      "val": "0x50",
+      "mat": "0.1",
+      "role": "sensor",
+      "class": {
+        "device_class": "battery"
+      }
+    },
+    "0104020000": {
+      "label": "Temperature",
+      "val": "0x0A5E",
+      "mat": "0.01",
+      "role": "sensor",
+      "class": {
+        "device_class": "temperature"
+      },
+      "parsed": "26.54"
+    },
+    "0104020001": {
+      "label": "Humidity",
+      "val": "0x0F68",
+      "mat": "0.01",
+      "role": "sensor",
+      "class": {
+        "device_class": "humidity"
+      },
+      "parsed": "39.44"
+    },
+    "0104020002": {
+      "label": "eCO2",
+      "val": "0x026C",
+      "mat": "1",
+      "role": "sensor",
+      "parsed": "620",
+      "class": {}
+    },
+    "0104020003": {
+      "label": "AirQuality",
+      "val": "0x0021",
+      "mat": "1",
+      "role": "sensor",
+      "parsed": "33",
+      "class": {}
+    }
+  },
+  "ClusterToBind": [
+    "0000",
+    "0001",
+    "0003",
+    "0402"
+  ],
+  "ConfigureReporting": [
+    {
+      "obj": "0100010021",
+      "DataType": "20",
+      "MinInterval": "012C",
+      "MaxInterval": "012C",
+      "TimeOut": "0FFF",
+      "Change": "0001"
+    }
+  ],
+  "ReadAttributes": {
+    "0000": [
+      "0000",
+      "0004",
+      "0005"
+    ],
+    "0001": [
+      "0021"
+    ],
+    "0201": [],
+    "0402": [
+      "0000",
+      "0001",
+      "0002",
+      "0003"
+    ],
+    "0405": []
+  }
+}

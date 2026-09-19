@@ -1,0 +1,142 @@
+{
+  "Device": "",
+  "IEEE": "",
+  "ModelId": "TS0601",
+  "ManufName": "_TZE204_ogx8u5z6",
+  "Name": "Термоголовка",
+  "PwrSrc": "",
+  "Location": "Дом",
+  "DevType": "ZED",
+  "leave": 0,
+  "type": "devices.types.thermostat",
+  "EP": {
+    "0001": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0004",
+        "0005",
+        "EF00"
+      ],
+      "ClO": [
+        "0019",
+        "000A"
+      ]
+    }
+  },
+  "Report": {
+    "01EF000005": {
+      "label": "Текущая темпер",
+      "val": 245,
+      "mat": "0.1",
+      "role": "sensor",
+      "class": {
+        "device_class": "temperature",
+        "unit_of_measurement": "C",
+        "state_class": "measurement",
+        "force_update": true,
+        "suggested_display_precision": 1
+      },
+      "parsed": "24.50",
+      "time": 1772704136657,
+      "Data": 245,
+      "ya_rep": {
+        "properties": [
+          {
+            "type": "devices.properties.float",
+            "retrievable": true,
+            "reportable": true,
+            "parameters": {
+              "instance": "temperature",
+              "unit": "unit.temperature.celsius"
+            },
+            "state": {
+              "instance": "temperature",
+              "value": 0
+            }
+          }
+        ]
+      }
+    },
+    "01EF000004": {
+      "label": "set",
+      "val": 220,
+      "mat": "0.1",
+      "role": "climate",
+      "class": {
+        "modes": "heat"
+      },
+      "parsed": "22",
+      "time": 1772698436692,
+      "Data": 220,
+      "ya_rep": {
+        "capabilities": [
+          {
+            "type": "devices.capabilities.range",
+            "retrievable": true,
+            "reportable": true,
+            "parameters": {
+              "instance": "temperature",
+              "random_access": true,
+              "range": {
+                "max": 40,
+                "min": 18,
+                "precision": 1
+              },
+              "unit": "unit.temperature.celsius"
+            },
+            "state": {
+              "instance": "temperature",
+              "value": 18
+            }
+          }
+        ]
+      }
+    },
+    "01EF000002": {
+      "label": "хз",
+      "val": "01",
+      "mat": "1",
+      "role": "sensor",
+      "parsed": "01",
+      "cfg_report": "",
+      "retain": "0",
+      "ya_rep": "none",
+      "Data": "01",
+      "time": 1772698372012,
+      "class": {}
+    },
+    "01EF000007": {
+      "label": "Блокировка",
+      "val": 0,
+      "mat": "1",
+      "role": "switch",
+      "parsed": "0",
+      "cfg_report": "",
+      "retain": "0",
+      "ya_rep": {
+        "capabilities": [
+          {
+            "type": "devices.capabilities.toggle",
+            "retrievable": true,
+            "reportable": true,
+            "parameters": {
+              "instance": "controls_locked"
+            },
+            "state": {
+              "instance": "controls_locked",
+              "value": false
+            }
+          }
+        ]
+      },
+      "Data": 0,
+      "class": {
+        "device_class": "switch"
+      },
+      "time": 1772698386655
+    }
+  },
+  "lastSeen": 1772705458770,
+  "sh3d": ""
+}

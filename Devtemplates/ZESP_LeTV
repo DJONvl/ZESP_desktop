@@ -1,0 +1,183 @@
+{
+  "Device": "4221",
+  "Name": "ZESP_LeTV",
+  "IEEE": "00124B000ADB794D",
+  "ModelId": "ZESP_LeTV",
+  "Location": "undefined",
+  "EP": {
+    "08": {
+      "PrfId": "0104",
+      "ClI": [
+        "0006"
+      ],
+      "ClO": [
+        "0006"
+      ]
+    },
+    "07": {
+      "PrfId": "0104",
+      "ClI": [
+        "0006"
+      ],
+      "ClO": [
+        "0006"
+      ]
+    },
+    "06": {
+      "PrfId": "0104",
+      "ClI": [
+        "0006"
+      ],
+      "ClO": [
+        "0006"
+      ]
+    },
+    "05": {
+      "PrfId": "0104",
+      "ClI": [
+        "0006"
+      ],
+      "ClO": [
+        "0006"
+      ]
+    },
+    "04": {
+      "PrfId": "0104",
+      "ClI": [
+        "0006"
+      ],
+      "ClO": [
+        "0006"
+      ]
+    },
+    "03": {
+      "PrfId": "0104",
+      "ClI": [
+        "0006"
+      ],
+      "ClO": [
+        "0006"
+      ]
+    },
+    "02": {
+      "PrfId": "0104",
+      "ClI": [
+        "0006"
+      ],
+      "ClO": [
+        "0006"
+      ]
+    },
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0006"
+      ],
+      "ClO": [
+        "0006"
+      ]
+    }
+  },
+  "DevType": "ZED",
+  "Report": {
+    "0100010000": {
+      "label": "Bat",
+      "val": "7A14",
+      "mat": "0.0001",
+      "role": "sensor",
+      "parsed": "7A14",
+      "class": {
+        "device_class": "battery",
+        "unit_of_measurement": "V"
+      }
+    },
+    "0100060000": {
+      "label": "Key01",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "class": {
+        "off_toggle_on": "off_toggle_on",
+        "device_class": "none"
+      }
+    },
+    "0200060000": {
+      "label": "Key02",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "class": {
+        "off_toggle_on": "off_toggle_on",
+        "device_class": "none"
+      }
+    },
+    "0300060000": {
+      "label": "Key03",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "class": {
+        "off_toggle_on": "off_toggle_on",
+        "device_class": "none"
+      }
+    },
+    "0400060000": {
+      "label": "Key04",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "class": {
+        "off_toggle_on": "off_toggle_on",
+        "device_class": "none"
+      }
+    },
+    "0500060000": {
+      "label": "Key05",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "class": {
+        "off_toggle_on": "off_toggle_on",
+        "device_class": "none"
+      }
+    },
+    "0600060000": {
+      "label": "Key06",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "class": {
+        "off_toggle_on": "off_toggle_on",
+        "device_class": "none"
+      }
+    },
+    "0700060000": {
+      "label": "Key07",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "class": {
+        "off_toggle_on": "off_toggle_on",
+        "device_class": "none"
+      }
+    },
+    "0800060000": {
+      "label": "Key08",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "class": {
+        "off_toggle_on": "off_toggle_on",
+        "device_class": "none"
+      }
+    }
+  }
+}

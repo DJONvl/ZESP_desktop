@@ -1,0 +1,58 @@
+{
+  "Device": "4EC4",
+  "Name": "ZESP_Light_RGB",
+  "IEEE": "00124B000770A384",
+  "ModelId": "ZESP_Light_RGB",
+  "Location": "undefined",
+  "EP": {
+    "0B": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0003",
+        "0004",
+        "0005",
+        "0006",
+        "0008",
+        "0300"
+      ],
+      "ClO": []
+    },
+    "0D": {
+      "PrfId": "C05E",
+      "ClI": [
+        "1000"
+      ],
+      "ClO": [
+        "1000"
+      ]
+    }
+  },
+  "DevType": "ZR",
+  "Report": {
+    "0B00060000": {
+      "label": "On_Off",
+      "val": "",
+      "mat": "1",
+      "role": "light",
+      "parsed": "",
+      "class": {}
+    },
+    "0B00080000": {
+      "label": "Level",
+      "val": "",
+      "mat": "1",
+      "role": "light",
+      "parsed": "",
+      "class": {}
+    },
+    "0B03000000": {
+      "label": "Color",
+      "val": "",
+      "mat": "1",
+      "role": "light",
+      "parsed": "",
+      "class": {}
+    }
+  }
+}

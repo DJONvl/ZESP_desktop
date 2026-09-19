@@ -1,0 +1,97 @@
+{
+  "Device": "2F2C",
+  "IEEE": "A4C13829DB5FF24A",
+  "ModelId": "TS0044",
+  "ManufName": "_TZ3000_5tqxpine",
+  "Name": "сцена",
+  "PwrSrc": "",
+  "Location": "Дом",
+  "DevType": "ZED",
+  "leave": 0,
+  "type": "devices.types.switch",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0001",
+        "0006",
+        "E000",
+        "0000"
+      ],
+      "ClO": [
+        "0019",
+        "000A"
+      ]
+    },
+    "02": {
+      "PrfId": "0104",
+      "ClI": [
+        "0006",
+        "0001",
+        "0006"
+      ],
+      "ClO": []
+    },
+    "03": {
+      "PrfId": "0104",
+      "ClI": [
+        "0006",
+        "0001",
+        "0006"
+      ],
+      "ClO": []
+    },
+    "04": {
+      "PrfId": "0104",
+      "ClI": [
+        "0006",
+        "0001",
+        "0006"
+      ],
+      "ClO": []
+    }
+  },
+  "Report": {
+    "0100060000": {
+      "label": "кнопка1",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "parsed": "",
+      "retain": "0",
+      "ya_rep": "{\"properties\":[{\"type\":\"devices.properties.event\",\"retrievable\":true,\"reportable\":true,\"parameters\":{\"instance\":\"button\",\"events\":[{\"value\":\"click\"},{\"value\":\"double_click\"},{\"value\":\"long_press\"}]},\"state\":{\"instance\":\"button\",\"value\":\"click\"}}],\"multi_id\":{\"name\":\"кнопка1\",\"room\":\"Дом\",\"type\":\"devices.types.other\"}}",
+      "class": {}
+    },
+    "0200060000": {
+      "label": "кнопка2",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "parsed": "",
+      "retain": "0",
+      "ya_rep": "{\"properties\":[{\"type\":\"devices.properties.event\",\"retrievable\":true,\"reportable\":true,\"parameters\":{\"instance\":\"button\",\"events\":[{\"value\":\"click\"},{\"value\":\"double_click\"},{\"value\":\"long_press\"}]},\"state\":{\"instance\":\"button\",\"value\":\"click\"}}],\"multi_id\":{\"name\":\"\",\"room\":\"\",\"type\":\"devices.types.sensor\"}}",
+      "class": {}
+    },
+    "0300060000": {
+      "label": "кнопка3",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "parsed": "",
+      "retain": "0",
+      "ya_rep": "{\"properties\":[{\"type\":\"devices.properties.event\",\"retrievable\":true,\"reportable\":true,\"parameters\":{\"instance\":\"button\",\"events\":[{\"value\":\"click\"},{\"value\":\"double_click\"},{\"value\":\"long_press\"}]},\"state\":{\"instance\":\"button\",\"value\":\"click\"}}],\"multi_id\":{\"name\":\"кнопка3\",\"room\":\"Дом\",\"type\":\"devices.types.sensor\"}}",
+      "class": {}
+    },
+    "0400060000": {
+      "label": "кнопка4",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "parsed": "",
+      "retain": "0",
+      "ya_rep": "{\"properties\":[{\"type\":\"devices.properties.event\",\"retrievable\":true,\"reportable\":true,\"parameters\":{\"instance\":\"button\",\"events\":[{\"value\":\"click\"},{\"value\":\"double_click\"},{\"value\":\"long_press\"}]},\"state\":{\"instance\":\"button\",\"value\":\"click\"}}],\"multi_id\":{\"name\":\"кнопка4\",\"room\":\"Дом\",\"type\":\"devices.types.sensor\"}}",
+      "class": {}
+    }
+  },
+  "lastSeen": 1738295202360
+}

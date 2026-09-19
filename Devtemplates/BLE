@@ -1,0 +1,647 @@
+[
+  {
+    "ATC": {
+      "template": {
+        "Device": "",
+        "Name": "BLE",
+        "IEEE": "",
+        "ModelId": "BLE",
+        "Location": "Дом",
+        "Img": "img/atc.jpg",
+        "EP": {},
+        "DevType": "BED",
+        "class": "181a",
+        "Report": {
+          "ble_battery": {
+            "label": "battery",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {
+              "device_class": "battery",
+              "unit_of_measurement": "%"
+            },
+            "parsed": "",
+            "ya_rep": "{\"properties\":[{\"type\":\"devices.properties.float\",\"retrievable\":true,\"reportable\":true,\"parameters\":{\"instance\":\"battery_level\",\"unit\":\"unit.percent\"},\"state\":{\"instance\":\"battery_level\",\"value\":0}}]}"
+          },
+          "ble_battery_voltage": {
+            "label": "battery_v",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {
+              "device_class": "voltage",
+              "unit_of_measurement": "V"
+            },
+            "parsed": "",
+            "ya_rep": "{\"properties\":[{\"type\":\"devices.properties.float\",\"retrievable\":true,\"reportable\":true,\"parameters\":{\"instance\":\"voltage\",\"unit\":\"unit.volt\"},\"state\":{\"instance\":\"voltage\",\"value\":0}}]}"
+          },
+          "ble_humidity": {
+            "label": "humidity",
+            "val": "",
+            "mat": "0.1",
+            "role": "sensor",
+            "class": {
+              "device_class": "humidity",
+              "unit_of_measurement": "%"
+            },
+            "parsed": "",
+            "ya_rep": "{\"properties\":[{\"type\": \"devices.properties.float\",\"retrievable\": true,\"reportable\": true,\"parameters\": {\"instance\": \"humidity\",\"unit\": \"unit.percent\"},\"state\": {\"instance\": \"humidity\",\"value\": 0}}]}"
+          },
+          "ble_temperature": {
+            "label": "temperature",
+            "val": "",
+            "mat": "0.1",
+            "role": "sensor",
+            "class": {
+              "device_class": "temperature",
+              "unit_of_measurement": "°C"
+            },
+            "parsed": "",
+            "ya_rep": "{\"properties\":[{\"type\": \"devices.properties.float\",\"retrievable\": true,\"reportable\": true,\"parameters\": {\"instance\": \"temperature\",\"unit\": \"unit.temperature.celsius\"},\"state\": {\"instance\": \"temperature\",\"value\": 0}}]}"
+          }
+        },
+        "type": "devices.types.sensor"
+      },
+      "description": "https://pvvx.github.io/ATC_MiThermometer/TelinkMiFlasher.html"
+    }
+  },
+  {
+    "ATC_mi": {
+      "template": {
+        "Device": "",
+        "Name": "BLE",
+        "IEEE": "",
+        "ModelId": "BLE",
+        "Location": "Дом",
+        "Img": "img/atc.jpg",
+        "EP": {},
+        "DevType": "BED",
+        "class": "mi",
+        "Report": {
+          "ble_battery": {
+            "label": "battery",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {
+              "device_class": "battery",
+              "unit_of_measurement": "%"
+            },
+            "parsed": "",
+            "ya_rep": "{\"properties\":[{\"type\":\"devices.properties.float\",\"retrievable\":true,\"reportable\":true,\"parameters\":{\"instance\":\"battery_level\",\"unit\":\"unit.percent\"},\"state\":{\"instance\":\"battery_level\",\"value\":0}}]}"
+          },
+          "ble_humidity": {
+            "label": "humidity",
+            "val": "",
+            "mat": "0.1",
+            "role": "sensor",
+            "class": {
+              "device_class": "humidity",
+              "unit_of_measurement": "%"
+            },
+            "parsed": "",
+            "ya_rep": "{\"properties\":[{\"type\": \"devices.properties.float\",\"retrievable\": true,\"reportable\": true,\"parameters\": {\"instance\": \"humidity\",\"unit\": \"unit.percent\"},\"state\": {\"instance\": \"humidity\",\"value\": 0}}]}"
+          },
+          "ble_temperature": {
+            "label": "temperature",
+            "val": "",
+            "mat": "0.1",
+            "role": "sensor",
+            "class": {
+              "device_class": "temperature",
+              "unit_of_measurement": "°C"
+            },
+            "parsed": "",
+            "ya_rep": "{\"properties\":[{\"type\": \"devices.properties.float\",\"retrievable\": true,\"reportable\": true,\"parameters\": {\"instance\": \"temperature\",\"unit\": \"unit.temperature.celsius\"},\"state\": {\"instance\": \"temperature\",\"value\": 0}}]}"
+          }
+        },
+        "type": "devices.types.sensor"
+      },
+      "description": "https://pvvx.github.io/ATC_MiThermometer/TelinkMiFlasher.html"
+    }
+  },
+  {
+    "LYWSD02": {
+      "template": {
+        "Device": "",
+        "Name": "BLE",
+        "IEEE": "",
+        "ModelId": "BLE",
+        "Location": "Дом",
+        "Img": "img/LYWSD02.jpg",
+        "EP": {},
+        "DevType": "BED",
+        "class": "mi",
+        "Report": {
+          "ble_battery": {
+            "label": "battery",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {
+              "device_class": "battery",
+              "unit_of_measurement": "%"
+            },
+            "parsed": "",
+            "ya_rep": "{\"properties\":[{\"type\":\"devices.properties.float\",\"retrievable\":true,\"reportable\":true,\"parameters\":{\"instance\":\"battery_level\",\"unit\":\"unit.percent\"},\"state\":{\"instance\":\"battery_level\",\"value\":0}}]}"
+          },
+          "ble_humidity": {
+            "label": "humidity",
+            "val": "",
+            "mat": "0.1",
+            "role": "sensor",
+            "class": {
+              "device_class": "humidity",
+              "unit_of_measurement": "%"
+            },
+            "parsed": "",
+            "ya_rep": "{\"properties\":[{\"type\": \"devices.properties.float\",\"retrievable\": true,\"reportable\": true,\"parameters\": {\"instance\": \"humidity\",\"unit\": \"unit.percent\"},\"state\": {\"instance\": \"humidity\",\"value\": 0}}]}"
+          },
+          "ble_temperature": {
+            "label": "temperature",
+            "val": "",
+            "mat": "0.1",
+            "role": "sensor",
+            "class": {
+              "device_class": "temperature",
+              "unit_of_measurement": "°C"
+            },
+            "parsed": "",
+            "ya_rep": "{\"properties\":[{\"type\": \"devices.properties.float\",\"retrievable\": true,\"reportable\": true,\"parameters\": {\"instance\": \"temperature\",\"unit\": \"unit.temperature.celsius\"},\"state\": {\"instance\": \"temperature\",\"value\": 0}}]}"
+          }
+        },
+        "type": "devices.types.sensor"
+      },
+      "description": "BLE-часы Xiaomi: датчик климата с экраном E-Ink"
+    }
+  },
+  {
+    "Mijia": {
+      "template": {
+        "Device": "",
+        "Name": "BLE",
+        "IEEE": "",
+        "ModelId": "BLE",
+        "Location": "Дом",
+        "Img": "img/Mijia.jpg",
+        "EP": {},
+        "DevType": "BED",
+        "class": "mi",
+        "Report": {
+          "ble_battery": {
+            "label": "battery",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {
+              "device_class": "battery",
+              "unit_of_measurement": "%"
+            },
+            "parsed": "",
+            "ya_rep": "{\"properties\":[{\"type\":\"devices.properties.float\",\"retrievable\":true,\"reportable\":true,\"parameters\":{\"instance\":\"battery_level\",\"unit\":\"unit.percent\"},\"state\":{\"instance\":\"battery_level\",\"value\":0}}]}"
+          },
+          "ble_humidity": {
+            "label": "humidity",
+            "val": "",
+            "mat": "0.1",
+            "role": "sensor",
+            "class": {
+              "device_class": "humidity",
+              "unit_of_measurement": "%"
+            },
+            "parsed": "",
+            "ya_rep": "{\"properties\":[{\"type\": \"devices.properties.float\",\"retrievable\": true,\"reportable\": true,\"parameters\": {\"instance\": \"humidity\",\"unit\": \"unit.percent\"},\"state\": {\"instance\": \"humidity\",\"value\": 0}}]}"
+          },
+          "ble_temperature": {
+            "label": "temperature",
+            "val": "",
+            "mat": "0.1",
+            "role": "sensor",
+            "class": {
+              "device_class": "temperature",
+              "unit_of_measurement": "°C"
+            },
+            "parsed": "",
+            "ya_rep": "{\"properties\":[{\"type\": \"devices.properties.float\",\"retrievable\": true,\"reportable\": true,\"parameters\": {\"instance\": \"temperature\",\"unit\": \"unit.temperature.celsius\"},\"state\": {\"instance\": \"temperature\",\"value\": 0}}]}"
+          }
+        },
+        "type": "devices.types.sensor"
+      },
+      "description": "Xiaomi Mijia Bluetooth Hygrothermograph"
+    }
+  },
+  {
+    "Mi_Kettle": {
+      "template": {
+        "Device": "",
+        "Name": "BLE",
+        "IEEE": "",
+        "ModelId": "BLE",
+        "Location": "Дом",
+        "Img": "img/mikettle.jpg",
+        "EP": {},
+        "DevType": "BED",
+        "class": "mi",
+        "Report": {
+          "ble_status": {
+            "label": "Статус",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": ""
+          },
+          "ble_temperature": {
+            "label": "Температура",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {
+              "device_class": "temperature",
+              "unit_of_measurement": "°C"
+            },
+            "parsed": ""
+          }
+        },
+        "type": "devices.types.cooking.kettle"
+      },
+      "description": "Чайник Xiaomi Mi Electric Kettle"
+    }
+  },
+  {
+    "Mi_Flora": {
+      "template": {
+        "Device": "",
+        "Name": "BLE",
+        "IEEE": "",
+        "ModelId": "BLE",
+        "Location": "Дом",
+        "Img": "img/Mi_Flora.jpg",
+        "EP": {},
+        "DevType": "BED",
+        "class": "mi",
+        "Report": {
+          "ble_battery": {
+            "label": "battery",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {
+              "device_class": "battery",
+              "unit_of_measurement": "%"
+            },
+            "parsed": ""
+          },
+          "ble_moisture": {
+            "label": "moisture",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": ""
+          },
+          "ble_fertility": {
+            "label": "fertility",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": ""
+          },
+          "ble_temperature": {
+            "label": "temperature",
+            "val": "",
+            "mat": "0.1",
+            "role": "sensor",
+            "class": {
+              "device_class": "temperature",
+              "unit_of_measurement": "°C"
+            },
+            "parsed": ""
+          }
+        },
+        "type": "devices.types.sensor"
+      },
+      "description": "Xiaomi Mi Plant Flowers"
+    }
+  },
+  {
+    "Mi_ScalesV2": {
+      "template": {
+        "Device": "",
+        "Name": "BLE",
+        "IEEE": "",
+        "ModelId": "BLE",
+        "Location": "Дом",
+        "Img": "img/XMTZC05HM.jpg",
+        "EP": {},
+        "DevType": "BED",
+        "class": "181b",
+        "Report": {
+          "ble_weight": {
+            "label": "weight",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {
+              "device_class": "weight",
+              "unit_of_measurement": "Kg."
+            },
+            "parsed": ""
+          },
+          "ble_impedance": {
+            "label": "impedance",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": ""
+          },
+          "ble_Stabilized": {
+            "label": "Stabilized",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": ""
+          },
+          "ble_loadRemoved": {
+            "label": "loadRemoved",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": ""
+          },
+          "ble_impedanceMeasured": {
+            "label": "impedanceMeasured",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": ""
+          },
+          "ble_unit": {
+            "label": "unit",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": ""
+          }
+        },
+        "type": "devices.types.sensor"
+      },
+      "description": "Xiaomi Mi Body Composition Scales 2 XMTZC05HM (NUN4048GL)"
+    }
+  },
+  {
+    "Redmond": {
+      "template": {
+        "Device": "ecaff7c10cd7",
+        "Name": "BLE",
+        "IEEE": "ecaff7c10cd7",
+        "ModelId": "BLE",
+        "Location": "Дом",
+        "Img": "img/redmond212s.jpg",
+        "EP": {},
+        "DevType": "BED",
+        "class": "r4s212s",
+        "Report": {
+          "ble_CurrentState": {
+            "label": "State",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": "",
+            "ya_rep": "none"
+          },
+          "ble_CurrentTemperature": {
+            "label": "Температура",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {
+              "device_class": "temperature",
+              "unit_of_measurement": "°C"
+            },
+            "parsed": "",
+            "ya_rep": ""
+          },
+          "ble_TargetState": {
+            "label": "Mode",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": "",
+            "ya_rep": "none"
+          },
+          "ble_TargetTemperature": {
+            "label": "TargetTemp",
+            "val": "",
+            "mat": "1",
+            "role": "climate",
+            "class": {
+              "temperature_command_topic": "~/TargetTemp/set",
+              "temperature_state_topic": "~/Температура/state",
+              "current_temperature_topic": "~/Температура/state",
+              "min_temp": "0",
+              "max_temp": "100",
+              "mode_state_topic": "~/State/state",
+              "mode_command_topic": "~/State/set",
+              "temp_step": "5",
+              "modes": [
+                "off",
+                "heat"
+              ]
+            },
+            "parsed": "",
+            "ya_rep": "{\"capabilities\":[{\"type\":\"devices.capabilities.range\",\"retrievable\":true,\"parameters\":{\"instance\":\"temperature\",\"random_access\":true,\"range\":{\"max\":100,\"min\":40,\"precision\":10},\"unit\":\"unit.temperature.celsius\"}},{\"type\":\"devices.capabilities.on_off\",\"retrievable\":true}],\"properties\":[]}"
+          }
+        },
+        "type": "devices.types.cooking.kettle"
+      },
+      "description": "Чайник REDMOND SkyKettle"
+    }
+  },
+  {
+    "Elehant": {
+      "template": {
+        "Device": "",
+        "Name": "BLE",
+        "IEEE": "",
+        "ModelId": "BLE",
+        "Location": "Дом",
+        "Img": "img/elehant.jpg",
+        "EP": {},
+        "DevType": "BED",
+        "class": "elehant",
+        "Report": {
+          "ble_CountNum": {
+            "label": "CountNum",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {
+              "device_class": "battery",
+              "unit_of_measurement": "%"
+            },
+            "parsed": ""
+          },
+          "ble_Count": {
+            "label": "Count",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": ""
+          }
+        },
+        "type": "devices.types.sensor"
+      },
+      "description": "Счетчик Элехант https://elehant.ru/"
+    }
+  },
+  {
+    "ElehantW": {
+      "template": {
+        "Device": "",
+        "Name": "BLE",
+        "IEEE": "",
+        "ModelId": "BLE",
+        "Location": "Дом",
+        "Img": "img/elehant.jpg",
+        "EP": {},
+        "DevType": "BED",
+        "class": "elehantW",
+        "Report": {
+          "ble_CountNum": {
+            "label": "Serial_num",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": ""
+          },
+          "ble_Count": {
+            "label": "Count",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": ""
+          },
+          "ble_Temper": {
+            "label": "Temperature",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {
+              "device_class": "temperature",
+              "unit_of_measurement": "°C"
+            },
+            "parsed": ""
+          }
+        },
+        "type": "devices.types.sensor"
+      },
+      "description": "Счетчик воды Элехант https://elehant.ru/"
+    }
+  },
+  {
+    "Beacon": {
+      "template": {
+        "Device": "",
+        "Name": "BLE",
+        "IEEE": "",
+        "ModelId": "BLE",
+        "Location": "Дом",
+        "Img": "img/beacon.jpg",
+        "EP": {},
+        "DevType": "BED",
+        "class": "beacon",
+        "Report": {
+          "ble_InRange": {
+            "label": "In_range",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": ""
+          },
+          "ble_signal_level": {
+            "label": "Signal_level",
+            "val": "",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": ""
+          }
+        },
+        "type": "devices.types.sensor"
+      },
+      "description": "Маяк, датчик присутствия(любое носимое устройство)"
+    }
+  },
+  {
+    "wp6003": {
+      "template": {
+        "Device": "",
+        "Name": "BLE",
+        "IEEE": "",
+        "ModelId": "BLE",
+        "Location": "Дом",
+        "Img": "img/wp6003.jpg",
+        "EP": {},
+        "DevType": "BED",
+        "class": "wp6003",
+        "Report": {
+          "ble_temperature": {
+            "label": "temperature",
+            "val": "",
+            "mat": "0.1",
+            "role": "sensor",
+            "class": {
+              "device_class": "temperature",
+              "unit_of_measurement": "°C"
+            },
+            "parsed": "",
+            "ya_rep": "{\"properties\":[{\"type\": \"devices.properties.float\",\"retrievable\": true,\"reportable\": true,\"parameters\": {\"instance\": \"temperature\",\"unit\": \"unit.temperature.celsius\"},\"state\": {\"instance\": \"temperature\",\"value\": 0}}]}"
+          },
+          "ble_co2": {
+            "label": "eCO2",
+            "val": "1",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": "1",
+            "ya_rep": "{\"properties\":[{\"type\":\"devices.properties.float\",\"retrievable\":true,\"reportable\":true,\"parameters\":{\"instance\":\"co2_level\",\"unit\":\"unit.ppm\"},\"state\":{\"instance\":\"co2_level\",\"value\":0}}]}"
+          },
+          "ble_tvoc": {
+            "label": "tVOC",
+            "val": "1",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": "1",
+            "ya_rep": "{\"properties\":[{\"type\":\"devices.properties.float\",\"retrievable\":true,\"reportable\":true,\"parameters\":{\"instance\":\"tvoc\",\"unit\":\"unit.density.mcg_m3\"},\"state\":{\"instance\":\"tvoc\",\"value\":0}}]}"
+          },
+          "ble_hcho": {
+            "label": "HCHO",
+            "val": "1",
+            "mat": "1",
+            "role": "sensor",
+            "class": {},
+            "parsed": "1",
+            "ya_rep": "{\"properties\":[{\"type\":\"devices.properties.float\",\"retrievable\":true,\"reportable\":true,\"parameters\":{\"instance\":\"pm1_density\",\"unit\":\"unit.density.mcg_m3\"},\"state\":{\"instance\":\"pm1_density\",\"value\":0}}]}"
+          }
+        },
+        "type": "devices.types.sensor"
+      },
+      "description": "WP6003 Bluetooth Air Quality Detector for PM Formaldehyde TVOC"
+    }
+  }
+]

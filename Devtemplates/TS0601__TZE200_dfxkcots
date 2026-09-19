@@ -1,0 +1,94 @@
+{
+  "Device": "",
+  "IEEE": "",
+  "ModelId": "TS0601",
+  "ManufName": "_TZE200_dfxkcots",
+  "PwrSrc": "",
+  "Name": "Димер",
+  "Location": "Дом",
+  "DevType": "ZR",
+  "leave": 0,
+  "type": "devices.types.light",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0004",
+        "0005",
+        "EF00"
+      ],
+      "ClO": [
+        "0019",
+        "000A"
+      ]
+    }
+  },
+  "Report": {
+    "01EF000001": {
+      "label": "State",
+      "val": 1,
+      "mat": "1",
+      "role": "switch",
+      "parsed": "1",
+      "cfg_report": "",
+      "retain": "0",
+      "ya_rep": {
+        "capabilities": [
+          {
+            "type": "devices.capabilities.on_off",
+            "retrievable": true,
+            "reportable": true,
+            "state": {
+              "instance": "on",
+              "value": false
+            }
+          }
+        ]
+      },
+      "class": {
+        "device_class": "switch"
+      },
+      "time": 1772630845091,
+      "Data": 1
+    },
+    "01EF000002": {
+      "label": "Level",
+      "val": 740,
+      "mat": "0.1",
+      "role": "light",
+      "parsed": "74",
+      "cfg_report": "",
+      "retain": "0",
+      "ya_rep": {
+        "capabilities": [
+          {
+            "type": "devices.capabilities.range",
+            "retrievable": true,
+            "reportable": false,
+            "parameters": {
+              "instance": "brightness",
+              "random_access": true,
+              "range": {
+                "max": 100,
+                "min": 1,
+                "precision": 1
+              },
+              "unit": "unit.percent"
+            },
+            "state": {
+              "instance": "brightness",
+              "value": 1
+            }
+          }
+        ]
+      },
+      "class": {
+        "color_mode": "brightness"
+      },
+      "Data": 910,
+      "time": 1772614334252
+    }
+  },
+  "sh3d": ""
+}

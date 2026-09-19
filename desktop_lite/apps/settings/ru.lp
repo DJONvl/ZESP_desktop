@@ -1,0 +1,21 @@
+{
+  "ui.title": "Настройки",
+  "ui.label": "Настройки",
+  "ui.save": "Сохранить",
+  "ui.save_title": "Сохранить",
+  "ya.qr": "QR-код",
+  "ya.cookie": "Cookie",
+  "ya.close": "✕",
+  "ya.qr_title": "Авторизация по QR",
+  "ya.cookie_title": "Авторизация через Cookie",
+  "ya.qr_wait": "Загрузка QR-кода…",
+  "ya.qr_scan": "Отсканируйте QR в приложении Яндекс",
+  "ya.qr_pending": "Ожидание сканирования…",
+  "ya.cookie_step1": "Откройте https://yandex.ru/iot и авторизуйтесь",
+  "ya.cookie_step2": "F12 → Application → Storage → Cookies → https://yandex.ru",
+  "ya.cookie_step3": "Скопируйте Session_id и вставьте ниже",
+  "ya.sess_placeholder": "Session_id",
+  "ya.ok": "OK",
+  "ya.err_sess": "Session_id некорректен",
+  "ya.err_reg": "активируйте ya_Enable 1, заполните ac_id/ac_login/ac_pass и сохраните"
+}

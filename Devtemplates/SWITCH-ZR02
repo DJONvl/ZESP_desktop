@@ -1,0 +1,42 @@
+{
+  "Device": "842D",
+  "Name": "ночник",
+  "IEEE": "00124B0024C2966D",
+  "ModelId": "SWITCH-ZR02",
+  "Location": "Спальня",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0003",
+        "0004",
+        "0005",
+        "0006",
+        "FC57"
+      ],
+      "ClO": [
+        "0019"
+      ]
+    },
+    "F2": {
+      "PrfId": "A1E0",
+      "ClI": [],
+      "ClO": [
+        "0021"
+      ]
+    }
+  },
+  "DevType": "ZR",
+  "Report": {
+    "0100060000": {
+      "label": "Btn",
+      "val": "00",
+      "mat": "1",
+      "role": "switch",
+      "ya_rep": "",
+      "class": {}
+    }
+  },
+  "type": "devices.types.switch"
+}

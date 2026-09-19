@@ -1,0 +1,46 @@
+{
+  "Device": "",
+  "Name": "Motion_Sensor",
+  "IEEE": "",
+  "ModelId": "Motion_Sensor",
+  "Location": "Дом",
+  "DevType": "ZED",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0003",
+        "0500",
+        "0001"
+      ],
+      "ClO": []
+    }
+  },
+  "Report": {
+    "0100010021": {
+      "label": "Battery",
+      "val": "0x64",
+      "mat": "1",
+      "role": "sensor",
+      "class": {
+        "device_class": "battery"
+      }
+    },
+    "0105000000": {
+      "label": "IAS_ZONE",
+      "val": "0001",
+      "mat": "1",
+      "role": "binary_sensor",
+      "parsed": "0001",
+      "class": {
+        "device_class": "motion",
+        "payload_on": "1",
+        "payload_off": "0"
+      }
+    }
+  },
+  "ClusterToBind": [
+    "010001"
+  ]
+}

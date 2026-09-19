@@ -1,0 +1,66 @@
+{
+  "Device": "E94B",
+  "Name": "TS0505B",
+  "IEEE": "60A423FFFE8A2C49",
+  "ModelId": "TS0505B",
+  "Location": "undefined",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0003",
+        "0004",
+        "0005",
+        "0006",
+        "1000",
+        "0008",
+        "0300"
+      ],
+      "ClO": [
+        "0019",
+        "000A"
+      ]
+    },
+    "F2": {
+      "PrfId": "A1E0",
+      "ClI": [],
+      "ClO": [
+        "0021"
+      ]
+    }
+  },
+  "DevType": "ZR",
+  "Report": {
+    "0100060000": {
+      "label": "On_Off",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "class": {
+        "off_toggle_on": "off_toggle_on",
+        "device_class": "none"
+      }
+    },
+    "0100080000": {
+      "label": "Level_Control",
+      "val": "",
+      "mat": "1",
+      "role": "light",
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "class": {}
+    },
+    "0103000000": {
+      "label": "Color_Control",
+      "val": "",
+      "mat": "1",
+      "role": "light",
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "class": {}
+    }
+  }
+}

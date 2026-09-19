@@ -1,0 +1,114 @@
+{
+  "Device": "AED1",
+  "Name": "ZESP_Router",
+  "IEEE": "00158D0003F0DB37",
+  "ModelId": "ZESP_Router",
+  "Location": "Дом",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0004",
+        "0003",
+        "0006",
+        "0008",
+        "0005",
+        "0300",
+        "FFFF",
+        "1000"
+      ],
+      "ClO": []
+    },
+    "F2": {
+      "PrfId": "A1E0",
+      "ClI": [
+        "0021"
+      ],
+      "ClO": [
+        "0021"
+      ]
+    },
+    "02": {
+      "PrfId": "0104",
+      "ClI": [
+        "0008",
+        "0006"
+      ],
+      "ClO": []
+    },
+    "03": {
+      "PrfId": "0104",
+      "ClI": [
+        "0008"
+      ],
+      "ClO": []
+    }
+  },
+  "DevType": "ZR",
+  "Report": {
+    "0100060000": {
+      "label": "On_Off",
+      "val": "",
+      "mat": "1",
+      "role": "light",
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "ya_rep": "",
+      "class": {}
+    },
+    "0100080000": {
+      "label": "Level",
+      "val": "",
+      "mat": "1",
+      "role": "light",
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "ya_rep": "",
+      "class": {}
+    },
+    "0103000000": {
+      "label": "Color",
+      "val": "",
+      "mat": "1",
+      "role": "light",
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "ya_rep": "none",
+      "class": {}
+    },
+    "0200060000": {
+      "label": "Play",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "ya_rep": "none",
+      "class": {
+        "off_toggle_on": "off_toggle_on",
+        "device_class": "none"
+      }
+    },
+    "0200080000": {
+      "label": "Ringtone",
+      "val": "",
+      "mat": "1",
+      "role": "gen_level",
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "ya_rep": "none",
+      "class": {}
+    },
+    "0300080000": {
+      "label": "Volume",
+      "val": "",
+      "mat": "1",
+      "role": "gen_level",
+      "parsed": "",
+      "ya_rep": "none",
+      "class": {}
+    }
+  },
+  "type": "devices.types.light"
+}
