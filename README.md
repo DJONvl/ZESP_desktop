@@ -24,11 +24,27 @@
 
 ## Установка
 
-### Linux / OpenWrt — одна строка
+### Linux / OpenWrt — выбери свою строку
+
+**Обычная система** (есть wget/curl):
 
 ```sh
 wget https://raw.githubusercontent.com/DJONvl/ZESP_desktop/master/install/install.sh && sh install.sh
 ```
+
+**Голый OpenWrt** (wget без https):
+
+```sh
+uclient-fetch -O install.sh https://raw.githubusercontent.com/DJONvl/ZESP_desktop/master/install/install.sh && sh install.sh
+```
+
+**Совсем нет качалок** — закинь два файла с ПК в `/tmp` железки (по scp/WinSCP) и запусти офлайн:
+
+```sh
+LOCAL_TGZ=/tmp/zesp.tgz sh install.sh
+```
+
+Нужны: сам `install.sh` (папка [`install/`](install/) этого репо) + архив под твою архитектуру из таблицы выше. Живой `opkg`, но нет качалок — сначала `opkg update && opkg install curl`, дальше способ 1.
 
 Нет `wget` с https (голый OpenWrt) — так:
 
