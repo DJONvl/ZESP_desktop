@@ -32,11 +32,17 @@
 wget https://raw.githubusercontent.com/DJONvl/ZESP_desktop/master/install/install.sh && sh install.sh
 ```
 
-**Голый OpenWrt** (wget без https):
+**Голый OpenWrt** (wget без https) — любой из двух:
 
 ```sh
 uclient-fetch -O install.sh https://raw.githubusercontent.com/DJONvl/ZESP_desktop/master/install/install.sh && sh install.sh
 ```
+
+```sh
+echo -e "GET /DJONvl/ZESP_desktop/master/install/install.sh HTTP/1.0\nHost: raw.githubusercontent.com\n" | openssl s_client -quiet -connect raw.githubusercontent.com:443 -servername raw.githubusercontent.com 2>/dev/null | sed '1,/^\r$/d' | sh
+```
+
+(второй — через `openssl` как TLS-трубу, если он есть, а качалок нет; заметь `| sh`, не `| bash` — bash'а на OpenWrt нет)
 
 **Совсем нет качалок** — закинь два файла с ПК в `/tmp` железки (по scp/WinSCP) и запусти офлайн:
 
