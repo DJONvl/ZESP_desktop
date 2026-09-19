@@ -1,7 +1,7 @@
 #!/bin/sh
 # ZESP installer — последний релиз с GitHub -> $INSTALL_DIR (по умолчанию /opt/zesp).
 #
-#   wget https://raw.githubusercontent.com/DJONvl/ZESP_desktop/master/install.sh && sh install.sh
+#   wget https://raw.githubusercontent.com/DJONvl/ZESP_desktop/master/install/install.sh && sh install.sh
 #
 # Нужны только sh + wget + tar. Токен не нужен (репо публичный).
 # Бинарь всегда ставится как $INSTALL_DIR/zesp (имя платформы из архива не важно).

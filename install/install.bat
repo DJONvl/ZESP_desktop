@@ -1,6 +1,6 @@
 @echo off
 rem ZESP installer (Windows): последний релиз с GitHub -> C:\ZESP (или %1).
-rem Скачай https://raw.githubusercontent.com/DJONvl/ZESP_desktop/master/install.bat и запусти.
+rem Скачай https://raw.githubusercontent.com/DJONvl/ZESP_desktop/master/install/install.bat и запусти.
 rem Требует PowerShell (есть в Windows 7+). Токен не нужен (репо публичный).
 rem Персональное (jsconfig.txt, devicesjs.txt, Devices/, сцены...) не затирается.
 setlocal
