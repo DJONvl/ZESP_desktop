@@ -37,7 +37,11 @@ if errorlevel 1 (
     exit /b 1
 )
 
-if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
+if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%" 2>nul
+if not exist "%INSTALL_DIR%" (
+    echo No write access to %INSTALL_DIR% - run as admin or pass another path: install.bat D:\ZESP >&2
+    exit /b 1
+)
 rem бинарь и стартер всегда свежие (если сервер запущен — сначала останови)
 copy /y "%TMPDIR%\pkg\zesp_*.exe" "%INSTALL_DIR%\" >nul
 if errorlevel 1 (

@@ -10,7 +10,12 @@
 set -e
 
 REPO="DJONvl/ZESP_desktop"
-INSTALL_DIR="${INSTALL_DIR:-/opt/zesp}"
+# root -> /opt/zesp, обычный юзер -> ~/zesp (в /opt ему писать не дадут).
+# Переопределить: INSTALL_DIR=/root/zesp sh install.sh
+if [ -z "$INSTALL_DIR" ]; then
+  if [ "$(id -u)" = 0 ]; then INSTALL_DIR=/opt/zesp; else INSTALL_DIR=$HOME/zesp; fi
+fi
+[ -z "$INSTALL_DIR" ] && die "cannot determine install dir (no HOME?)"
 SKIP="jsconfig.txt devicesjs.txt Devices scenes.json groups.json location.json workspace.xml"
 
 die() { echo "ERROR: $1" >&2; exit 1; }
@@ -64,8 +69,8 @@ for src in "$TMP"/desktop/*; do
   cp -r "$src" "$INSTALL_DIR/desktop/$base"
 done
 
-# --- автозапуск ---
-if [ -d /run/systemd/system ]; then
+# --- автозапуск (системный юнит — только под рутом) ---
+if [ -d /run/systemd/system ] && [ "$(id -u)" = 0 ]; then
   cat > /etc/systemd/system/zesp.service <<EOF
 [Unit]
 Description=ZESP smart home server
@@ -82,9 +87,9 @@ EOF
   systemctl enable --now zesp
   echo "service zesp enabled and started"
 else
-  echo "no systemd detected (e.g. OpenWrt/procd):"
+  echo "no system autostart (no systemd or not root):"
   echo "  start manually: $INSTALL_DIR/zesp"
-  echo "  or add to /etc/rc.local"
+  echo "  or add to crontab (@reboot) / /etc/rc.local"
 fi
 
 echo "DONE: $INSTALL_DIR/zesp ($TAG)"
