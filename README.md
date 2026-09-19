@@ -1,38 +1,45 @@
 # ZESP
 
-Сервер умного дома с веб-интерфейсом: Zigbee-координатор, устройства, карта сети, Blockly-автоматизация, сцены, 3D-план дома, MQTT + Home Assistant, Яндекс-колонки.
+Сервер умного дома с веб-интерфейсом. Ставится на роутер с OpenWrt, Raspberry Pi, мини-ПК, обычный Windows-компьютер или Mac. Умеет: Zigbee-устройства, карту сети, автоматизацию (Blockly), сцены, 3D-план дома, MQTT + Home Assistant, Яндекс-колонки.
 
-## Что нужно
+## Что понадобится
 
-* **Железо**: роутер с OpenWrt, Raspberry Pi, мини-ПК, Windows-ПК или Mac.
-* **Zigbee-адаптер** (один из): ZiGate, ZBoss (Nordic), TI Z-Stack (CC2530/CC2531/CC2652 — режим `znp`), EmberZNet/EZSP (EFR32, SkyConnect, Sonoff ZBDongle-E), Telink. Можно и без адаптера — тогда только колонки/сцены/автоматизация.
-* Остальное опционально: MQTT-брокер, аккаунт Яндекса (колонки), Telegram-бот.
+Железка: роутер с OpenWrt, Raspberry Pi, мини-ПК, Windows-ПК или Mac.
 
-## Какой архив качать
+Zigbee-адаптер (одна из «флешек»): ZiGate, ZBoss, TI Z-Stack (CC2530/CC2531/CC2652), EmberZNet/EZSP (EFR32, SkyConnect, Sonoff ZBDongle-E), Telink.
+
+Можно и без адаптера — тогда будут только колонки, сцены и автоматизация, без Zigbee-устройств.
+
+Остальное по желанию: MQTT-брокер, аккаунт Яндекса (для колонок), Telegram-бот.
+
+## Какой файл скачивать
 
 Со страницы [Releases](https://github.com/DJONvl/ZESP_desktop/releases):
 
 | У тебя | Файл |
 |---|---|
-| Windows 64-bit | `zesp_windows_x64.zip` |
-| Windows 32-bit | `zesp_windows_x86.zip` |
-| Linux ПК (x64) | `zesp_linux_amd64.tar.gz` |
-| Raspberry Pi 4/5, ARM64 | `zesp_linux_arm64.tar.gz` |
-| Raspberry Pi 2/3, ARMv7 | `zesp_linux_armv7l.tar.gz` |
-| Роутер OpenWrt | ставь скриптом ниже (сам выберет) |
-| macOS Intel / Apple Silicon | `zesp_darwin_amd64` / `zesp_darwin_arm64.tar.gz` |
+| Обычный Windows-компьютер (64-bit) | `zesp_windows_x64.zip` |
+| Старый Windows (32-bit) | `zesp_windows_x86.zip` |
+| Linux-ПК (64-bit) | `zesp_linux_amd64.tar.gz` |
+| Raspberry Pi 4 или 5 | `zesp_linux_arm64.tar.gz` |
+| Raspberry Pi 2 или 3 | `zesp_linux_armv7l.tar.gz` |
+| Роутер OpenWrt | ничего не качай — ставь скриптом ниже, он сам выберет |
+| Mac (Intel) | `zesp_darwin_amd64.tar.gz` |
+| Mac (M1/M2/M3) | `zesp_darwin_arm64.tar.gz` |
+
+Если не знаешь, 32-bit у тебя или 64-bit — на Windows посмотри «Параметры → Система → О системе». На Raspberry Pi модель написана на корпусе.
 
 ## Установка
 
 ### Linux / OpenWrt — выбери свою строку
 
-**Обычная система** (есть wget/curl):
+Обычная система (есть wget или curl):
 
 ```sh
 wget https://raw.githubusercontent.com/DJONvl/ZESP_desktop/master/install/install.sh && sh install.sh
 ```
 
-**Голый OpenWrt** (wget без https) — любой из двух:
+Голый OpenWrt (wget без https) — любой из двух:
 
 ```sh
 uclient-fetch -O install.sh https://raw.githubusercontent.com/DJONvl/ZESP_desktop/master/install/install.sh && sh install.sh
@@ -43,52 +50,53 @@ printf 'GET /DJONvl/ZESP_desktop/master/install/install.sh HTTP/1.0\r\nHost: raw
 grep -q '^REPO=' install.sh && sh install.sh || echo DOWNLOAD FAILED
 ```
 
-(второй — через `openssl` как TLS-трубу, если он есть, а качалок нет; заметь `| sh`, не `| bash` — bash'а на OpenWrt нет. Вставлять строго одной строкой: разорванная вставка — главная причина молчаливых fails. Проверка `grep` не даст запустить пустой файл)
+Второй способ — через openssl, если он есть, а качалок нет. Вставлять строго одной строкой: разорванная вставка — главная причина молчаливых fails. grep не даст запустить пустой файл.
 
-**Совсем нет качалок** — закинь два файла с ПК в `/tmp` железки (по scp/WinSCP) и запусти офлайн:
+Совсем нет качалок — закинь два файла с ПК в `/tmp` железки (по scp/WinSCP) и запусти офлайн:
 
 ```sh
 LOCAL_TGZ=/tmp/zesp.tgz sh install.sh
 ```
 
-Нужны: сам `install.sh` (папка [`install/`](install/) этого репо) + архив под твою архитектуру из таблицы выше. Живой `opkg`, но нет качалок — сначала `opkg update && opkg install curl`, дальше способ 1.
+Нужны: сам `install.sh` (папка [`install/`](install/) этого репо) + архив под твою архитектуру из таблицы выше.
 
-Нет `wget` с https (голый OpenWrt) — так:
+Если opkg живой, а качалок нет — сначала `opkg update && opkg install curl`, дальше способ 1.
 
-```sh
-uclient-fetch -O install.sh https://raw.githubusercontent.com/DJONvl/ZESP_desktop/master/install/install.sh && sh install.sh
-```
-
-Поставит последний релиз в `/opt/zesp` (бинарь как `zesp`, фронт рядом), под рутом добавит systemd-юнит. Из-под юзера ставится в `~/zesp`. Подробнее и особые случаи — [install/install.sh](install/install.sh).
+Установка идёт в `/opt/zesp` (бинарь `zesp` + фронт рядом). Под рутом добавится systemd-юнит. Из-под юзера — в `~/zesp`. Подробности — [install/install.sh](install/install.sh).
 
 ### Windows
 
-Скачай [`install/install.bat`](install/install.bat) и запусти — последний релиз распакуется в `C:\ZESP`, на рабочем столе появится ярлык ZESP.
+Скачай [`install/install.bat`](install/install.bat) и запусти. Всё распакуется в `C:\ZESP`, на рабочем столе появится ярлык ZESP. Запускай только через ярлык (или `zesp_start.bat`) — он сам перезапускает сервер и применяет обновления.
 
-### Вручную
+### Вручную (если хочется)
 
-1. Забери архив под свою платформу (таблица выше).
+1. Скачай архив под свою платформу.
 2. Распакуй: внутри бинарь + папка `desktop/` (+ `zesp_start.bat` на Windows).
-3. Запусти: на Windows — **через `zesp_start.bat`** (супервизор: сам перезапускает сервер и применяет обновления), на Linux — `./zesp`.
-4. Открой `http://<ip>:8081`. Порты: `8081` — веб, `8181` — WebSocket.
+3. Запусти: на Windows — через `zesp_start.bat`, на Linux — `./zesp`.
+4. Открой `http://<ip-железки>:8081`. Порты: `8081` — веб, `8181` — WebSocket.
 
 При первом старте недостающие конфиги создаются сами из шаблонов (`.tpl`).
 
 ## Первый запуск (5 минут)
 
-1. Открой вебморду: `http://<ip-железки>:8081`.
-2. Настройки → **ZIGBEE**: выбери свой адаптер (Adapter), укажи порт (Transport: `COMx` на Windows, `/dev/tty*` на Linux, `host:ip:port` для сетевого). Остальное (скорость, канал, PanID) — по умолчанию. Сохрани. Смена адаптера требует рестарта.
-3. В списке устройств найди **Coordinator** → включи **PermitJoin**.
-4. Переведи Zigbee-устройство в режим спаривания (обычно долгое нажатие кнопки) — оно появится в списке. Дай имя и комнату.
+1. Открой в браузере `http://<ip-железки>:8081`.
+2. Настройки → **ZIGBEE**: выбери свой адаптер (Adapter), укажи порт:
+   - Windows — COMx (например COM3),
+   - Linux — /dev/tty... (например /dev/ttyUSB0),
+   - сетевой — host:ip:port.
+
+   Остальное (скорость, канал, PanID) оставь по умолчанию. Сохрани. Смена адаптера требует перезапуска сервера.
+3. В списке устройств найди **Coordinator** → включи **PermitJoin** (это режим «разрешаю новым устройствам подключиться»).
+4. Переведи Zigbee-устройство в режим спаривания (обычно долгое нажатие кнопки) — оно появится в списке. Дай ему имя и комнату.
 5. Дальше по вкусу: сцены, Blockly-автоматизация, MQTT/Home Assistant, Яндекс-колонки — всё в настройках.
 
 ## Обновления
 
-Сервер проверяет [Releases](https://github.com/DJONvl/ZESP_desktop/releases) сам: кнопка «Обновление» в настройках (APP) скачивает архив под твою платформу, меняет бинарь (старый остаётся как `.old`) и фронт, потом просит рестарт. Настройки и устройства при этом не трогаются.
+Сервер сам проверяет [Releases](https://github.com/DJONvl/ZESP_desktop/releases). В настройках (APP) есть кнопка «Обновление» — она скачает архив под твою платформу, заменит файл программы (старый останется как `.old`) и фронт, потом попросит перезапуск. Настройки и устройства при этом не трогаются.
 
-## Структура
+## Что где лежит (для любопытных)
 
-```
+```text
 desktop_lite/apps/   виджеты: devicemanager, devices, zigbeemap, blockly,
                      scenes, sh3d, templateedit, settings, yammanager
 desktop_lite/js/     движок окон, сокеты, локализация
@@ -99,6 +107,12 @@ img/                 фото устройств
 install/             скрипты установки (в релизные архивы НЕ пакуются)
 ```
 
-## Персональные файлы (в git не входят)
+## Личные файлы (в git не попадают)
 
-`jsconfig.txt` (настройки+токены), `devicesjs.txt`, `Devices/`, `scenes.json`, `groups.json`, `location.json`, `workspace.xml` — живут только на твоей машине. Не коммить и не выкладывай: там токены.
+`jsconfig.txt` (настройки + токены), `devicesjs.txt`, `Devices/`, `scenes.json`, `groups.json`, `location.json`, `workspace.xml` — живут только на твоей машине. Никому не выкладывай: там токены.
+
+## Если что-то пошло не так
+
+* Не открывается страница — проверь, что сервер запущен, и что порт 8081 не занят.
+* Zigbee-устройство не находится — включён ли PermitJoin, тот ли порт адаптера, в режиме ли спаривания само устройство.
+* После обновления ничего не работает — перезапусти сервер и смотри лог; крайний случай — верни `.old` обратно вместо бинаря.
