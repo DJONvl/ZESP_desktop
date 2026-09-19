@@ -1,6 +1,6 @@
 ﻿*.pyc
 __pycache__/
-Devices/
+/Devices/
 devicesjs.txt
 jsconfig.txt
 

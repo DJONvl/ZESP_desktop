@@ -247,7 +247,8 @@
   // ---------- загрузка workspace.xml + toolbox.xml ----------
   function loadXml() {
     Promise.all(['workspace.xml', 'toolbox.xml'].map(function (file) {
-      return fetch(file).then(function (r) { return r.text(); });
+      // файла может не быть (чистая установка) — тогда пустой workspace вместо 404-страницы
+      return fetch(file).then(function (r) { return r.ok ? r.text() : '<xml xmlns="https://developers.google.com/blockly/xml"></xml>'; });
     })).then(function (xmls) {
       xmls.forEach(function (xml) {
         var parser = new DOMParser();
