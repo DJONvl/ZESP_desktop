@@ -56,7 +56,13 @@ echo "Installing ZESP $TAG ($ASSET) -> $INSTALL_DIR"
 URL="https://github.com/$REPO/releases/download/$TAG/$ASSET"
 TMP="$(mktemp -d)" || die "mktemp failed"
 trap 'rm -rf "$TMP"' EXIT INT TERM
-fetch "$URL" "$TMP/pkg.tgz" || die "download failed"
+if [ -n "$LOCAL_TGZ" ]; then
+  # офлайн: архив уже закинут на железку (scp/cat), качать нечего
+  echo "Using local archive: $LOCAL_TGZ"
+  cp "$LOCAL_TGZ" "$TMP/pkg.tgz" || die "cannot read $LOCAL_TGZ"
+else
+  fetch "$URL" "$TMP/pkg.tgz" || die "download failed"
+fi
 tar -xzf "$TMP/pkg.tgz" -C "$TMP" || die "extract failed"
 
 # --- бинарь -> zesp (всегда свежий) ---
