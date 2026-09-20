@@ -48,13 +48,13 @@ case "$ARCH" in
 esac
 fi
 
-# --- последний релиз ---
-# Качалки может не быть вовсе — тогда сразу говорим как ставить офлайн.
-if ! command -v curl >/dev/null 2>&1 && ! command -v uclient-fetch >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
-  die "no downloader found. Offline way: copy .tgz + install.sh to box (scp), then LOCAL_TGZ=/tmp/x.tgz sh install.sh"
+# --- последний релиз (офлайну версия не нужна — только для логов) ---
+if [ -n "$LOCAL_TGZ" ]; then
+  TAG="${TAG:-local}"
+else
+  TAG="$(fetch "https://api.github.com/repos/$REPO/releases/latest" - 2>/dev/null | grep '"tag_name"' | cut -d'"' -f4)"
+  [ -z "$TAG" ] && die "cannot get latest release (no network? wget without https? try uclient-fetch or LOCAL_TGZ offline mode — see README)"
 fi
-TAG="$(fetch "https://api.github.com/repos/$REPO/releases/latest" - 2>/dev/null | grep '"tag_name"' | cut -d'"' -f4)"
-[ -z "$TAG" ] && die "cannot get latest release (no network? wget without https? try uclient-fetch or LOCAL_TGZ offline mode — see README)"
 echo "Installing ZESP $TAG ($ASSET) -> $INSTALL_DIR"
 
 URL="https://github.com/$REPO/releases/download/$TAG/$ASSET"
