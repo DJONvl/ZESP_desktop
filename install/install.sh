@@ -60,14 +60,24 @@ echo "Installing ZESP $TAG ($ASSET) -> $INSTALL_DIR"
 URL="https://github.com/$REPO/releases/download/$TAG/$ASSET"
 TMP="$(mktemp -d)" || die "mktemp failed"
 trap 'rm -rf "$TMP"' EXIT INT TERM
+# распаковка tgz: у голого busybox tar нет флага -z — идём через gzip, иначе напрямую
+untgz() { # untgz FILE DEST
+  if command -v gzip >/dev/null 2>&1 && gzip -dc "$1" 2>/dev/null | tar -xf - -C "$2"; then return 0; fi
+  tar -xzf "$1" -C "$2"
+}
+
 if [ -n "$LOCAL_TGZ" ]; then
-  # офлайн: архив уже закинут на железку (scp/cat), качать нечего
+  # офлайн: архив уже закинут на железку (scp), качать нечего.
+  # Имя файла сверяем с детектом: не тот ассет под эту архитектуру — сразу говорим.
+  case "$(basename "$LOCAL_TGZ")" in
+    zesp_*) [ "$(basename "$LOCAL_TGZ")" = "$ASSET" ] || echo "WARNING: archive $(basename "$LOCAL_TGZ") != detected $ASSET for this box" ;;
+  esac
   echo "Using local archive: $LOCAL_TGZ"
   cp "$LOCAL_TGZ" "$TMP/pkg.tgz" || die "cannot read $LOCAL_TGZ"
 else
   fetch "$URL" "$TMP/pkg.tgz" || die "download failed"
 fi
-tar -xzf "$TMP/pkg.tgz" -C "$TMP" || die "extract failed"
+untgz "$TMP/pkg.tgz" "$TMP" || die "extract failed (no gzip on box?)"
 
 # --- бинарь -> zesp (всегда свежий) ---
 BIN=""
