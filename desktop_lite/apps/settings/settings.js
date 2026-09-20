@@ -17,9 +17,17 @@
 .win-settings .s-group{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px}
 .win-settings .s-group>label{font-size:11px;color:var(--muted);min-width:90px;text-transform:uppercase;letter-spacing:.4px;flex:1}
 .win-settings .s-group input{background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:6px 8px;font-size:12.5px;flex:1;min-width:120px}
-.win-settings .s-group input:focus,.win-settings select:focus{outline:none;border-color:var(--accent)}
-.win-settings select{background:var(--bg);border:1px solid var(--border2);color:var(--accent);padding:4px;cursor:pointer;flex-shrink:0}
-.win-settings select option{color:var(--text);background:var(--bg)}
+.win-settings .s-group input:focus{outline:none;border-color:var(--accent)}
+.win-settings .s-combo{position:relative;flex:1;display:flex;min-width:120px}
+.win-settings .s-combo input{width:100%;min-width:0;flex:1;padding-right:32px}
+.win-settings .s-pick{position:absolute;right:1px;top:1px;bottom:1px;width:28px;flex:none;border:none;border-left:1px solid var(--border2);border-radius:0 3px 3px 0;background-color:transparent;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2388909c' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:center;padding:0;cursor:pointer;color:var(--muted);font-size:0;line-height:0}
+.win-settings .s-pick:hover{background-color:var(--hover)}
+.win-settings .s-pick:focus{outline:none;border-left-color:var(--accent)}
+.win-settings .s-drop{position:absolute;top:calc(100% + 2px);left:0;right:0;background:var(--bg);border:1px solid var(--border2);border-radius:4px;max-height:180px;overflow-y:auto;z-index:50;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.win-settings .s-drop[hidden]{display:none}
+.win-settings .s-opt{padding:6px 8px;font-size:12.5px;color:var(--text);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.win-settings .s-opt:hover{background:var(--hover)}
+.win-settings .s-opt.cur{color:var(--accent);font-weight:600}
 .win-settings button{background:var(--accent);border:none;color:#fff;padding:7px 14px;cursor:pointer;font-size:12.5px;font-weight:600}
 .win-settings button:hover{background:var(--accent-dark)}
 .ya-backdrop{position:fixed;inset:0;z-index:2147483003;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center}
@@ -38,7 +46,7 @@
 `;
 
   // ---------------- helpers ----------------
-  function esc(v) { return String(v).replace(/"/g, '&quot;'); }
+  function esc(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function setByPath(node, key, value) {
     var a = key.split('.');
     var obj = node._state.cfg && node._state.cfg[a[0]];
@@ -83,10 +91,16 @@
       return '<div class="s-group"><label>' + prop + '</label><button data-action="' + act + '">' + ((val && val.label) || prop) + '</button></div>';
     }
     if (val && typeof val === 'object' && 'val' in val) {
-      var opts = (val.list || []).map(function (o) { return '<option>' + o + '</option>'; }).join('');
+      var list = val.list || [];
+      var cur = String(val.val == null ? '' : val.val);
+      var opts = list.map(function (o) {
+        var s = String(o);
+        return '<div class="s-opt' + (s === cur ? ' cur' : '') + '" data-val="' + esc(s) + '">' + esc(s) + '</div>';
+      }).join('');
       return '<div class="s-group"><label>' + prop + '</label>' +
-        '<select data-cfg="' + section + '.' + prop + '">' + opts + '</select>' +
-        '<input data-cfg="' + section + '.' + prop + '" value="' + esc(val.val) + '"></div>';
+        '<div class="s-combo"><input data-cfg="' + section + '.' + prop + '" value="' + esc(val.val) + '" autocomplete="off">' +
+        '<button type="button" class="s-pick" tabindex="-1" title="Выбрать из списка">▾</button>' +
+        '<div class="s-drop" hidden>' + opts + '</div></div></div>';
     }
     return '<div class="s-group"><label>' + prop + '</label><input data-cfg="' + section + '.' + prop + '" value="' + esc(val || '') + '"></div>';
   }
@@ -220,9 +234,33 @@
         window.WSsend('loadConfig');
       }
 
+      function closeDrops() { node.querySelectorAll('.s-drop').forEach(function (d) { d.hidden = true; }); }
+      function toggleDrop(combo) {
+        if (!combo) return;
+        var drop = combo.querySelector('.s-drop');
+        if (!drop) return;
+        var willOpen = drop.hidden;
+        closeDrops();
+        if (willOpen) drop.hidden = false;
+      }
+      function markCur(combo, v) {
+        combo.querySelectorAll('.s-opt').forEach(function (o) { o.classList.toggle('cur', o.dataset.val === v); });
+      }
+
       node.addEventListener('click', function (e) {
         var tab = e.target.closest('[data-tab]');
-        if (tab) return selectTab(node, tab.dataset.tab);
+        if (tab) { closeDrops(); return selectTab(node, tab.dataset.tab); }
+        var pick = e.target.closest('.s-pick');
+        if (pick) { toggleDrop(pick.closest('.s-combo')); return; }
+        var opt = e.target.closest('.s-opt');
+        if (opt) {
+          var combo = opt.closest('.s-combo');
+          var inp = combo && combo.querySelector('input[data-cfg]');
+          if (inp) { inp.value = opt.dataset.val; markCur(combo, inp.value); comboCommit(inp.dataset.cfg, inp.value); }
+          closeDrops();
+          return;
+        }
+        if (!e.target.closest('.s-combo')) closeDrops();
         var b = e.target.closest('[data-action]');
         if (!b) return;
         var act = b.dataset.action;
@@ -233,27 +271,63 @@
         if (typeof window[act] === 'function') return window[act]();
       });
 
-      node.addEventListener('change', function (e) {
-        var sel = e.target.closest('select[data-cfg]');
-        if (!sel) return;
-        var group = sel.closest('.s-group');
-        var inp = group && group.querySelector('input[data-cfg]');
-        if (inp) inp.value = sel.value;
-        setByPath(node, sel.dataset.cfg, sel.value);
-        var arr = sel.dataset.cfg.split('.');
-        var o = (node._state.cfg || {})[arr[0]];
-        if (o && o[arr[1]] && o[arr[1]].onchange && window[o[arr[1]].onchange]) window[o[arr[1]].onchange](sel.value);
-        if (arr[0] === 'APP' && arr[1] === 'agent' && sel.value) {
-          if (typeof loadAgent === 'function') loadAgent(sel.value); // мгновенная смена агента без перезагрузки
+      // Коммит значения комбобокса (input + свой выпадающий список): обновить cfg и мгновенные сайд-эффекты.
+      // Сайд-эффекты (смена агента/языка/onchange) — только если значение из списка,
+      // чтобы опечатка в ручном вводе ничего не ломала до нажатия «Сохранить».
+      function comboCommit(key, value) {
+        if (!node._state) return;
+        var st = node._state;
+        st._comboDone = st._comboDone || {};
+        if (st._comboDone[key] === value) return;
+        st._comboDone[key] = value;
+        setByPath(node, key, value);
+        var arr = key.split('.');
+        var o = (st.cfg || {})[arr[0]];
+        var entry = o && o[arr[1]];
+        var list = entry && entry.list;
+        var valid = !list || list.map(String).indexOf(String(value)) >= 0;
+        if (entry && entry.onchange && window[entry.onchange]) { try { window[entry.onchange](value); } catch (_) {} }
+        if (arr[0] === 'APP' && arr[1] === 'agent' && value && valid) {
+          if (typeof loadAgent === 'function') loadAgent(value); // мгновенная смена агента без перезагрузки
         }
-        if (arr[0] === 'APP' && arr[1] === 'Lang' && sel.value && window.L) {
-          L.lang = sel.value; // мгновенная смена языка интерфейса
+        if (arr[0] === 'APP' && arr[1] === 'Lang' && value && valid && window.L) {
+          L.lang = value; // мгновенная смена языка интерфейса
           L.ready('settings').then(function () {
             L.applyLang(document);
             if (window.WinEngine && window.WinEngine.applyLang) window.WinEngine.applyLang();
           });
         }
+      }
+
+      node.addEventListener('input', function (e) {
+        var inp = e.target.closest && e.target.closest('.s-combo input[data-cfg]');
+        if (!inp || !node._state) return;
+        // Мгновенная реакция при точном совпадении со списком (выбор из выпадашки
+        // или допечатали вручную). change — только при blur/Enter.
+        var arr = inp.dataset.cfg.split('.');
+        var sec = (node._state.cfg || {})[arr[0]];
+        var entry = sec && sec[arr[1]];
+        var list = entry && entry.list;
+        if (!list) return;
+        if (list.map(String).indexOf(inp.value) >= 0) {
+          comboCommit(inp.dataset.cfg, inp.value);
+          var combo = inp.closest('.s-combo');
+          if (combo) markCur(combo, inp.value);
+        }
       });
+
+      node.addEventListener('change', function (e) {
+        var inp = e.target.closest && e.target.closest('.s-combo input[data-cfg]');
+        if (!inp) return;
+        comboCommit(inp.dataset.cfg, inp.value);
+      });
+
+      node.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeDrops();
+      });
+      // Клик вне окна настроек — закрыть раскрытый список
+      node._state.onDoc = function (ev) { if (!node.contains(ev.target)) closeDrops(); };
+      document.addEventListener('pointerdown', node._state.onDoc);
     },
 
     destroy(node) {
@@ -263,6 +337,7 @@
         if (st && st.onCfg) window.eventE.off('jsconfig', st.onCfg);
         if (st && st.onYa) window.eventE.off('yaLogin', st.onYa);
       }
+      if (st && st.onDoc) document.removeEventListener('pointerdown', st.onDoc);
       var bd = node.querySelector('.ya-backdrop');
       if (bd && bd.parentNode) bd.parentNode.removeChild(bd);
       node._state = null;
