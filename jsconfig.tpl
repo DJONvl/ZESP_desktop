@@ -30,6 +30,16 @@
     "version": "dev"
   },
   "ZIGBEE": {
+    "Board": {
+      "val": "",
+      "list": [
+        "custom",
+        "DGNWG05LM",
+        "mts-hc-001",
+        "YNDX-00055(Duo)",
+        "YNDX-00510(Hub)"
+      ]
+    },
     "Adapter": {
       "val": "zigate",
       "list": [

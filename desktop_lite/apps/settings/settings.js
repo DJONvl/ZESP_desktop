@@ -59,6 +59,40 @@
     if (el && el.tagName === 'INPUT') el.value = value;
   }
 
+  // Board-пресеты: list из одно-ключевых объектов {"имя платы": {поле: значение}}.
+  // Обычные списки — массив строк. "custom" — пустой пресет {}, ручной режим.
+  function isBoardList(list) {
+    return Array.isArray(list) && list.length > 0 && typeof list[0] === 'object' && list[0] !== null && !Array.isArray(list[0]);
+  }
+  function boardNames(list) {
+    if (!isBoardList(list)) return [];
+    return list.map(function (item) { return String(Object.keys(item)[0]); });
+  }
+  function boardPreset(list, name) {
+    if (!isBoardList(list)) return null;
+    for (var i = 0; i < list.length; i++) {
+      if (String(Object.keys(list[i])[0]) === String(name)) return list[i][Object.keys(list[i])[0]] || {};
+    }
+    return null;
+  }
+  // Раскладывает пресет платы по полям секции (инпуты + cfg). Пустой пресет (custom) — ничего не делает.
+  function applyBoardPreset(node, section, boardName) {
+    var st = node._state;
+    if (!st) return;
+    var sec = (st.cfg || {})[section];
+    if (!sec) return;
+    var preset = boardPreset(sec.Board && sec.Board.list, boardName);
+    if (!preset) return;
+    Object.keys(preset).forEach(function (k) {
+      if (!(k in sec)) return; // неизвестных полей не трогаем
+      var v = String(preset[k] == null ? '' : preset[k]);
+      setByPath(node, section + '.' + k, v);
+      var el = node.querySelector('input[data-cfg="' + section + '.' + k + '"]');
+      if (el) el.value = v;
+      st._comboDone = st._comboDone || {};
+      st._comboDone[section + '.' + k] = v;
+    });
+  }
   // ---------------- render ----------------
   function render(node, data) {
     var st = node._state;
@@ -93,12 +127,14 @@
     if (val && typeof val === 'object' && 'val' in val) {
       var list = val.list || [];
       var cur = String(val.val == null ? '' : val.val);
-      var opts = list.map(function (o) {
-        var s = String(o);
+      var isBoard = isBoardList(list);
+      var names = isBoard ? boardNames(list) : list.map(String);
+      var opts = names.map(function (s) {
         return '<div class="s-opt' + (s === cur ? ' cur' : '') + '" data-val="' + esc(s) + '">' + esc(s) + '</div>';
       }).join('');
+      var ph = (isBoard && !cur) ? ' placeholder="выберите плату…"' : '';
       return '<div class="s-group"><label>' + prop + '</label>' +
-        '<div class="s-combo"><input data-cfg="' + section + '.' + prop + '" value="' + esc(val.val) + '" autocomplete="off">' +
+        '<div class="s-combo"><input data-cfg="' + section + '.' + prop + '" value="' + esc(val.val) + '" autocomplete="off"' + ph + '>' +
         '<button type="button" class="s-pick" tabindex="-1" title="Выбрать из списка">▾</button>' +
         '<div class="s-drop" hidden>' + opts + '</div></div></div>';
     }
@@ -282,10 +318,13 @@
         st._comboDone[key] = value;
         setByPath(node, key, value);
         var arr = key.split('.');
+        if (arr[1] === 'Board') applyBoardPreset(node, arr[0], value); // выбор платы — разложить пресет по полям
+        // Ручные правки других полей Board не сбрасывают: пресет — это стартовые
+        // значения, дальше пользователь волен менять скорость и т.д., плата остаётся выбранной.
         var o = (st.cfg || {})[arr[0]];
         var entry = o && o[arr[1]];
         var list = entry && entry.list;
-        var valid = !list || list.map(String).indexOf(String(value)) >= 0;
+        var valid = !list || (isBoardList(list) ? boardNames(list).indexOf(String(value)) >= 0 : list.map(String).indexOf(String(value)) >= 0);
         if (entry && entry.onchange && window[entry.onchange]) { try { window[entry.onchange](value); } catch (_) {} }
         if (arr[0] === 'APP' && arr[1] === 'agent' && value && valid) {
           if (typeof loadAgent === 'function') loadAgent(value); // мгновенная смена агента без перезагрузки
@@ -309,7 +348,8 @@
         var entry = sec && sec[arr[1]];
         var list = entry && entry.list;
         if (!list) return;
-        if (list.map(String).indexOf(inp.value) >= 0) {
+        var names = isBoardList(list) ? boardNames(list) : list.map(String);
+        if (names.indexOf(inp.value) >= 0) {
           comboCommit(inp.dataset.cfg, inp.value);
           var combo = inp.closest('.s-combo');
           if (combo) markCur(combo, inp.value);
@@ -320,6 +360,8 @@
         var inp = e.target.closest && e.target.closest('.s-combo input[data-cfg]');
         if (!inp) return;
         comboCommit(inp.dataset.cfg, inp.value);
+        var combo = inp.closest('.s-combo');
+        if (combo) markCur(combo, inp.value);
       });
 
       node.addEventListener('keydown', function (e) {
