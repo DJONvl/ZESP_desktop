@@ -31,13 +31,13 @@
   },
   "ZIGBEE": {
     "Board": {
-      "val": "",
+      "val": "custom",
       "list": [
-        "custom",
-        "DGNWG05LM",
-        "mts-hc-001",
-        "YNDX-00055(Duo)",
-        "YNDX-00510(Hub)"
+        {"custom":{}},
+        {"DGNWG05LM":{"Adapter":"zigate","Transport":"/dev/ttymxc1","Speed": "1000000"}},
+        {"mts-hc-001":{"Adapter":"zboss","Transport":"/dev/ttymxc3","Speed": "250000"}},
+        {"YNDX-00055(Duo)":{"Adapter":"telink","Transport":"/dev/ttyS3","Speed": "115200"}},
+        {"YNDX-00510(Hub)":{"Adapter":"telink","Transport":"/dev/ttyS3","Speed": "115200"}}
       ]
     },
     "Adapter": {

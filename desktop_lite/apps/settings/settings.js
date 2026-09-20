@@ -30,6 +30,7 @@
 .win-settings .s-opt.cur{color:var(--accent);font-weight:600}
 .win-settings button{background:var(--accent);border:none;color:#fff;padding:7px 14px;cursor:pointer;font-size:12.5px;font-weight:600}
 .win-settings button:hover{background:var(--accent-dark)}
+.win-settings .s-group.s-btn-row{justify-content:flex-end}
 .ya-backdrop{position:fixed;inset:0;z-index:2147483003;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center}
 .ya-modal{background:var(--bg2);border:1px solid var(--border2);color:var(--text);padding:20px;border-radius:8px;max-width:520px;width:92%}
 .ya-tabs{display:flex;gap:6px;margin-bottom:14px;align-items:center}
@@ -122,7 +123,8 @@
   function fieldHtml(section, prop, val) {
     if (prop.indexOf('button') === 0) {
       var act = (val && val.onClick) || '';
-      return '<div class="s-group"><label>' + prop + '</label><button data-action="' + act + '">' + ((val && val.label) || prop) + '</button></div>';
+      var blabel = (val && val.label) || prop;
+      return '<div class="s-group s-btn-row"><button data-action="' + act + '">' + esc(blabel) + '</button></div>';
     }
     if (val && typeof val === 'object' && 'val' in val) {
       var list = val.list || [];
