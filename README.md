@@ -2,9 +2,11 @@
   <img src="docs/zesp.png" alt="ZESP" width="280">
 </p>
 
-# ZESP
+<h1 align="center">ZESP</h1>
 
+<p align="center">
 Сервер умного дома с веб-интерфейсом. Ставится на роутер с OpenWrt, Raspberry Pi, мини-ПК, обычный Windows-компьютер или Mac. Умеет: Zigbee-устройства, карту сети, автоматизацию (Blockly), сцены, 3D-план дома, MQTT + Home Assistant, Яндекс-колонки.
+</p>
 
 ## Что понадобится
 
