@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/zesp.png" alt="ZESP" width="280">
+  <img src="docs/zesp.png" alt="ZESP" width="200">
 </p>
 
 <h1 align="center">ZESP</h1>
