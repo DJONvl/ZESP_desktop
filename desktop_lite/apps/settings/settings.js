@@ -131,6 +131,9 @@
       var cur = String(val.val == null ? '' : val.val);
       var isBoard = isBoardList(list);
       var names = isBoard ? boardNames(list) : list.map(String);
+      // Дедуп: данные после миграции могут содержать плату дважды
+      // (старый и новый пресет) — показываем первое вхождение.
+      names = names.filter(function (s, i) { return names.indexOf(s) === i; });
       var opts = names.map(function (s) {
         return '<div class="s-opt' + (s === cur ? ' cur' : '') + '" data-val="' + esc(s) + '">' + esc(s) + '</div>';
       }).join('');
