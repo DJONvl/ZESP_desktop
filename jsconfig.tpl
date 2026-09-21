@@ -36,8 +36,8 @@
         {"custom":{}},
         {"DGNWG05LM":{"Adapter":"zigate","Transport":"/dev/ttymxc1","Speed": "1000000"}},
         {"mts-hc-001":{"Adapter":"zboss","Transport":"/dev/ttymxc3","Speed": "250000"}},
-        {"YNDX-00055(Duo)":{"Adapter":"telink","Transport":"/dev/ttyS3","Speed": "115200"}},
-        {"YNDX-00510(Hub)":{"Adapter":"telink","Transport":"/dev/ttyS3","Speed": "115200"}}
+        {"YNDX-00055(Duo)":{"Adapter":"telink","Transport":"/dev/ttyS3","Speed": "115200","zb_reset":153,"zb_boot":154,"zb_power":150}},
+        {"YNDX-00510(Hub)":{"Adapter":"telink","Transport":"/dev/ttyS3","Speed": "115200","zb_reset":411,"zb_boot":412}}
       ]
     },
     "Adapter": {

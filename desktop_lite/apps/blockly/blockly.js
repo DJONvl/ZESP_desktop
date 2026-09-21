@@ -14,6 +14,7 @@
 .bl-area{position:relative;flex:1;min-height:0;overflow:hidden}
 .bl-div{position:absolute;inset:0}
 .bl-js{position:absolute;inset:0;display:none}
+#toolbox,#workspaceBlocks,xml{display:none!important}
 .blockly-custom-highlight > path.blocklyPath{stroke:#84ff00!important;stroke-width:5px!important;stroke-linejoin:round!important;paint-order:stroke!important;filter:drop-shadow(0 0 5px #84ff00) drop-shadow(0 0 10px #1aff00);animation:bl-gentle-pulse 2s ease-in-out infinite}
 @keyframes bl-gentle-pulse{0%,100%{stroke-width:2px;filter:drop-shadow(0 0 2px #84ff00) drop-shadow(0 0 8px #1aff00)}50%{stroke-width:5px;filter:drop-shadow(0 0 2px #84ff00) drop-shadow(0 0 8px #1aff00)}}
 `;
@@ -277,6 +278,9 @@
           }
           doc = parser.parseFromString(xml, 'application/xml');
         }
+        // XML-определения (toolbox/workspace) должны быть в DOM для getElementById,
+        // но не должны светиться текстом под редактором — прячем явно.
+        try { doc.documentElement.setAttribute('style', 'display:none!important'); } catch (e) {}
         node.appendChild(doc.documentElement);
       });
       blocklyInit();
