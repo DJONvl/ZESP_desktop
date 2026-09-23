@@ -7,97 +7,92 @@
   "door_bell": {
     "ringtone": [
       {
-        "path": "C:\\ZESP_go\\wav\\db1.mp3",
-        "vol": 0,
+        "path": "db1.mp3",
+        "vol": 60,
         "kill": false
       },
       {
-        "path": "C:\\ZESP_go\\wav\\db2.mp3",
-        "vol": 0,
+        "path": "db2.mp3",
+        "vol": 60,
         "kill": false
       },
       {
-        "path": "C:\\ZESP_go\\wav\\db3.mp3",
-        "vol": 0,
+        "path": "db3.mp3",
+        "vol": 60,
         "kill": false
       },
       {
-        "path": "C:\\ZESP_go\\wav\\airp1.mp3",
-        "vol": 0,
+        "path": "airp1.mp3",
+        "vol": 60,
         "kill": false
       },
       {
-        "path": "C:\\ZESP_go\\wav\\airp2.mp3",
-        "vol": 0,
+        "path": "airp2.mp3",
+        "vol": 60,
         "kill": false
       },
       {
-        "path": "C:\\ZESP_go\\wav\\airp3.mp3",
-        "vol": 0,
+        "path": "airp3.mp3",
+        "vol": 60,
         "kill": false
       },
       {
-        "path": "C:\\ZESP_go\\wav\\dog1.mp3",
-        "vol": 0,
+        "path": "dog1.mp3",
+        "vol": 60,
         "kill": false
       },
       {
-        "path": "C:\\ZESP_go\\wav\\dog2.mp3",
-        "vol": 0,
+        "path": "dog2.mp3",
+        "vol": 60,
         "kill": false
       },
       {
-        "path": "C:\\ZESP_go\\wav\\dog3.mp3",
-        "vol": 0,
+        "path": "cat1.mp3",
+        "vol": 60,
         "kill": false
       },
       {
-        "path": "C:\\ZESP_go\\wav\\cat1.mp3",
-        "vol": 0,
+        "path": "cat2.mp3",
+        "vol": 60,
         "kill": false
       },
       {
-        "path": "C:\\ZESP_go\\wav\\cat2.mp3",
-        "vol": 0,
+        "path": "siren.mp3",
+        "vol": 60,
         "kill": false
       },
       {
-        "path": "C:\\ZESP_go\\wav\\siren.mp3",
-        "vol": 0,
+        "path": "siren1.mp3",
+        "vol": 60,
         "kill": false
       },
       {
-        "path": "C:\\ZESP_go\\wav\\siren1.mp3",
-        "vol": 0,
+        "path": "siren2.mp3",
+        "vol": 60,
         "kill": false
       },
       {
-        "path": "C:\\ZESP_go\\wav\\siren2.mp3",
-        "vol": 0,
+        "path": "siren3.mp3",
+        "vol": 60,
         "kill": false
       },
       {
-        "path": "C:\\ZESP_go\\wav\\siren3.mp3",
-        "vol": 0,
+        "path": "siren4.mp3",
+        "vol": 60,
         "kill": false
       },
       {
-        "path": "C:\\ZESP_go\\wav\\siren4.mp3",
-        "vol": 0,
+        "path": "bird4.mp3",
+        "vol": 60,
         "kill": false
       },
       {
-        "path": "C:\\ZESP_go\\wav\\bird4.mp3",
-        "vol": 0,
-        "kill": false
-      },
-      {
-        "path": "C:\\ZESP_go\\wav\\test10.mp3",
-        "vol": 0,
+        "path": "test10.mp3",
+        "vol": 60,
         "kill": false
       }
     ],
-    "curr_ind": 0
+    "curr_ind": 1
   },
   "level": 60,
   "on": 0,
