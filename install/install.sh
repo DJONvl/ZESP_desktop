@@ -52,7 +52,9 @@ fi
 if [ -n "$LOCAL_TGZ" ]; then
   TAG="${TAG:-local}"
 else
-  TAG="$(fetch "https://api.github.com/repos/$REPO/releases/latest" - 2>/dev/null | grep '"tag_name"' | cut -d'"' -f4)"
+  # GitHub иногда отдаёт JSON одной строкой — режем запятые в строки,
+  # иначе grep хватает всю строку и cut вытаскивает url вместо тега.
+  TAG="$(fetch "https://api.github.com/repos/$REPO/releases/latest" - 2>/dev/null | tr ',' '\n' | grep '"tag_name"' | head -1 | cut -d'"' -f4)"
   [ -z "$TAG" ] && die "cannot get latest release (no network? wget without https? try uclient-fetch or LOCAL_TGZ offline mode — see README)"
 fi
 echo "Installing ZESP $TAG ($ASSET) -> $INSTALL_DIR"
