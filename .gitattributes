@@ -1,0 +1,4 @@
+# Шелл-скрипты всегда LF (иначе sh на Linux/OpenWrt давится \r),
+# батники всегда CRLF (иначе cmd на Windows чудит).
+*.sh text eol=lf
+*.bat text eol=crlf
