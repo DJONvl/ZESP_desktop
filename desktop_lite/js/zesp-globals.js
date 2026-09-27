@@ -91,6 +91,120 @@ if (typeof ProgressBarWidget === 'undefined') {
 }
 window.updateProgress = new ProgressBarWidget();
 
+// ── zespConfirm / zespAlert ───────────────────────────────────────────────────
+// Стилизованная замена нативных confirm()/alert() (те не в теме и с адресом сервера).
+// zespConfirm(message, opts) -> Promise<boolean>; opts: {title, okText, cancelText, danger, details:[{k,v}]}
+// zespAlert(message, opts) -> Promise<void>; opts: {title, okText}
+(function () {
+  if (window.zespConfirm) return;
+  var STYLE_ID = 'zesp-confirm-style';
+  function ensureStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    var s = document.createElement('style');
+    s.id = STYLE_ID;
+    s.textContent =
+      '.zesp-cf-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2147483700;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}' +
+      '.zesp-cf-box{background:var(--bg2);color:var(--text);border:1px solid var(--border2);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.5);width:min(440px,94vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden}' +
+      '.zesp-cf-head{padding:14px 16px 0;font-size:16px;font-weight:700}' +
+      '.zesp-cf-msg{padding:8px 16px 0;font-size:13px;line-height:1.5;white-space:pre-line;overflow-y:auto}' +
+      '.zesp-cf-details{margin:8px 16px 0;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;font-size:12px;display:flex;flex-direction:column;gap:4px}' +
+      '.zesp-cf-details .row{display:flex;gap:8px}' +
+      '.zesp-cf-details .k{color:var(--muted);min-width:90px;flex-shrink:0}' +
+      '.zesp-cf-details .v{word-break:break-all}' +
+      '.zesp-cf-btns{display:flex;justify-content:flex-end;gap:8px;padding:14px 16px}' +
+      '.zesp-cf-btns button{padding:7px 18px;border-radius:8px;font-size:13px}' +
+      '.zesp-cf-ok{background:var(--accent);border:1px solid var(--accent);color:#fff;font-weight:600}' +
+      '.zesp-cf-ok:hover{background:var(--accent-dark)}' +
+      '.zesp-cf-ok.danger{background:var(--red);border-color:var(--red)}' +
+      '.zesp-cf-cancel{background:var(--bg3);border:1px solid var(--border2);color:var(--text)}';
+    document.head.appendChild(s);
+  }
+
+  var current = null; // {overlay, resolve}
+  function close(val) {
+    if (!current) return;
+    var c = current;
+    current = null;
+    if (c.overlay && c.overlay.parentNode) c.overlay.parentNode.removeChild(c.overlay);
+    document.removeEventListener('keydown', onKey, true);
+    c.resolve(val);
+  }
+  function onKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(false); }
+  }
+
+  function openModal(o) {
+    ensureStyle();
+    if (current) close(false);
+    return new Promise(function (resolve) {
+      var overlay = document.createElement('div');
+      overlay.className = 'zesp-cf-overlay';
+      var box = document.createElement('div');
+      box.className = 'zesp-cf-box';
+      box.setAttribute('role', 'dialog');
+      var head = document.createElement('div');
+      head.className = 'zesp-cf-head';
+      head.textContent = o.title || '';
+      var msg = document.createElement('div');
+      msg.className = 'zesp-cf-msg';
+      msg.textContent = o.message || '';
+      box.appendChild(head);
+      box.appendChild(msg);
+      if (o.details && o.details.length) {
+        var det = document.createElement('div');
+        det.className = 'zesp-cf-details';
+        o.details.forEach(function (d) {
+          var row = document.createElement('div');
+          row.className = 'row';
+          var k = document.createElement('span');
+          k.className = 'k';
+          k.textContent = d.k || '';
+          var v = document.createElement('span');
+          v.className = 'v';
+          v.textContent = d.v || '';
+          row.appendChild(k);
+          row.appendChild(v);
+          det.appendChild(row);
+        });
+        box.appendChild(det);
+      }
+      var btns = document.createElement('div');
+      btns.className = 'zesp-cf-btns';
+      var ok = document.createElement('button');
+      ok.className = 'zesp-cf-ok' + (o.danger ? ' danger' : '');
+      ok.textContent = o.okText || 'OK';
+      ok.addEventListener('click', function () { close(true); });
+      btns.appendChild(ok);
+      if (!o.alert) {
+        var cancel = document.createElement('button');
+        cancel.className = 'zesp-cf-cancel';
+        cancel.textContent = o.cancelText || 'Отмена';
+        cancel.addEventListener('click', function () { close(false); });
+        btns.appendChild(cancel);
+      }
+      box.appendChild(btns);
+      overlay.appendChild(box);
+      overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) close(false); });
+      document.body.appendChild(overlay);
+      current = { overlay: overlay, resolve: resolve };
+      document.addEventListener('keydown', onKey, true);
+      setTimeout(function () { try { ok.focus(); } catch (e) {} }, 0);
+    });
+  }
+
+  window.zespConfirm = function (message, opts) {
+    opts = opts || {};
+    opts.message = message;
+    return openModal(opts);
+  };
+  window.zespAlert = function (message, opts) {
+    opts = opts || {};
+    opts.message = message;
+    opts.alert = true;
+    return openModal(opts);
+  };
+})();
+
 // ── get_tile(dev) — tile устройства в списке устройств ───────────────────────
 // socket.js вызывает внутри widgetReport при каждом rep.
 function get_tile(device) {

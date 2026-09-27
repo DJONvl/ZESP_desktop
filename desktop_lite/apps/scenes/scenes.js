@@ -1188,9 +1188,9 @@
     if (!s) return;
     openEditor(JSON.parse(JSON.stringify(s)));
   }
-  function closeEditor(force) {
+  async function closeEditor(force) {
     if (!force && st.editorDirty) {
-      if (!window.confirm('Есть несохранённые изменения. Закрыть без сохранения?')) return;
+      if (!await window.zespConfirm('Есть несохранённые изменения. Закрыть без сохранения?', { title: 'Закрыть редактор', okText: 'Закрыть', danger: true })) return;
     }
     var overlay = $('sc_editor_overlay');
     var editor = $('sc_editor');
@@ -1245,8 +1245,8 @@
       saveScenes();
     }
   }
-  function deleteScene(idx) {
-    if (!confirm('Удалить сценарий "' + (st.scenes[idx].name || '') + '"?')) return;
+  async function deleteScene(idx) {
+    if (!await window.zespConfirm('Удалить сценарий "' + (st.scenes[idx].name || '') + '"?', { title: 'Удалить сценарий', okText: 'Удалить', danger: true })) return;
     st.scenes.splice(idx, 1);
     saveScenes();
   }
@@ -1275,12 +1275,12 @@
     if (!fileInput || !fileInput.files || !fileInput.files[0]) return;
     var file = fileInput.files[0];
     var reader = new FileReader();
-    reader.onload = function (e) {
+    reader.onload = async function (e) {
       try {
         var parsed = JSON.parse(e.target.result);
         if (!Array.isArray(parsed)) { alert('Файл не содержит массив сцен'); return; }
         migrateScenes(parsed);
-        if (!confirm('Импортировать ' + parsed.length + ' сцен? Текущие сцены будут заменены.')) return;
+        if (!await window.zespConfirm('Импортировать ' + parsed.length + ' сцен? Текущие сцены будут заменены.', { title: 'Импорт сцен', okText: 'Импортировать' })) return;
         st.scenes = parsed;
         saveScenes();
       } catch (err) {

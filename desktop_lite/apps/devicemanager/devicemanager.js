@@ -214,9 +214,22 @@
           var nMin = (attr && attr.min != null) ? attr.min : 0;
           var nMax = (attr && attr.max != null) ? attr.max : 100;
           var nStep = (attr && attr.step != null) ? attr.step : 1;
-          html += '<div style="display:flex;align-items:center;gap:4px;">' + window.getIconSvg('number', 16, '#90caf9') +
-            '<input class="' + id + ' level" type="range" id="number|' + id + '" style="width:80px" min="' + nMin + '" max="' + nMax + '" step="' + nStep + '" value="' + (value.parsed != null ? value.parsed : nMin) + '" onchange="evm(\'number|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value">' +
-            '<span class="' + id + '" style="font-size:11px;color:var(--faint);min-width:26px">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
+          var nMode = (attr && attr.mode) ? String(attr.mode) : 'slider';
+          var nVal = (value.parsed != null ? value.parsed : nMin);
+          html += '<div style="display:flex;align-items:center;gap:4px;">' + window.getIconSvg('number', 16, '#90caf9');
+          if (nMode === 'box') {
+            var nValNum = parseFloat(nVal);
+            if (!isFinite(nValNum)) nValNum = parseFloat(nMin) || 0;
+            html += '<span style="display:inline-flex;align-items:center;gap:3px;">' +
+              '<button type="button" title="-" style="cursor:pointer;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:0 7px;color:var(--text);font-size:13px;" onclick="var el=this.parentNode.querySelector(\'input\');var st=parseFloat(el.step)||1;var v=(parseFloat(el.value)||0)-st;var mn=parseFloat(el.min);if(isFinite(mn)&&v<mn)v=mn;el.value=v;">&#8249;</button>' +
+              '<input class="' + id + '" type="number" style="width:52px" min="' + nMin + '" max="' + nMax + '" step="' + nStep + '" value="' + nValNum + '" onkeydown="if(event.key===\'Enter\'){evm(\'number|' + id + '\',this.value)}">' +
+              '<button type="button" title="+" style="cursor:pointer;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:0 7px;color:var(--text);font-size:13px;" onclick="var el=this.parentNode.querySelector(\'input\');var st=parseFloat(el.step)||1;var v=(parseFloat(el.value)||0)+st;var mx=parseFloat(el.max);if(isFinite(mx)&&v>mx)v=mx;el.value=v;">&#8250;</button>' +
+              '<button type="button" title="Send" style="cursor:pointer;background:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:0 7px;color:#fff;font-size:12px;" onclick="evm(\'number|' + id + '\',this.parentNode.querySelector(\'input\').value)">OK</button></span>' +
+              '<span class="' + id + '" style="font-size:11px;color:var(--faint);min-width:26px">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
+          } else {
+            html += '<input class="' + id + ' level" type="range" id="number|' + id + '" style="width:80px" min="' + nMin + '" max="' + nMax + '" step="' + nStep + '" value="' + nVal + '" onchange="evm(\'number|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value">' +
+              '<span class="' + id + '" style="font-size:11px;color:var(--faint);min-width:26px">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
+          }
           break;
         }
         case 'select': {
@@ -257,7 +270,34 @@
           var cTemp = value.parsed || '—';
           var cSet = (attr && attr.target_temp != null) ? attr.target_temp : (value.set_temp || (value.temperature || '—'));
           var cMode = (attr && attr.hvac_mode) ? attr.hvac_mode : (value.mode || 'off');
-          var cModes = (attr && attr.modes) ? attr.modes.split(',') : ['off', 'heat', 'cool', 'auto'];
+          var cModes = ['off', 'heat', 'cool', 'auto'];
+          var normM = function(x){ return (x && typeof x === 'object') ? (x.value || x.name || x.mode || '') : String(x); };
+          if (attr && attr.modes) {
+            var am = Array.isArray(attr.modes) ? attr.modes.map(normM) : String(attr.modes).split(',');
+            am = am.map(function(s){ return String(s).trim(); }).filter(function(s){ return !!s; });
+            if (am.length) cModes = am;
+          }
+          try {
+            var dmYa = value && value.ya_rep;
+            if (typeof dmYa === 'string') { try { dmYa = JSON.parse(dmYa); } catch (e0) { dmYa = null; } }
+            var dmCaps = (dmYa && dmYa.capabilities) || [];
+            for (var cmi = 0; cmi < dmCaps.length; cmi++) {
+              var dmCp = dmCaps[cmi] && dmCaps[cmi].parameters;
+              if (dmCp && dmCp.modes) {
+                var ym2 = (Array.isArray(dmCp.modes) ? dmCp.modes.map(normM) : String(dmCp.modes).split(',')).map(function(s){ return String(s).trim(); }).filter(function(s){ return !!s; });
+                if (ym2.length) { cModes = ym2; break; }
+              }
+            }
+          } catch (e2) {}
+          try {
+            var dmSys = false;
+            if (device && device.Report) {
+              for (var dmk in device.Report) {
+                if (/^01\d{4}001C$/.test(dmk)) { dmSys = true; break; }
+              }
+            }
+            if (dmSys && cModes.indexOf('off') === -1) cModes.unshift('off');
+          } catch (e3) {}
           var cMinT = (attr && attr.min_temp) ? Number(attr.min_temp) : 5;
           var cMaxT = (attr && attr.max_temp) ? Number(attr.max_temp) : 35;
           var cTStep = (attr && attr.temp_step) ? Number(attr.temp_step) : 0.5;

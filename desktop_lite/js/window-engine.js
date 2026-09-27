@@ -788,6 +788,9 @@ window.WinEngine = (function () {
 
   function initShortcutDrag() {
     shortcutEls().forEach(el => {
+      // Глушим нативный HTML5-drag картинок/текста: иначе браузер тащит
+      // «призрак» глифа, а pointermove ярлыку не приходит.
+      el.addEventListener('dragstart', (e) => e.preventDefault());
       let dragging = false, moved = false, sx = 0, sy = 0, bx = 0, by = 0;
       let lpTimer = null, lpFired = false;
       let dragGroup = null;   // набор перетаскиваемых ярлыков (включая захваченный)
@@ -1012,8 +1015,8 @@ window.WinEngine = (function () {
     const restart = document.createElement('div');
     restart.className = 'start-menu-item danger';
     restart.innerHTML = `<span class="ico">↻</span> ${tl('sm.restart', 'Завершить сессию')}`;
-    restart.addEventListener('click', () => {
-      if (confirm(tl('sm.restart_confirm', 'Закрыть текущую сессию?'))) {
+    restart.addEventListener('click', async () => {
+      if (await window.zespConfirm(tl('sm.restart_confirm', 'Закрыть текущую сессию?'), { title: tl('sm.restart', 'Завершить сессию'), okText: 'Завершить', danger: true })) {
         if (typeof WSsend === 'function') WSsend('RebootESP');
       }
     });

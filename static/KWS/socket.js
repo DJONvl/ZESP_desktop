@@ -380,8 +380,8 @@ function widgetReport(rep) {
 								}
 							} catch {}
 
-							// Обновляем лампочку (для light on_off)
-							if (role === "light") {
+							// Обновляем лампочку (для light_onoff)
+							if (role === "light_onoff") {
 								try {
 									const bulb = el.closest(".ac")?.querySelector("[id^='z']");
 									if (bulb) {
@@ -394,11 +394,19 @@ function widgetReport(rep) {
 							break;
 						}
 
+						case "number": {
+							let numVal = parseFloat(val);
+							if (!isNaN(numVal)) el.value = numVal;
+							break;
+						}
 						case "range": {
 							let rangeVal = parseFloat(val) || 0;
 
-							// Масштабируем по кластеру/роли
-							if (cluster === "0008") {
+						// Масштабируем по кластеру/роли.
+						// 0008→0-100 — только яркость света (role light):
+						// у number/range своя шкала из класса (напр. Volume 0300080000, max 254),
+						// маппинг писал ~100 в ползунок с max=254 и уводил бегунок на середину.
+						if (cluster === "0008" && role !== "number" && role !== "range") {
 								// Яркость ZigBee: 0-255 → 0-100
 								rangeVal = map_range(rangeVal, 0, 255, 0, 100);
 							} else if (cluster === "0300" && attrID.endsWith("0007")) {
@@ -440,7 +448,7 @@ function widgetReport(rep) {
 							} catch {}
 
 							// Обновляем лампочку brightness
-							if (cluster === "0008" || (role === "light" && report && report.label === "Level")) {
+							if (cluster === "0008" || role === "light_level") {
 								try {
 									const ac = el.closest(".ac");
 									const bulb = ac && ac.querySelector("[id^='z']");
@@ -448,13 +456,17 @@ function widgetReport(rep) {
 								} catch {}
 							}
 							// Обновляем цвет лампочки по репорту цветовой температуры
-							if (cluster === "0300" && role === "light" && report && (report.label === "Color_Control" || report.label === "ColorT")) {
+							if (cluster === "0300" && role === "light_color_temp") {
 								try {
 									const ac = el.closest(".ac");
 									const bulb = ac && ac.querySelector("[id^='z']");
 									if (bulb) {
-										var hue2 = Math.floor(50 + (170 - 50) * (rangeVal - 1) / (100 - 1));
-										bulb.style.background = 'radial-gradient(circle 150px,' + hsl2Hex(hue2, 100, 50) + ', rgb(82,89,81))';
+										var t = rangeVal / 100, h = t < 0.5 ? 185 : 35;
+										var s = Math.round(Math.abs(t - 0.5) * 2 * 85);
+										var l = Math.round(60 + (1 - s / 85) * 28);
+										var c2 = hsl2Hex(h, s, l);
+										bulb.style.background = 'radial-gradient(circle 150px,' + c2 + ', rgb(82,89,81))';
+										bulb.style['box-shadow'] = c2 + ' 0px 1px 50px 8px';
 									}
 								} catch {}
 							}
@@ -464,7 +476,7 @@ function widgetReport(rep) {
 					break;
 			}
 			// Обновляем цвет лампочки по репорту hex цвета (вне зависимости от типа элемента)
-			if (cluster === "0300" && attrID.endsWith("0000") && role === "light") {
+			if (cluster === "0300" && attrID.endsWith("0000") && role === "light_color") {
 				console.log('[color] hex bulb update val=', val);
 				try {
 					const ac = el.closest(".ac");
@@ -473,6 +485,7 @@ function widgetReport(rep) {
 						var hex = val.replace('#','');
 						if (hex.length >= 6) {
 							bulb.style.background = 'radial-gradient(circle 150px,#' + hex + ', rgb(82,89,81))';
+							bulb.style['box-shadow'] = '#' + hex + ' 0px 1px 50px 8px';
 						}
 					}
 				} catch {}

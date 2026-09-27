@@ -11,7 +11,7 @@ function getDeviceClass(json) {
     } catch (e) {}
   }
 
-  if (json.role === "light" && json.label) {
+  if ((json.role === "light_onoff" || json.role === "light_level" || json.role === "light_color" || json.role === "light_color_temp") && json.label) {
     return json.label;
   }
 
@@ -284,6 +284,8 @@ function getWidget(IEEE) {
 	var _speakerWidgetRendered = false
 
 	for (let [key, value] of Object.entries(dev.Report)) {
+		value = value || {};
+		try {
 		try {var device_class = dev.Report[key].class.device_class 
 		} catch { 
 		 try { var device_class = JSON.parse(dev.Report[key].role.split("&")[1]).device_class } catch { var device_class = "" }
@@ -299,7 +301,7 @@ function getWidget(IEEE) {
 		var idh = Date.now()
 		var idw = idh + ""
 		switch (role) {
-			case 'light':
+			case 'light_onoff':
 				if (dev.DevType === "DIS") {			
 						var rval=( parseInt(value.parsed)===true)? 1:0
 						var state = ( rval== 1) ? "checked" : ""
@@ -331,8 +333,8 @@ function getWidget(IEEE) {
 						tpl += `<div class="switch flex">`
 						tpl += `<div class="icon flex">❄️</div>`
 						tpl += `<input class="${id} color-temp"  style="width: 66%;" type="range" id="colorT|${id}" onchange="widgetEvnt(this.id,this.value)"
-					 oninput="var hue=Math.floor(50 + (170 - 50) * (this.value - 1) / (100 - 1)).toFixed(0);console.log(hue,hsl(hue),hsl2Hex(hue,100,50));
-					document.getElementById('z${idw}').style.background='radial-gradient(circle 150px,\'+hsl2Hex(hue,100,50)+\', rgb(82, 89, 81))'"
+					 oninput="var t=this.value/100,h=t<0.5?185:35,s=Math.round(Math.abs(t-0.5)*2*85),l=Math.round(60+(1-s/85)*28),c=hsl2Hex(h,s,l);console.log(c);
+					document.getElementById('z${idw}').style.background='radial-gradient(circle 150px,\'+c+\', rgb(82, 89, 81))'"
 					 min="0" max="100" value="${value.parsed||"?"}" step="2">`
 						
 //						tpl += `<span type="label" class="z${id} ${dev.IEEE+"#"+dev.IEEE+"_colorTemperature"} style="color:white;" >${value.parsed||0}</span>`
@@ -417,8 +419,8 @@ function getWidget(IEEE) {
 						tpl += `<div class="switch flex">`
 						tpl += `<div class="icon flex">❄️</div>`
 						tpl += `<input class="${id} color-temp"  style="width: 66%;" type="range" id="colorT|${id}" onchange="widgetEvnt(this.id,this.value)"
-					 oninput="var hue=Math.floor(50 + (170 - 50) * (this.value - 1) / (100 - 1)).toFixed(0);console.log(hue,hsl(hue),hsl2Hex(hue,100,50));
-					document.getElementById('z${idw}').style.background='radial-gradient(circle 150px,\'+hsl2Hex(hue,100,50)+\', rgb(82, 89, 81))'"
+					 oninput="var t=this.value/100,h=t<0.5?185:35,s=Math.round(Math.abs(t-0.5)*2*85),l=Math.round(60+(1-s/85)*28),c=hsl2Hex(h,s,l);console.log(c);
+					document.getElementById('z${idw}').style.background='radial-gradient(circle 150px,\'+c+\', rgb(82, 89, 81))'"
 					 min="0" max="100" value="${value.parsed}" step="2">`
 						tpl += `<span type="label" class="z${id}" style="color:white;" >${value.parsed}</span>`
 						tpl += `</div>`
@@ -436,7 +438,9 @@ function getWidget(IEEE) {
 				}
 
 
-				if (value.label == "On_Off") {
+				// Роль уже говорит, какой виджет рисовать — условий по лейблам нет.
+				// Каждый виджет заканчивается открывающим <div> под общий закрывающий </div> итерации.
+				{
 					var state = (parseInt(value.parsed) == 1) ? "checked" : ""
 					tpl += `<div id="z${idw}" style="margin-bottom:25px;width:65px;height:65px;background:silver;border-radius:54px;filter:brightness(100%);"><img class="bulbw" src='./static/icons/bulb.png'/></div>`
 					tpl += `<div class="switch flex">`
@@ -449,7 +453,10 @@ function getWidget(IEEE) {
 					tpl += `</div>`
 					tpl += `<div>`
 				}
-				if (value.label == "Level") {
+
+				break;
+			case 'light_level':
+				{
 					var lvl = Math.round((parseFloat(value.parsed)||0)*100/255);
 					tpl += `<div class="switch flex">`
 					tpl += `<div class="icon flex">${getIconSvg("brightness")}</div>`
@@ -461,19 +468,25 @@ function getWidget(IEEE) {
 					tpl += `</div>`
 					tpl += `<div>`
 				}
-				if (value.label == "Color_Control" || value.label == "ColorT") {
+
+				break;
+			case 'light_color_temp':
+				{
 					var ct = Math.round(((parseFloat(value.parsed)||153)-153)*100/347);
 					tpl += `<div class="switch flex">`
 					tpl += `<div class="icon flex">${getIconSvg("sun_temp")}</div>`
 					tpl += `<input class="${id} color-temp" style="width:66%;" type="range" id="colorT|${id}"
 					onchange="widgetEvnt(this.id,this.value)"
-					oninput="var hue=Math.floor(50+(170-50)*(this.value-1)/(100-1));document.getElementById('z${idw}').style.background='radial-gradient(circle 150px,'+hsl2Hex(hue,100,50)+', rgb(82,89,81))'"
+					oninput="var t=this.value/100,h=t<0.5?185:35,s=Math.round(Math.abs(t-0.5)*2*85),l=Math.round(60+(1-s/85)*28),c=hsl2Hex(h,s,l),el=document.getElementById('z${idw}');if(el){el.style.background='radial-gradient(circle 150px,'+c+', rgb(82,89,81))';el.style['box-shadow']=c+' 0px 1px 50px 8px'}"
 					min="0" max="100" value="${ct}" step="2">`
 					tpl += `<span type="label" class="${id}" style="color:white;">${ct}</span>`
 					tpl += `</div>`
 					tpl += `<div>`
 				}
-				if (value.label == "Color") {
+
+				break;
+			case 'light_color':
+				{
 					tpl += `<div class="switch flex">`
 					tpl += `<div class="icon flex">${getIconSvg("palette")}</div>`
 					tpl += `<input class="color-range" type="range" min="0" max="100" value="75"
@@ -533,10 +546,21 @@ function getWidget(IEEE) {
 					tpl += `<div class="switch flex">`
 					tpl += `<div class="icon flex">${getIconSvg(device_class)}</div>`;
 					tpl += `<div class="labelObj">${value.label}</div>`
-					tpl += `<input class="${id} level" type="range" id="number|${id}" style="width: 66%;" 
-					onchange="widgetEvnt(this.id,this.value)" '
-					oninput="console.log(this.value);document.getElementById('z${idw}').style.webkitFilter = 'brightness(\'${this.value}\'%)';"
-					min="0" max="100" value="${value.parsed}" step="2">`
+					if ((attr&&attr.mode)==='box') {
+						const nMinB = (attr&&attr.min!=null)?attr.min:0;
+						const nMaxB = (attr&&attr.max!=null)?attr.max:100;
+						const nStepB = (attr&&attr.step!=null)?attr.step:1;
+						let nValB = parseFloat(value.parsed);
+						if (!isFinite(nValB)) nValB = Number(nMinB)||0;
+						tpl += `<span style="display:inline-flex;align-items:center;gap:3px;">`
+						+ `<button type="button" title="-" style="background:#333;color:#fff;border:1px solid #555;border-radius:6px;min-width:24px;padding:2px 6px;cursor:pointer;font-size:14px;line-height:1;" onclick="var el=this.parentNode.querySelector('input');var st=parseFloat(el.step)||1;var v=(parseFloat(el.value)||0)-st;var mn=parseFloat(el.min);if(isFinite(mn)&&v<mn)v=mn;el.value=v;">&#8249;</button>`
+						+ `<input class="${id} number-box" type="number" id="number|${id}" style="width:52px;background:#1e1e1e;color:#fff;border:1px solid #555;border-radius:6px;padding:3px 4px;font-size:14px;text-align:center;" min="${nMinB}" max="${nMaxB}" step="${nStepB}" value="${nValB}" onkeydown="if(event.key==='Enter'){widgetEvnt('number|${id}',this.value)}">`
+						+ `<button type="button" title="+" style="background:#333;color:#fff;border:1px solid #555;border-radius:6px;min-width:24px;padding:2px 6px;cursor:pointer;font-size:14px;line-height:1;" onclick="var el=this.parentNode.querySelector('input');var st=parseFloat(el.step)||1;var v=(parseFloat(el.value)||0)+st;var mx=parseFloat(el.max);if(isFinite(mx)&&v>mx)v=mx;el.value=v;">&#8250;</button>`
+						+ `<button type="button" title="Send" style="background:#2e7d32;color:#fff;border:1px solid #43a047;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px;" onclick="widgetEvnt('number|${id}',this.parentNode.querySelector('input').value)">OK</button>`
+						+ `</span>`;
+					} else {
+						tpl += `<input class="${id} level" type="range" id="number|${id}" style="width: 66%;" onchange="widgetEvnt(this.id,this.value)" min="${(attr&&attr.min!=null)?attr.min:0}" max="${(attr&&attr.max!=null)?attr.max:100}" value="${value.parsed}" step="${(attr&&attr.step!=null)?attr.step:1}">`;
+					}
 					tpl += `<span  "type="label" class="${id}" style="color:white;" >${value.parsed||"?"}</span>`
 
                 break;
@@ -564,7 +588,15 @@ function getWidget(IEEE) {
 				let curTemp   = value.parsed || '—';
 				let setTemp   = (attr && attr.target_temp != null) ? attr.target_temp : (value.set_temp || '—');
 				let hvacMode  = (attr && attr.hvac_mode) ? attr.hvac_mode : (value.mode || 'off');
-				let hvacModes = (attr && attr.modes) ? (Array.isArray(attr.modes) ? attr.modes : String(attr.modes).split(',').map(function(s){ return s.trim(); })) : ['off','auto','heat','cool','fan_only','dry'];
+				// modes могут прийти объектами [{value:'heat'}...] (ya_rep) — приводим к строкам,
+				// иначе кнопки рисуют [object Object]
+				const normHvacModes = function(m) {
+					if (Array.isArray(m)) return m.map(function(x){ return (x && typeof x === 'object') ? (x.value || x.name || x.mode || '') : String(x); }).map(function(s){ return String(s).trim(); }).filter(function(s){ return !!s; });
+					if (typeof m === 'string') return m.split(',').map(function(s){ return s.trim(); }).filter(function(s){ return !!s; });
+					return [];
+				};
+				let hvacModes = (attr && attr.modes) ? normHvacModes(attr.modes) : [];
+				if (!hvacModes.length) hvacModes = ['off','auto','heat','cool','fan_only','dry'];
 				const minTemp   = (attr && attr.min_temp) ? Number(attr.min_temp) : 5;
 				const maxTemp   = (attr && attr.max_temp) ? Number(attr.max_temp) : 35;
 				const tempStep  = (attr && attr.temp_step) ? Number(attr.temp_step) : 0.5;
@@ -579,10 +611,15 @@ function getWidget(IEEE) {
 					if (curKey && dev.Report[curKey].parsed !== undefined) curTemp = dev.Report[curKey].parsed;
 					if (setKey && dev.Report[setKey].parsed !== undefined) setTemp = dev.Report[setKey].parsed;
 					try {
-						const caps = (dev.Report[sysKey].ya_rep && dev.Report[sysKey].ya_rep.capabilities) || [];
+						var yaRep = dev.Report[sysKey].ya_rep;
+						if (typeof yaRep === 'string') { try { yaRep = JSON.parse(yaRep); } catch (e) { yaRep = null; } }
+						const caps = (yaRep && yaRep.capabilities) || [];
 						const mc = caps.find(c => c.parameters && c.parameters.modes);
-						if (mc) hvacModes = mc.parameters.modes;
+						if (mc) { const ym = normHvacModes(mc.parameters.modes); if (ym.length) hvacModes = ym; }
 					} catch {}
+					// Кнопка выключения: SystemMode 0=off обязаны поддерживать все термостаты,
+					// но в ya_rep его часто нет — добавляем всегда (бэкенд climate_mode:"off" умеет).
+					if (hvacModes.indexOf('off') === -1) hvacModes.unshift('off');
 				}
 
 				const modeColors = {heat:'#ff7043', cool:'#42a5f5', auto:'#ab47bc', 'fan_only':'#29b6f6', dry:'#ffca28', off:'#616161'};
@@ -754,6 +791,17 @@ function getWidget(IEEE) {
 				tpl += `<div class="icon flex">${getIconSvg(device_class,28,"silver",state)}</div>`;
 				tpl += `<div class="labelObj">${value.label}</div>`
 				tpl += `<span class="${id}" style="color:white;">${value.parsed || "?"}</span>`
+		}
+		} catch(e) {
+			// Кривой объект (нет role, битый class и т.п.) — дефолт-полоса,
+			// остальные объекты рисуются дальше, карточка не умирает
+			console.warn('getWidget: broken obj, default strip:', key, e);
+			tpl += `<div class="switch flex">`
+			tpl += `<div class="icon flex">⚠️</div>`;
+			tpl += `<div class="labelObj">${key}</div>`
+			tpl += `<span style="color:white;">?</span>`
+			tpl += `</div>`
+			tpl += `<div>`
 		}
 		tpl += `</div>`
 	}

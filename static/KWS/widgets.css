@@ -132,6 +132,51 @@ margin-top: -10px;
   box-sizing: border-box;
   outline: none;
   background: linear-gradient(to right, black, white);
+  cursor: pointer;
+}
+
+/* Явный бегунок: без него Chrome держит нативный в contained-режиме
+   (во всю ширину трека, ход с отступом в пол-бегунка с краёв).
+   С кастомным бегунок ходит центром строго 0→100%. */
+.level::-webkit-slider-thumb,
+.color-range::-webkit-slider-thumb,
+.color-temp::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: calc(0.35em - 7px);
+  border-radius: 50%;
+  background: #e8ecf3;
+  border: 1px solid #555;
+  box-shadow: 0 1px 3px rgba(0,0,0,.6);
+  cursor: pointer;
+}
+.level::-moz-range-thumb,
+.color-range::-moz-range-thumb,
+.color-temp::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #e8ecf3;
+  border: 1px solid #555;
+  box-shadow: 0 1px 3px rgba(0,0,0,.6);
+  cursor: pointer;
+}
+
+/* Chrome 154 ведёт даже кастомный бегунок в contained-режиме
+   (целиком внутри трека → визуальный недолёт в пол-бегунка с краёв).
+   Выносим зону хода на пол-бегунка (7px) за края: градиент при этом
+   остаётся на месте (он на инпуте), а бегунок дотягивается с классическим налеганием. */
+.level::-webkit-slider-runnable-track,
+.color-range::-webkit-slider-runnable-track,
+.color-temp::-webkit-slider-runnable-track {
+  margin: 0 -10px;
+}
+.level::-moz-range-track,
+.color-range::-moz-range-track,
+.color-temp::-moz-range-track {
+  margin: 0 -10px;
 }
 
 

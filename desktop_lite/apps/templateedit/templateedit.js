@@ -173,10 +173,13 @@ WSsend(`writeAtribute|${attrR}`)
 }
 te_setObjAttr=function(ep,id,atr) {
 	te_newObj.innerText=`${ep}${id}${atr}`
-	document.getElementById("te_prevDR").className = `${te_file.IEEE}#${ep}${id}${atr}`;
-	console.log(clusters[parseInt(id,16)].a[parseInt(atr,16)])
-	let type=clusters[parseInt(id,16)].a[parseInt(atr,16)].t.toString(16)
-	document.getElementById('DataType').value = type;
+	// className не затираем (там стилевой класс obj-mnu-prev) — ключ кладём в title, превью в текст
+	const pv=document.getElementById("te_prevDR");
+	if (pv) { pv.innerText=`${ep}|${id}|${atr}`; pv.title=`${te_file.IEEE}#${ep}${id}${atr}`; }
+	try {
+		const atEntry=clusters[parseInt(id,16)].a[parseInt(atr,16)];
+		document.getElementById('DataType').value = atEntry.t.toString(16).toUpperCase();
+	} catch(e) { console.warn("te_setObjAttr: нет в cl.js", id, atr); document.getElementById('DataType').value=""; }
 }
 te_drawJsonEp = function() {
       console.log("new obj");
@@ -399,6 +402,9 @@ te_drawJson = function(js, obj) {
         objectTable.innerHTML = `
             ${createInputRow("Label", "te_label", ro.label)}
             ${createInputRow("Val.raw.Hex", "te_val", ro.val)}
+            <tr><td title="ZCL-тип атрибута для записи (hex). Заполняется кнопкой + Add из cl.js">DataType</td>
+                <td><input type="text" id="${obj}_te_dataType" list="lDTL" oninput="te_devObjEd(this.id,this.value)" value="${ro.dataType || ''}" placeholder="—" title="hex: 10, 20, 21, 29..."></td>
+                <td></td></tr>
             ${createInputRow("Mat", "te_mat", ro.mat)}
             ${createInputRow("Val.parsed", "te_parsed", ro.parsed, true)}
             ${createInputRow("Polling", "te_polling", ro.polling)}
@@ -412,16 +418,15 @@ te_drawJson = function(js, obj) {
                         ${Object.keys(device_type).map(key => `<option value="${key}"></option>`).join('')}
                     </datalist>
                 </td>
-                <td><span onclick='clearField("${obj}_te_role")' style="cursor:pointer;color:var(--red);font-size:14px;line-height:1">×</span></td>
+                <td><div style="display:flex;gap:3px;align-items:center;">
+                    <button class="obj-mnu-btn" onclick="te_openClassEditor('${obj}')">✏️ Edit</button>
+                    <button class="obj-mnu-btn" onclick="te_clearClass('${obj}')">✖</button>
+                </div></td>
             </tr>
             <tr>
                 <td>Dev_class</td>
                 <td colspan="2">
-                    <div class="class-editor-row">
-                        <span class="class-preview" id="${obj}_te_classname_view">${getDeviceClass(ro)}</span>
-                        <button class="obj-mnu-btn" onclick="te_openClassEditor('${obj}')">✏️ Edit</button>
-                        <button class="obj-mnu-btn" onclick="te_clearClass('${obj}')">✖</button>
-                    </div>
+                    <span class="class-preview" id="${obj}_te_classname_view">${getDeviceClass(ro)}</span>
                 </td>
             </tr>
             <tr>
@@ -763,6 +768,10 @@ te_devObjEd=function(id,value){
 		}
 		value = value.trim();
 	}
+	// DataType объекта — чистим до hex ("21: UINT16" → "21")
+	if(key==='dataType'){
+		value=String(value).split(":")[0].trim().toUpperCase();
+	}
 	te_file.Report[obj][key]=value
 
 	if(key==='role') te_setClassOptions(value)
@@ -901,17 +910,21 @@ te_cmSave_click=function()
 	}catch(e){}
 }
 
-te_cmSaveTmpl_click=function()
+te_cmSaveTmpl_click=async function()
 {
 	if(!te_file || te_file===''){
-		alert('Нет открытого устройства');
+		await window.zespAlert('Нет открытого устройства', {title:'Шаблон'});
 		return;
 	}
 	const sanitize = s => (s||'').trim().replace(/[\/\\:*?"<>|]/g,'_');
 	const mid = sanitize(te_file.ModelId);
 	const mf  = sanitize(te_file.ManufName);
 	const tplName = (mid && mf) ? `${mid}_${mf}` : (mid || mf || 'unknown');
-	const confirmed = confirm(`Сохранить шаблон?\n\nФайл: Devtemplates/${tplName}\n\nModelId:   ${te_file.ModelId||'—'}\nManufName: ${te_file.ManufName||'—'}`);
+	const confirmed = await window.zespConfirm('Сохранить шаблон?', {title:'Сохранить шаблон', okText:'Сохранить', details:[
+		{k:'Файл', v:'Devtemplates/' + tplName},
+		{k:'ModelId', v:String(te_file.ModelId||'—')},
+		{k:'ManufName', v:String(te_file.ManufName||'—')}
+	]});
 	if(!confirmed) return;
 const templateData = JSON.parse(JSON.stringify(te_file));
 te_migrateRoleFormat(templateData);
@@ -920,8 +933,8 @@ templateData.Device = "";
 templateData.Location = "Дом";
 templateData.leave = 0;
 templateData.sh3d = "";
-SaveJson(`/Devtemplates/${tplName}`, JSON.stringify(templateData));	
-	alert(`✅ Шаблон сохранён:\nDevtemplates/${tplName}`);
+	SaveJson(`/Devtemplates/${tplName}`, JSON.stringify(templateData));	
+	await window.zespAlert(`Шаблон сохранён:\nDevtemplates/${tplName}`, {title:'Шаблон'});
 }
 
 te_resIconDesktop=function(xmlDoc){ /* not-needed */ }
@@ -1024,17 +1037,41 @@ te_wMain_about=function()
         '0004': { label: 'Groups', role: 'system' },
         '0005': { label: 'Scenes', role: 'system' },
         '0006': { label: 'On_Off', role: 'switch' },
-        '0008': { label: 'Level', role: 'light' },
+        '0008': { label: 'Level', role: 'light_level' },
         '000A': { label: 'Time', role: 'system' },
         '0013': { label: 'Multistate', role: 'sensor' },
         '0021': { label: 'Diagnostics', role: 'system' },
-        '0300': { label: 'Color', role: 'light' },
+        '0300': { label: 'Color', role: 'light_color' },
         '0402': { label: 'Temperature', role: 'sensor' },
         '0403': { label: 'Pressure', role: 'sensor' },
         '0405': { label: 'Humidity', role: 'sensor' },
         '0406': { label: 'Occupancy', role: 'sensor' },
         'E000': { label: 'Custom1', role: 'sensor' },
         'E001': { label: 'Custom2', role: 'sensor' }
+    };
+
+    // ZCL-атрибуты ламп (гл.3 General: 0006/0008; гл.5 Lighting: 0300/0301)
+    // → каноничные лейблы. Ключ: "CCCCAAAA" (кластер+атрибут).
+    // Канон виджетов (widgets.js getWidget + socket.js): On_Off / Level / Color / Color_Control
+    // (ColorT — legacy-синоним, виджеты его понимают). Переименования управляющих
+    // лейблов нет — иначе отвалятся виджеты. Служебным атрибутам сразу даём role sensor
+    // (данные, не управление): текстовый сенсор вместо невидимки в ветке light.
+    // Используется в te_Add_obj: перекрывает кластерный лейбл/роль из te_clusterMappings.
+    const te_lampAttrLabels = {
+        '00060000': { label: 'On_Off' },
+        '00080000': { label: 'Level', role: 'light_level' },
+        '03000000': { label: 'Color', role: 'light_color' },
+        '03000001': { label: 'Saturation', role: 'sensor' },
+        '03000003': { label: 'X', role: 'sensor' },
+        '03000004': { label: 'Y', role: 'sensor' },
+        '03000007': { label: 'Color_Control', role: 'light_color_temp' },
+        '03000008': { label: 'ColorMode', role: 'sensor' },
+        '0300400A': { label: 'ColorCapabilities', role: 'sensor' },
+        '0300400B': { label: 'PhysicalMinMireds', role: 'sensor' },
+        '0300400C': { label: 'PhysicalMaxMireds', role: 'sensor' },
+        '03004010': { label: 'StartUpColorTemperature', role: 'sensor' },
+        '03010000': { label: 'MaxLevel', role: 'sensor' },
+        '03010001': { label: 'MinLevel', role: 'sensor' }
     };
 function generateReportsFromEP(epData) {
     const reports = {};
@@ -1044,7 +1081,10 @@ function generateReportsFromEP(epData) {
     // Маппинг типов данных для конфигурации репортинга
     const dataTypeMappings = {
         'switch': '10',    // Boolean
-        'light': '20',     // 8-bit unsigned (для Level)
+        'light_onoff': '10',      // Boolean (On_Off)
+        'light_level': '20',      // 8-bit unsigned (Level)
+        'light_color': '20',      // 8-bit unsigned (Color)
+        'light_color_temp': '21', // 16-bit unsigned (mireds)
         'color': '19',     // Структура для Color
         'temperature': '29', // 16-bit signed
         'humidity': '21',  // 16-bit unsigned
@@ -1095,9 +1135,16 @@ if (te_file.Report[id]) {alert("Уже существует");return}//objEnbl
     const cluster=id.substring(2, 6);
 	const attr=id.substring(6, 10);
 	const mapping = te_clusterMappings[cluster] || { label: `Cluster_${cluster}`, role: 'sensor' };
+	// ZCL-лейбл/роль атрибута лампы (te_lampAttrLabels) важнее кластерных
+	const lampAttr = (typeof te_lampAttrLabels !== 'undefined') ? te_lampAttrLabels[cluster + attr] : null;
+	const lampAttrLbl = lampAttr ? lampAttr.label : null;
+	const lampAttrRole = lampAttr ? lampAttr.role : null;
     const dataTypeMappings = {
         'switch': '10',    // Boolean
-        'light': '20',     // 8-bit unsigned (для Level)
+        'light_onoff': '10',      // Boolean (On_Off)
+        'light_level': '20',      // 8-bit unsigned (Level)
+        'light_color': '20',      // 8-bit unsigned (Color)
+        'light_color_temp': '21', // 16-bit unsigned (mireds)
         'color': '19',     // Структура для Color
         'temperature': '29', // 16-bit signed
         'humidity': '21',  // 16-bit unsigned
@@ -1107,16 +1154,33 @@ if (te_file.Report[id]) {alert("Уже существует");return}//objEnbl
             let dataType = dataTypeMappings[mapping.role] || dataTypeMappings['default'];
             if (cluster === '0300') dataType = dataTypeMappings['color'];
             if (cluster === '0402') dataType = dataTypeMappings['temperature'];
-            if (cluster === '0405') dataType = dataTypeMappings['humidity'];	
-	
+            if (cluster === '0405') dataType = dataTypeMappings['humidity'];
+
+	// Реальный ZCL-тип атрибута из описателя кластеров (cl.js), hex-строка ("21").
+	// Кладём в объект, чтобы запись/виджеты брали тип отсюда, а не гадали.
+	// Не путать с cfg_report.DataType — тот для подписки репортинга.
+	let attrDataType = "";
+	try {
+		const clEntry = (typeof clusters !== "undefined" && clusters) ? clusters[parseInt(cluster, 16)] : null;
+		const atEntry = (clEntry && clEntry.a) ? clEntry.a[parseInt(attr, 16)] : null;
+		if (atEntry && typeof atEntry.t === "number") {
+			const manufEl = document.getElementById("te_Manuf");
+			const manufTxt = (manufEl && manufEl.innerText) || "0000";
+			if (!atEntry.m || parseInt(manufTxt, 16) === atEntry.m) {
+				attrDataType = atEntry.t.toString(16).toUpperCase().padStart(2, "0");
+			}
+		}
+	} catch (e) { console.warn("te_Add_obj: cl.js lookup failed", e); }
+
 	te_file.Report[id] = {
-                label: mapping.label,
+                label: lampAttrLbl || mapping.label,
                 val: "",
                 mat: "1",
-                role: mapping.role,
+                role: lampAttrRole || mapping.role,
                 parsed: "",
                 polling: 0,
                 debounce: 0,
+                dataType: attrDataType,
                 cfg_report: {
                     DataType: dataType,
                     MinInterval: "0001",
@@ -1394,10 +1458,11 @@ te_HA_CLASSES = {
       "sound_pressure","speed","sulphur_dioxide","temperature","timestamp",
       "uv","volatile_organic_compounds","volatile_organic_compounds_parts",
       "voltage","volume","volume_flow_rate","volume_storage","water","weight",
-      "wind_speed","text","force_update"
+      "wind_speed","enum"
     ],
     props: {
-      "unit_of_measurement": {"type":"text","hint":"°C, %, V, A, W, lx, hPa, ppm ..."},
+      "unit_of_measurement": {"type":"combo","hint":"выбери или вбей (HA-валидный!)","options":["°C","°F","K","%","V","mV","A","mA","W","kW","Wh","kWh","lx","lm","hPa","Pa","ppm","µg/m³","m/s","km/h","m","mm","dB","dBm","s","ms","L","m³","pcs"]},
+      "options":             {"type":"text","hint":"val1,val2 (только для device_class enum)"},
       "state_class":         {"type":"select","options":["measurement","total","total_increasing"]},
       "device_class":        {"type":"select","options":[]},
       "force_update":        {"type":"bool"},
@@ -1428,12 +1493,42 @@ te_HA_CLASSES = {
       "entity_category": {"type":"select","options":["config","diagnostic"]}
     }
   },
-  light: {
+  light_onoff: {
     device_classes: [],
     props: {
-      "color_mode":          {"type":"select","options":["onoff","brightness","color_temp","hs","xy","rgb","rgbw","rgbww","white"]},
+      "optimistic":      {"type":"bool","hint":"не откатывать состояние без отчёта"},
       "icon":                {"type":"text","hint":"mdi:lightbulb"},
       "entity_category":     {"type":"select","options":["config","diagnostic"]}
+    }
+  },
+  light_level: {
+    device_classes: [],
+    props: {
+      "brightness_min": {"type":"number","hint":"0"},
+      "brightness_max": {"type":"number","hint":"254 (шкала лампы: Zigbee 0–254)"},
+      "transition":     {"type":"number","hint":"десятые сек (10 = 1с, пусто = 10)"},
+      "with_onoff":     {"type":"bool","hint":"команды яркости включают лампу"},
+      "icon":           {"type":"text","hint":"mdi:brightness-6"},
+      "entity_category": {"type":"select","options":["config","diagnostic"]}
+    }
+  },
+  light_color: {
+    device_classes: [],
+    props: {
+      "color_modes":    {"type":"select","options":["rgb","hs","xy","white"],"hint":"режимы HA"},
+      "transition":     {"type":"number","hint":"десятые сек (10 = 1с, пусто = 10)"},
+      "icon":           {"type":"text","hint":"mdi:palette"},
+      "entity_category": {"type":"select","options":["config","diagnostic"]}
+    }
+  },
+  light_color_temp: {
+    device_classes: [],
+    props: {
+      "min_mireds":     {"type":"number","hint":"153 (пусто = из PhysicalMinMireds)"},
+      "max_mireds":     {"type":"number","hint":"500 (пусто = из PhysicalMaxMireds)"},
+      "transition":     {"type":"number","hint":"десятые сек (10 = 1с, пусто = 10)"},
+      "icon":           {"type":"text","hint":"mdi:thermometer"},
+      "entity_category": {"type":"select","options":["config","diagnostic"]}
     }
   },
   button: {
@@ -1450,7 +1545,7 @@ te_HA_CLASSES = {
       "min":                  {"type":"number","hint":"0"},
       "max":                  {"type":"number","hint":"100"},
       "step":                 {"type":"number","hint":"1"},
-      "unit_of_measurement":  {"type":"text","hint":"%"},
+      "unit_of_measurement":  {"type":"combo","hint":"выбери или вбей","options":["%","°C","°F","V","A","W","kWh","lx","m/s","pcs"]},
       "mode":                 {"type":"select","options":["auto","box","slider"]},
       "icon":                 {"type":"text","hint":"mdi:volume-high"},
       "entity_category":      {"type":"select","options":["config","diagnostic"]}
@@ -1516,10 +1611,10 @@ te_openClassEditor = function(obj) {
   const wnd = document.getElementById('te_classEditorWnd');
   wnd.style.display = 'flex';
 
-  te_renderClassEditor(role, currentClass);
+  te_renderClassEditor(role, currentClass, ro.label);
 };
 
-te_renderClassEditor = function(role, currentClass) {
+te_renderClassEditor = function(role, currentClass, label) {
   const schema = te_HA_CLASSES[role] || te_HA_CLASSES['sensor'];
   const dc = schema.device_classes;
 
@@ -1538,11 +1633,13 @@ te_renderClassEditor = function(role, currentClass) {
       </select>
     </div>` : '';
 
-  // Поля props (кроме device_class — он уже отдельно)
+  // Поля props (кроме device_class — он уже отдельно).
+  // only_for: показать поле только для ключей с этими лейблами (контекст ZCL-атрибута).
   let propsHtml = '';
   const props = schema.props || {};
   for (const [key, cfg] of Object.entries(props)) {
     if (key === 'device_class') continue;
+    if (cfg.only_for && (!label || cfg.only_for.indexOf(label) === -1)) continue;
     const val = currentClass[key] !== undefined ? currentClass[key] : '';
     if (cfg.type === 'select') {
       propsHtml += `<div class="ce-row">
@@ -1556,6 +1653,17 @@ te_renderClassEditor = function(role, currentClass) {
       propsHtml += `<div class="ce-row">
         <label class="ce-label">${key}</label>
         <input type="checkbox" class="ce-check" id="ce_${key}" data-key="${key}" ${val?'checked':''}>
+      </div>`;
+    } else if (cfg.type === 'combo') {
+      // Редактируемый комбобокс: выбор из списка или свой ввод (datalist).
+      // В apply обрабатывается как обычный текст (data-key уже стоит).
+      const listId = 'ce_list_' + key;
+      propsHtml += `<div class="ce-row">
+        <label class="ce-label">${key}</label>
+        <input type="text" class="ce-input" id="ce_${key}" data-key="${key}" value="${val}" placeholder="${cfg.hint||''}" list="${listId}">
+        <datalist id="${listId}">
+          ${(cfg.options||[]).map(o=>`<option value="${o}">`).join('')}
+        </datalist>
       </div>`;
     } else {
       propsHtml += `<div class="ce-row">
@@ -1578,7 +1686,7 @@ te_onCeRoleChange = function(val) {
   const obj = te_currentEditObj;
   const ro = te_file.Report[obj];
   const currentClass = ro.class || {};
-  te_renderClassEditor(val, currentClass);
+  te_renderClassEditor(val, currentClass, ro.label);
 };
 
 te_applyClassEditor = function() {
@@ -1598,7 +1706,9 @@ te_applyClassEditor = function() {
   document.querySelectorAll('#ce_props [data-key]').forEach(el => {
     const key = el.dataset.key;
     if (el.type === 'checkbox') {
-      if (el.checked) newClass[key] = true;
+      // bool пишем всегда явно (true/false): снятая галка — это false,
+      // а не отсутствие ключа, иначе читатель не отличит "выключено" от "не задано"
+      newClass[key] = !!el.checked;
     } else if (el.value !== '') {
       if (key === 'options') {
         newClass[key] = el.value.split(',').map(function(s){ return s.trim(); });
@@ -1614,9 +1724,11 @@ te_applyClassEditor = function() {
   ro.role = classJson ? `${roleBase}&${classJson}` : roleBase;
   ro.class = newClass;
 
-  // Обновляем превью в основной панели
+  // Обновляем превью в основной панели — как при рендере, через getDeviceClass (фолбэк на role)
   const dcView = document.getElementById(`${obj}_te_classname_view`);
-  if (dcView) dcView.textContent = newClass.device_class || '';
+  if (dcView) dcView.textContent = (typeof getDeviceClass === 'function') ? getDeviceClass(ro) : (newClass.device_class || '');
+  const roleInput = document.getElementById(`${obj}_te_role`);
+  if (roleInput) roleInput.value = roleBase;
   const propView = document.getElementById(`${obj}_te_classprop_view`);
   if (propView) propView.textContent = Object.entries(newClass).filter(([k])=>k!=='device_class').map(([k,v])=>`${k}: ${v}`).join(', ');
 
@@ -1629,8 +1741,10 @@ te_clearClass = function(obj) {
   const ro = te_file.Report[obj];
   ro.class = {};
   ro.role = (ro.role||'').split('&')[0];
+  const roleInput = document.getElementById(`${obj}_te_role`);
+  if (roleInput) roleInput.value = ro.role;
   const dcView = document.getElementById(`${obj}_te_classname_view`);
-  if (dcView) dcView.textContent = '';
+  if (dcView) dcView.textContent = (typeof getDeviceClass === 'function') ? getDeviceClass(ro) : ro.role;
   const propView = document.getElementById(`${obj}_te_classprop_view`);
   if (propView) propView.textContent = '';
   te_syncLive(true);
@@ -1701,8 +1815,20 @@ te_openCfgReportEditor = function(obj) {
     }
   } catch(e) {}
 
-  // DataType — hex в select и hex-input
-  const dtHex = (cfg.DataType || '').toLowerCase();
+  // DataType — hex в select и hex-input.
+  // Тип всегда по атрибуту (ZCL требует тип атрибута и в Configure Reporting):
+  // поле объекта → cl.js; сохранённый cfg.DataType — только фолбэк.
+  // Иначе stale "20" от эвристики по роли перекрывает реальный "21".
+  let dtHex = '';
+  if (ro && ro.dataType) {
+    dtHex = String(ro.dataType).toLowerCase();
+  } else try {
+    const cl = obj.substring(2, 6), at = obj.substring(6, 10);
+    const atEntry = clusters[parseInt(cl, 16)].a[parseInt(at, 16)];
+    dtHex = atEntry.t.toString(16).toLowerCase();
+  } catch(e) {}
+  if (!dtHex) dtHex = (cfg.DataType || '').toLowerCase();
+  dtHex = dtHex.replace(/^0x/, '');
   const sel   = document.getElementById('te_cre_DataType');
   const hexIn = document.getElementById('te_cre_DataType_hex');
   hexIn.value = dtHex ? dtHex.toUpperCase().padStart(2,'0') : '';
@@ -2138,7 +2264,7 @@ var TE_CSS="\n\
     box-shadow: 0 0 0 2px rgba(80,160,120,0.25);\n\
 }\n\
 .obj-mnu-editable.obj-mnu-small { max-width: 52px; flex: 0 0 52px; text-align: center; }\n\
-.obj-mnu-editable.obj-mnu-val { max-width: 80px; flex: 0 0 80px; }\n\
+.obj-mnu-editable.obj-mnu-val { flex: 1 1 80px; min-width: 80px; max-width: none; }\n\
 \n\
 .obj-mnu-prev {\n\
     border: 1px solid var(--border2);\n\
@@ -2168,6 +2294,7 @@ var TE_CSS="\n\
 .obj-mnu-btn {\n\
     padding: 2px 8px;\n\
     font-size: 11px;\n\
+    flex: 0 0 auto;\n\
     border: 1px solid var(--border2);\n\
     border-radius: 4px;\n\
     background: var(--bg3);\n\
@@ -2871,6 +2998,8 @@ var TE_CSS="\n\
 }\n\
 .class-preview {\n\
     flex: 1;\n\
+    display: inline-block;\n\
+    min-width: 60px;\n\
     font-size: 12px;\n\
     font-weight: bold;\n\
     color: var(--text);\n\
