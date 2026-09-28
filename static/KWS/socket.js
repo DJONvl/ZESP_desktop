@@ -95,6 +95,9 @@ function parseSocket(msg) {
 		
 		
 		if (z[0] === "/groups.json") { groups = JSON.parse(z[1]); eventE.emit('groups', groups); }
+		if (z[0] === "joinSetup") { eventE.emit('joinSetup:' + z[1], z.slice(2).join('|')); }
+		// Полный файл устройства/шаблона (JoinSetup и др.): deviceFile:/Devices/XXX
+		if (z[0].indexOf('/Devices/')===0 || z[0].indexOf('/Devtemplates/')===0) { eventE.emit('deviceFile:'+z[0], z.slice(1).join('|')); }
 
 		if (z[0] === "LQI_RSP") { eventE.emit('LQI_RSP', JSON.parse(z[1])); console.log(z); }
 		if (z[0] === "rep") {

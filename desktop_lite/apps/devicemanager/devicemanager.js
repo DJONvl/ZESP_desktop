@@ -161,7 +161,9 @@
       var ri = getRoleInfo(value);
       var role = ri.roleBase, attr = ri.classObj;
       // Роли ламп разделились (light_onoff/light_level/light_color/light_color_temp),
-      // а ветка ниже одна — case 'light'. Нормализуем, как в widgets.js.
+      // а ветка ниже одна — case 'light'. Нормализуем, как в widgets.js,
+      // исходную роль помним для выбора юнита.
+      var lightKind = role;
       if (role === 'light_onoff' || role === 'light_level' || role === 'light_color' || role === 'light_color_temp') role = 'light';
       var device_class = '';
       try { device_class = value.class.device_class; } catch (e) { try { device_class = attr.device_class || ''; } catch (e2) {} }
@@ -175,26 +177,41 @@
       }
 
       switch (role) {
-        case 'light':
-          if (value.label === 'On_Off' || value.label === 'on_off') {
+        case 'light': {
+          // Юнит выбираем по исходной роли (label ненадёжен: бывает русская «яркость»).
+          var isOnOff = (lightKind === 'light_onoff') || (lightKind === 'light' && (value.label === 'On_Off' || value.label === 'on_off'));
+          var isLevel = (lightKind === 'light_level') || (lightKind === 'light' && (value.label === 'Level' || value.label === 'яркость' || value.label === 'brightness'));
+          var isCt = (lightKind === 'light_color_temp') || (lightKind === 'light' && (value.label === 'ColorT' || value.label === 'Color_temp'));
+          var isColor = (lightKind === 'light_color') || (lightKind === 'light' && value.label === 'Color');
+          if (isOnOff) {
             var litOn = [1, '1', true, 'on', 'ON'].indexOf(value.parsed) !== -1;
             html += '<div style="display:flex;align-items:center;gap:5px;">' + window.getIconSvg('light_bulb', 18, litOn ? '#ffd54f' : '#666') +
               '<input type="checkbox" class="' + id + ' input toggle-input" id="lt_' + idw + '"' + (litOn ? ' checked' : '') +
               ' onchange="evm(\'on_off|' + id + '\',this.checked?1:0)"/>' +
               '<label for="lt_' + idw + '"><div class="toggle-switch ' + id + '"><span></span></div></label>' +
               '<span class="' + id + '" style="font-size:11px;color:var(--faint)">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
-          } else if (value.label === 'Level') {
+          } else if (isLevel) {
+            // parsed 0-255 → показываем проценты, шлём проценты (как виджеты).
+            var lvlPct = Math.round((parseFloat(value.parsed) || 0) * 100 / 255);
             html += '<div style="display:flex;align-items:center;gap:4px;">' + window.getIconSvg('brightness', 16, '#ffd54f') +
-              '<input class="' + id + ' level" type="range" id="level|' + id + '" style="width:80px" min="0" max="100" step="2" value="' + (value.parsed || 0) + '" onchange="evm(\'level|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
-              '<span class="' + id + '" style="font-size:11px;color:var(--faint);min-width:26px">' + (value.parsed != null ? value.parsed : 0) + '%</span></div>';
-          } else if (value.label === 'Color') {
+              '<input class="' + id + ' level" type="range" id="level|' + id + '" style="width:80px" min="0" max="100" step="2" value="' + lvlPct + '" onchange="evm(\'level|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
+              '<span class="' + id + '" style="font-size:11px;color:var(--faint);min-width:26px">' + lvlPct + '%</span></div>';
+          } else if (isCt) {
+            // миреды 153-500 → проценты, шлём проценты (как виджеты).
+            var ctPct = Math.round(((parseFloat(value.parsed) || 153) - 153) * 100 / 347);
             html += '<div style="display:flex;align-items:center;gap:4px;">' + window.getIconSvg('sun_temp', 16, '#ff9800') +
-              '<input class="' + id + ' color-temp" type="range" id="colorT|' + id + '" style="width:80px" min="0" max="100" step="2" value="' + (value.parsed || 0) + '" onchange="evm(\'colorT|' + id + '\',this.value)">' +
-              '<span class="z' + id + '" style="font-size:11px;color:var(--faint)">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
+              '<input class="' + id + ' color-temp" type="range" id="colorT|' + id + '" style="width:80px" min="0" max="100" step="2" value="' + ctPct + '" onchange="evm(\'colorT|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
+              '<span class="' + id + '" style="font-size:11px;color:var(--faint);min-width:26px">' + ctPct + '%</span></div>';
+          } else if (isColor) {
+            // оттенок hue 0-100 → шлём hex (как виджеты, hsl2Hex глобальный).
+            html += '<div style="display:flex;align-items:center;gap:4px;">' + window.getIconSvg('palette', 16, '#ff9800') +
+              '<input class="' + id + ' color-range" type="range" id="color|' + id + '" style="width:80px" min="0" max="100" step="2" value="75" onchange="var hue=((this.value/100)*360).toFixed(0);evm(\'color|' + id + '\',hsl2Hex(hue,100,50))" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
+              '<span class="' + id + '" style="font-size:11px;color:var(--faint);min-width:26px">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
           } else {
             html += '<span class="' + id + '" style="font-size:11px;color:var(--faint)">' + (value.parsed != null ? value.parsed : '?') + '</span>';
           }
           break;
+        }
         case 'switch': {
           var swOn = [1, '1', true, 'on', 'ON', 'вкл'].indexOf(value.parsed) !== -1;
           html += '<div style="display:flex;align-items:center;gap:5px;">' + window.getIconSvg(device_class || 'switch', 18, swOn ? '#66bb6a' : '#666') +

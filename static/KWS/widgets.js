@@ -805,8 +805,168 @@ function getWidget(IEEE) {
 		}
 		tpl += `</div>`
 	}
+	// --- JoinSetup юниты: пустая категория — инлайн, config/diagnostic — в details ---
+	try { tpl += renderSetupBlock(dev); } catch(e) { console.warn('setup block', e); }
 	tpl += `</div>`
 	return tpl
+}
+
+// Кэш проекций JoinSetup.writes: ieee -> {state, writes}. Грузится лениво, один раз.
+window.jsCache = window.jsCache || {};
+function jsEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+function setupRowHtml(ieee, w, forceLabel) {
+	var id = ieee + '#setup:' + w.id;
+	var kind = w.kind || 'select';
+	var title = forceLabel || w.unitname || w.unit || w.label || w.id;
+	var h = `<div class="switch flex">`;
+	h += `<div class="icon flex">⚙️</div>`;
+	h += `<div class="labelObj">${jsEsc(title)}</div>`;
+	if (kind === 'number') {
+		var nv = parseFloat(w.value);
+		if (!isFinite(nv)) nv = 0;
+		h += `<input class="${jsEsc(id)}" type="number" style="width:64px;background:#1e1e1e;color:#fff;border:1px solid #555;border-radius:6px;padding:3px 4px;font-size:13px;text-align:center;" value="${nv}" onkeydown="if(event.key==='Enter'){widgetEvnt('setup|${jsEsc(id)}',this.value)}">`;
+		h += `<button type="button" title="Записать" style="background:#2e7d32;color:#fff;border:1px solid #43a047;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px;" onclick="widgetEvnt('setup|${jsEsc(id)}',this.parentNode.querySelector('input').value)">OK</button>`;
+	} else if (kind === 'button') {
+		h += `<input type="button" class="${jsEsc(id)} button-input" value="${jsEsc(title)}" onclick="widgetEvnt('setup|${jsEsc(id)}','${jsEsc(w.value || '1')}')">`;
+	} else {
+		var opts = [];
+		(w.options || []).forEach(function(o) {
+			if (o && typeof o === 'object') opts.push({ v: String(o.v != null ? o.v : ''), l: String(o.l != null && o.l !== '' ? o.l : o.v) });
+			else if (o != null && o !== '') opts.push({ v: String(o), l: String(o) });
+		});
+		if (!opts.length && w.value != null && w.value !== '') opts.push({ v: String(w.value), l: String(w.value) });
+		if (!opts.length) return '';
+		// Один вариант — дропдаун бессмысленен, показываем текст
+		if (opts.length < 2) {
+			var only = opts[0];
+			var txt = only.l !== only.v ? only.l + ' (' + only.v + ')' : only.v;
+			h += `<span class="${jsEsc(id)}" style="color:#e6a23c;font-size:12px;" title="Один вариант — дополни в редакторе">⚠ ${jsEsc(txt)}</span>`;
+			h += `</div>`;
+			return h;
+		}
+		// Выбор только стейджит, запись — по OK (иначе случайный клик пишет в устройство)
+		h += `<select class="${jsEsc(id)}" onchange="jsCacheSet('${jsEsc(ieee)}','${jsEsc(w.id)}',this.value)" style="width:110px;">`;
+		opts.forEach(function(o) {
+			var sel = (o.v === String(w.value)) ? 'selected' : '';
+			h += `<option value="${jsEsc(o.v)}" ${sel}>${jsEsc(o.l)}</option>`;
+		});
+		h += `</select>`;
+		h += `<button type="button" title="Записать" style="background:#2e7d32;color:#fff;border:1px solid #43a047;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px;" onclick="var s=this.parentNode.querySelector('select');widgetEvnt('setup|${jsEsc(id)}',s.value);jsCacheSet('${jsEsc(ieee)}','${jsEsc(w.id)}',s.value)">OK</button>`;
+	}
+	h += `</div>`;
+	return h;
+}
+
+function jsCacheSet(ieee, wid, val) {
+	try {
+		var c = window.jsCache[ieee];
+		if (c && c.writes) c.writes.forEach(function(w) { if (w.id === wid) w.value = val; });
+	} catch(e) {}
+}
+
+function renderSetupBlock(dev) {
+	if (!dev || !dev.IEEE) return '';
+	// В редакторе превью строится из te_file (там полный JoinSetup, флага может не быть)
+	var localWrites = (dev.JoinSetup && dev.JoinSetup.writes) || [];
+	if (!dev.hasSetup && !localWrites.length) return '';
+	var ieee = dev.IEEE;
+	var c = window.jsCache[ieee];
+	if (!c) {
+		window.jsCache[ieee] = { state: 'loading', writes: [] };
+		try {
+			eventE.once('joinSetup:' + ieee, function(data) {
+				try {
+					var w = (data && data !== 'NULL') ? JSON.parse(data) : [];
+					window.jsCache[ieee] = { state: 'ready', writes: w };
+				} catch(e) { window.jsCache[ieee] = { state: 'ready', writes: [] }; }
+				try {
+					var el = document.getElementById('setup_' + ieee);
+					if (el) el.innerHTML = setupBlockInner(ieee, window.jsCache[ieee].writes);
+				} catch(e) {}
+			});
+			WSsend('getJoinSetup|' + ieee);
+		} catch(e) {}
+		return `<div class="switch flex" id="setup_${jsEsc(ieee)}"><span style="color:#888;font-size:11px;">⚙ загрузка настроек…</span></div>`;
+	}
+	if (c.state !== 'ready') return `<div class="switch flex" id="setup_${jsEsc(ieee)}"><span style="color:#888;font-size:11px;">⚙ загрузка настроек…</span></div>`;
+	return `<div id="setup_${jsEsc(ieee)}" style="width:100%">${setupBlockInner(ieee, c.writes)}</div>`;
+}
+
+function setupBlockInner(ieee, writes) {
+	if (!writes || !writes.length) return '';
+	// Группировка по unitname. Несколько select-записей одного юнита —
+	// варианты одного дропдауна (каждая запись = вариант со своим адресом).
+	var groups = {}, order = [];
+	writes.forEach(function(w) {
+		var u = w.unitname || w.unit || w.label || w.id || '';
+		if (!groups[u]) { groups[u] = []; order.push(u); }
+		groups[u].push(w);
+	});
+	var inline = '', cfg = '';
+	var put = function(w, row) {
+		if (!row) return;
+		var cat = w.entity_category || '';
+		if (cat === 'config' || cat === 'diagnostic') cfg += row;
+		else inline += row;
+	};
+	order.forEach(function(u) {
+		var members = groups[u];
+		var sels = members.filter(function(w) { return (w.kind || 'select') === 'select'; });
+		var rest = members.filter(function(w) { return (w.kind || 'select') !== 'select'; });
+		if (sels.length > 1) {
+			var mrow = setupMergedSelectHtml(ieee, u, sels);
+			if (mrow) put(sels[0], mrow);
+			rest.forEach(function(w) { put(w, setupRowHtml(ieee, w, w.label || w.id)); });
+		} else {
+			members.forEach(function(w) { put(w, setupRowHtml(ieee, w)); });
+		}
+	});
+	var h = inline;
+	if (cfg) h += `<details style="width:100%;margin-top:2px;"><summary style="cursor:pointer;color:#aaa;font-size:11px;">⚙ Настройки</summary>${cfg}</details>`;
+	return h;
+}
+
+// Один дропдаун из нескольких select-записей: каждая запись = вариант
+// (название + значение + свой адрес). Вложенные options тут не смотрятся.
+function setupMergedSelectHtml(ieee, uname, entries) {
+	var opts = [];
+	entries.forEach(function(w) {
+		if (w.value == null || w.value === '') return;
+		opts.push({ entry: w.id, v: String(w.value), l: String(w.label || w.value), sel: !!w.selected });
+	});
+	if (!opts.length) return '';
+	var selIdx = 0;
+	for (var k = 0; k < opts.length; k++) {
+		if (opts[k].sel) { selIdx = k; break; }
+	}
+	var h = `<div class="switch flex">`;
+	h += `<div class="icon flex">⚙️</div>`;
+	h += `<div class="labelObj">${jsEsc(uname)}</div>`;
+	h += `<select style="width:110px;">`;
+	opts.forEach(function(o, k) {
+		h += `<option value="${jsEsc(o.entry + '|' + o.v)}"${k === selIdx ? ' selected' : ''}>${jsEsc(o.l)}</option>`;
+	});
+	h += `</select>`;
+	h += `<button type="button" title="Записать" style="background:#2e7d32;color:#fff;border:1px solid #43a047;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px;" onclick="jsMergedOk('${jsEsc(ieee)}',this)">OK</button>`;
+	h += `</div>`;
+	return h;
+}
+
+function jsMergedOk(ieee, btn) {
+	try {
+		var s = btn.parentNode.querySelector('select');
+		if (!s) return;
+		var p = s.value.split('|');
+		var entry = p[0], val = p.slice(1).join('|');
+		widgetEvnt('setup|' + ieee + '#setup:' + entry, val);
+		var c = window.jsCache[ieee];
+		if (c && c.writes) {
+			var u = '';
+			c.writes.forEach(function(w) { if (w.id === entry) { w.value = val; w.selected = true; u = w.unitname || w.unit || ''; } });
+			if (u) c.writes.forEach(function(w) { if (w.id !== entry && (w.unitname || w.unit || '') === u) delete w.selected; });
+		}
+	} catch(e) {}
 }
 
 

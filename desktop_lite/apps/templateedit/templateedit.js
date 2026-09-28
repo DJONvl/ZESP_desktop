@@ -8,7 +8,7 @@ function teShowAbout(){}
 var te_mock={show:function(){},hide:function(){},bringToFront:function(){},destroy:function(){},clickClose:function(){},render:function(){}};
 var te_cm1={setItemState:function(){},setState:function(){}};
 window.te_timers=[];
-function te_reset(){ var v=["file","fileName","filePath","docChanged","ClassterAttr","tmpFile","dragItem","dragStartIndex","dragStartY","dragStartX","dragOffsetY","isDragging","placeholder","dragContainer","currentEditObj","currentCfgObj","currentYaObj","currentYaData","sniffSelected"]; v.forEach(function(v2){ try{ window["te_"+v2]=null; }catch(e){} }); }
+function te_reset(){ var v=["file","fileName","filePath","docChanged","ClassterAttr","tmpFile","dragItem","dragStartIndex","dragStartY","dragStartX","dragOffsetY","isDragging","placeholder","dragContainer","currentEditObj","currentCfgObj","currentYaObj","currentYaData","sniffSelected","jsEditIdx","currentBindObj","jsVarEdit"]; v.forEach(function(v2){ try{ window["te_"+v2]=null; }catch(e){} }); }
 function te_openFromManager(ieee){ if(window.WinEngine) WinEngine.open("templateedit",{params:"1#"+ieee}); }
 
 
@@ -79,6 +79,10 @@ te_parseFile=function(file)
 	if (window.te_retryIv) { clearInterval(window.te_retryIv); window.te_retryIv = null; }
 	if (window.te_retryHdl && window.eventE) { eventE.off("updateDeviceList", window.te_retryHdl); window.te_retryHdl = null; }
 	te_file={ ...src };
+
+	// JoinSetup живёт в файле, в deviceList его нет — нормализуем и догружаем полным LoadJson
+	te_normJoinSetup(te_file);
+	te_fetchJoinSetup(file);
 
 	// Приводим все объекты Report к новому формату сразу после загрузки
 	te_migrateRoleFormat(te_file);
@@ -446,6 +450,16 @@ te_drawJson = function(js, obj) {
                 </td>
             </tr>
             <tr>
+                <td title="Куда слать репорты этого кластера. Сохраняется в JoinSetup.binds">Bind</td>
+                <td colspan="2">
+                    <div style="display:flex;align-items:center;gap:3px;">
+                        <div class="cfg-rpt-preview" id="${obj}_te_bind_view">${te_bindPreview(obj)}</div>
+                        <button class="obj-mnu-btn" style="padding:1px 5px" onclick="te_openBindEditor('${obj}')">✏️</button>
+                        <button class="obj-mnu-btn" style="padding:1px 5px" onclick="te_clearBind('${obj}')">✖</button>
+                    </div>
+                </td>
+            </tr>
+            <tr>
                 <td>Location</td>
                 <td colspan="2">
                     <input type="text"
@@ -504,12 +518,21 @@ te_drawJson = function(js, obj) {
             dragContainer.appendChild(object);
         }
         container.appendChild(dragContainer);
+        // Секция JoinSetup («Настройка подключения») — под списком объектов.
+        // innerHTML ставим здесь же (контейнер ещё не в DOM), refresh — после вставки ниже.
+        try {
+            const jsBlock = document.createElement("div");
+            jsBlock.id = "te_JoinSetup";
+            try { jsBlock.innerHTML = te_joinSetupHtml(); } catch(e2) { console.warn("te JoinSetup html", e2); }
+            container.appendChild(jsBlock);
+        } catch(e) { console.warn("te JoinSetup render", e); }
     }
     
     // Очищаем и заполняем DeviceJson
     const deviceJson = document.getElementById("te_DeviceJson");
     deviceJson.innerHTML = '';
     deviceJson.appendChild(container);
+    try { te_refreshJoinSetup(); } catch(e) {}
 
     // ========== ИСПРАВЛЕНИЕ: СОЗДАЕМ ПИКЕР ПОСЛЕ ДОБАВЛЕНИЯ В DOM ==========
     // Небольшая задержка для гарантии, что DOM обновился
@@ -713,7 +736,7 @@ te_updateReportOrder = function() {
     console.log('Порядок обновлен:', newOrder);
 	te_markSave(0);
 	let ind=deviceList.findIndex(d => d.IEEE === te_file.IEEE)
-	if(ind>=0){deviceList[ind]=te_file}
+	if(ind>=0){deviceList[ind]=te_strippedLive(te_file)}
 	try{redrawDevice(te_file.IEEE)}catch{}
 };
 
@@ -727,9 +750,10 @@ te_syncLive = function(immediate) {
     te_docChanged = true;
     try { te_markSave(0); } catch(e) {}
     var push = function() {
+        try { te_primeJsCache(); } catch(e) {}
         try {
             var ind = deviceList.findIndex(function(d){ return d.IEEE === te_file.IEEE; });
-            if (ind >= 0) deviceList[ind] = te_file;
+            if (ind >= 0) deviceList[ind] = te_strippedLive(te_file);
         } catch(e) {}
         try { if (typeof redrawDevice === "function") redrawDevice(te_file.IEEE); } catch(e) {}
         try { if (window.eventE) eventE.emit("updateDeviceList", deviceList); } catch(e) {}
@@ -895,11 +919,12 @@ te_cmSave_click=function()
 		return;
 
 	te_migrateRoleFormat(te_file);
+	te_normJoinSetup(te_file);
 	//SaveJson(`/Devices/${te_fileName}`, JSON.stringify(te_file))
 	WSsend(`SaveJson|/Devices/${te_fileName}|` + JSON.stringify(te_file));
 	te_markSave(1);	
 	let ind=deviceList.findIndex(d => d.IEEE === te_file.IEEE)
-	if(ind>=0){deviceList[ind]=te_file}
+	if(ind>=0){deviceList[ind]=te_strippedLive(te_file)}
 	// Живое обновление десктопа: плитки подтянутся по alldev-бродкасту с бэка,
 	// открытый попап устройства перерисовываем сразу
 	try{ if(typeof redrawDevice==="function") redrawDevice(te_file.IEEE); }catch(e){}
@@ -1438,6 +1463,564 @@ var _origCloseApp = (typeof te_closeApp !== 'undefined') ? te_closeApp : functio
 te_closeApp = function() {
     te_stopSniff();
     _origCloseApp();
+};
+
+// ============================================================
+// JOINSETUP — «Настройка подключения» (writes/binds/reports/groups)
+// Хранится в файле устройства/шаблона, в deviceList/broadcast не попадает.
+// ============================================================
+
+// Копия te_file без JoinSetup — для deviceList/десктопа (память чистая)
+te_strippedLive = function(src) {
+    if (!src) return src;
+    var c = Object.assign({}, src);
+    try { delete c.JoinSetup; } catch(e) {}
+    // Флаг виджету: есть юниты — карточка подтянет проекцию из общего jsCache
+    try {
+        if (src.JoinSetup && src.JoinSetup.writes && src.JoinSetup.writes.length) c.hasSetup = true;
+    } catch(e) {}
+    return c;
+};
+
+// Кладём проекцию юнитов из te_file в общий jsCache — превью и плитки
+// рисуются мгновенно, без ожидания getJoinSetup и сейва
+te_primeJsCache = function() {
+    try {
+        if (!window.te_file || !te_file.IEEE || !te_file.JoinSetup) return;
+        var proj = (te_file.JoinSetup.writes || []).map(function(w) {
+            return { id: w.id, unitname: w.unitname, label: w.label, kind: w.kind, entity_category: w.entity_category, value: w.value, options: w.options, selected: !!w.selected };
+        });
+        window.jsCache = window.jsCache || {};
+        window.jsCache[te_file.IEEE] = { state: 'ready', writes: proj };
+    } catch(e) {}
+};
+
+// Нормализация к {writes:[],binds:[],reports:[],groups:[]} — правит по месту, возвращает ссылку
+te_normJoinSetup = function(dev) {
+    if (!dev) return { writes: [], binds: [], reports: [], groups: [] };
+    var js = dev.JoinSetup;
+    if (!js || typeof js !== 'object' || Array.isArray(js)) js = {};
+    ['writes', 'binds', 'reports', 'groups'].forEach(function(k) {
+        if (!Array.isArray(js[k])) js[k] = [];
+    });
+    // Миграция: options-строки → [{v,l}], unit → unitname, unitname ← label
+    js.writes.forEach(function(w) {
+        if (Array.isArray(w.options)) {
+            w.options = w.options.map(function(o) {
+                if (typeof o === 'string') return { v: o, l: o };
+                return o;
+            });
+        }
+        if (w.unit && !w.unitname) { w.unitname = w.unit; delete w.unit; }
+        if (!w.unitname) w.unitname = w.label || w.id || '';
+    });
+    // Чистка: в merged-группе (2+ select на юнит) вложенные options бессмысленны — записи сами варианты
+    var selCount = {};
+    js.writes.forEach(function(w) {
+        if ((w.kind || 'select') === 'select') {
+            var u = w.unitname || w.label || '';
+            selCount[u] = (selCount[u] || 0) + 1;
+        }
+    });
+    js.writes.forEach(function(w) {
+        if ((w.kind || 'select') === 'select' && (selCount[w.unitname || w.label || ''] || 0) > 1 && w.options && w.options.length) {
+            w.options = [];
+        }
+    });
+    dev.JoinSetup = js;
+    return js;
+};
+
+// Догрузка полного файла с диска (в deviceList JoinSetup нет) — мерж только JoinSetup
+te_fetchJoinSetup = function(ieee) {
+    if (!ieee || !window.eventE || typeof WSsend !== 'function') return;
+    try {
+        var key = 'deviceFile:/Devices/' + ieee;
+        eventE.once(key, function(data) {
+            try {
+                if (!data || data === 'NULL') return;
+                if (!window.te_file || te_file.IEEE !== ieee) return; // окно уже закрыто/сменено
+                var full = JSON.parse(data);
+                if (full && full.JoinSetup) {
+                    te_file.JoinSetup = te_normJoinSetup(full);
+                    te_refreshJoinSetup();
+                }
+            } catch(e) { console.warn('te JoinSetup merge', e); }
+        });
+        WSsend('LoadJson|/Devices/' + ieee);
+    } catch(e) {}
+};
+
+te_jsDirty = function() {
+    te_docChanged = true;
+    try { te_markSave(0); } catch(e) {}
+    te_syncLive(true);
+};
+
+te_escJs = function(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+};
+
+// ---------- HTML ----------
+te_joinSetupHtml = function() {
+    var js = te_normJoinSetup(te_file || {});
+    var h = '<div class="obj-mnu-divider"></div>';
+    h += '<div class="te_edObj" id="te_jsHead"><div class="ep">⚙</div><div class="cl">JoinSetup</div><div>— Настройка подключения (применяется при подключении)</div></div>';
+    h += '<div class="te_edAttr show" style="display:block">';
+
+    // --- WRITES: всё правится прямо на месте, без режимов правки ---
+    h += '<div class="obj-mnu-section"><div class="obj-mnu-row"><label class="obj-mnu-label">Записи</label>'
+        + '<span style="font-size:11px;color:var(--text-muted)">юниты: запись значения в EP+кластер+атрибут</span></div>';
+    if (!js.writes.length) h += '<div style="font-size:11px;color:#bbb;padding:2px 6px">— пусто —</div>';
+    // Группировка по unitname; select-записи одного юнита = варианты одного селекта
+    var dup = te_jsDupKeys(js);
+    var groups = {}, order = [];
+    js.writes.forEach(function(w, i) {
+        var u = w.unitname || w.label || '';
+        if (!groups[u]) { groups[u] = []; order.push(u); }
+        groups[u].push(i);
+    });
+    order.forEach(function(u) {
+        var nsel = groups[u].filter(function(i) { return (js.writes[i].kind || 'select') === 'select'; }).length;
+        h += '<div class="obj-mnu-row" style="margin-top:4px;background:var(--bg3);border-radius:4px;padding:2px 5px">'
+            + '<label class="obj-mnu-label" style="font-weight:bold">📦</label>'
+            + '<input class="obj-mnu-dt-input" style="width:160px;font-weight:bold" value="' + te_escJs(u) + '" data-old="' + te_escJs(u) + '" onchange="te_jsSetUnit(this)" title="Имя юнита (одинаковое = один юнит)">'
+            + '<span style="font-size:10px;color:var(--text-muted)">' + groups[u].length + ' зап.</span>'
+            + (nsel > 1 ? '<span style="font-size:10px;color:var(--accent)" title="Эти select-записи сольются в один селект в виджете">→ один селект</span>' : '')
+            + '</div>';
+        groups[u].forEach(function(i) {
+            var w = js.writes[i];
+            var cat = w.entity_category || '';
+            var dkey = ((w.ep || '') + (w.cluster || '') + (w.attr || '')).toUpperCase();
+            var isDup = (dup[dkey] || 0) > 1;
+            var kind = w.kind || 'select';
+            h += '<div style="border:1px solid ' + (isDup ? 'var(--red)' : 'var(--border2)') + ';border-radius:4px;padding:3px 5px;margin:2px 0 2px 8px">'
+                + '<div class="obj-mnu-row" style="gap:3px">'
+                + '<input class="obj-mnu-dt-input" style="width:120px" value="' + te_escJs(w.label || '') + '" onchange="te_jsSetF(' + i + ',\'label\',this.value)" title="Название">'
+                + '<select class="obj-mnu-dt-input" title="Тип юнита" onchange="te_jsSetKind(' + i + ',this.value)">'
+                + ['select', 'number', 'button'].map(function(k) { return '<option value="' + k + '"' + (k === kind ? ' selected' : '') + '>' + k + '</option>'; }).join('')
+                + '</select>'
+                + '<select class="obj-mnu-dt-input" title="Где показывать: пусто — в виджете" onchange="te_jsSetF(' + i + ',\'entity_category\',this.value)">'
+                + '<option value=""' + (cat === '' ? ' selected' : '') + '>виджет</option>'
+                + '<option value="config"' + (cat === 'config' ? ' selected' : '') + '>config</option>'
+                + '<option value="diagnostic"' + (cat === 'diagnostic' ? ' selected' : '') + '>diagnostic</option>'
+                + '</select>'
+                + '<button class="obj-mnu-btn" onclick="te_jsDel(\'writes\',' + i + ')" title="Удалить запись">🗑</button>'
+                + (w.selected ? '<b style="color:var(--accent)" title="Выбранный вариант юнита (уйдёт в устройство при подключении)">●</b>' : '')
+                + (isDup ? '<span style="font-size:10px;color:var(--red)" title="Две записи пишут в один атрибут — останется одна">⚠ дубль атрибута</span>' : '')
+                + '</div>'
+                + '<div class="obj-mnu-row" style="gap:3px">'
+                + '<input class="obj-mnu-dt-input" style="width:36px" value="' + te_escJs(w.ep || '') + '" onchange="te_jsSetF(' + i + ',\'ep\',this.value)" title="Endpoint hex" placeholder="EP">'
+                + '<input class="obj-mnu-dt-input" style="width:52px" value="' + te_escJs(w.cluster || '') + '" onchange="te_jsSetF(' + i + ',\'cluster\',this.value)" title="Cluster hex" placeholder="Clust">'
+                + '<input class="obj-mnu-dt-input" style="width:52px" value="' + te_escJs(w.attr || '') + '" onchange="te_jsSetF(' + i + ',\'attr\',this.value)" title="Attribute hex" placeholder="Attr">'
+                + '<input class="obj-mnu-dt-input" style="width:52px" value="' + te_escJs(w.manuf || '') + '" onchange="te_jsSetF(' + i + ',\'manuf\',this.value)" title="Manuf code hex" placeholder="Manuf">'
+                + '<input class="obj-mnu-dt-input" style="width:44px" value="' + te_escJs(w.dataType || '') + '" onchange="te_jsSetF(' + i + ',\'dataType\',this.value)" title="DataType hex" placeholder="Type">'
+                + '<button class="obj-mnu-btn" onclick="te_jsReadWrite(' + i + ')" title="Прочитать текущее значение из устройства">🔄</button>'
+                + '<button class="obj-mnu-btn" onclick="te_jsApplyWrite(' + i + ')" title="Выполнить сейчас: записать в устройство">▶</button>'
+                + '</div>';
+            if (kind === 'select' && nsel < 2) {
+                h += '<div class="obj-mnu-row" style="flex-wrap:wrap;gap:3px">';
+                var nopts = (w.options || []).length;
+                if (nopts < 2) h += '<span style="font-size:10px;color:#e6a23c">⚠ нужен ещё вариант:</span>';
+                (w.options || []).forEach(function(o, j) {
+                    var cur = (String(o.v) === String(w.value)) ? ' <b style="color:var(--accent)" title="Текущий">●</b>' : '';
+                    h += '<span style="font-size:11px;border:1px solid var(--border2);border-radius:6px;padding:1px 3px;display:inline-flex;gap:2px;align-items:center">'
+                        + '<input class="obj-mnu-dt-input" style="width:40px" value="' + te_escJs(o.v) + '" onchange="te_jsSetVar(' + i + ',' + j + ',\'v\',this.value)" title="Значение hex">'
+                        + '<input class="obj-mnu-dt-input" style="width:76px" value="' + te_escJs(o.l) + '" onchange="te_jsSetVar(' + i + ',' + j + ',\'l\',this.value)" title="Название варианта">'
+                        + cur
+                        + '<span onclick="te_jsTestVariant(' + i + ',' + j + ')" style="cursor:pointer" title="Проверить: записать в устройство">▶</span>'
+                        + '<span onclick="te_jsDelVariant(' + i + ',' + j + ')" style="cursor:pointer;color:var(--red)" title="Убрать вариант">×</span></span>';
+                });
+                h += '<input id="te_js_ov_' + i + '" class="obj-mnu-dt-input" style="width:40px" placeholder="val" title="Значение hex">'
+                    + '<input id="te_js_ol_' + i + '" class="obj-mnu-dt-input" style="width:76px" placeholder="название" title="Название варианта">'
+                    + '<button class="obj-mnu-btn" onclick="te_jsAddVariant(' + i + ')" title="Добавить вариант">+</button>'
+                    + '</div>';
+            } else if (kind === 'select') {
+                h += '<div class="obj-mnu-row"><span style="font-size:11px;color:var(--text-muted)">вариант селекта: <b>' + te_escJs(w.label || '') + ' = ' + te_escJs(w.value || '') + '</b> (меняется полями выше)</span></div>';
+            } else {
+                h += '<div class="obj-mnu-row"><span style="font-size:11px;color:var(--text-muted)">значение:</span>'
+                    + '<input class="obj-mnu-dt-input" style="width:80px" value="' + te_escJs(w.value || '') + '" onchange="te_jsSetF(' + i + ',\'value\',this.value)" title="Значение">'
+                    + '</div>';
+            }
+            h += '</div>';
+        });
+    });
+    h += '<div class="obj-mnu-row"><button class="obj-mnu-btn obj-mnu-btn-primary" onclick="te_jsAddUnit()" title="Добавить пустой юнит, заполнить прямо тут">+ юнит</button></div></div>';
+
+    // --- BINDS (настраиваются из карточки объекта, строка Bind ✏️) ---
+    h += '<div class="obj-mnu-divider"></div><div class="obj-mnu-section"><div class="obj-mnu-row"><label class="obj-mnu-label">Бинды</label>'
+        + '<span style="font-size:11px;color:var(--text-muted)">настройка — из карточки объекта (строка Bind ✏️)</span></div>';
+    if (!js.binds.length) h += '<div style="font-size:11px;color:#bbb;padding:2px 6px">— пусто —</div>';
+    js.binds.forEach(function(b, i) {
+        h += '<div class="obj-mnu-row" style="border:1px solid var(--border2);border-radius:4px;padding:3px 5px;margin:2px 0">'
+            + '<b>' + te_escJs(te_jsClusterName(b.cluster) + ' · EP ' + (b.ep || '')) + '</b>'
+            + '<span class="obj-mnu-prev">→ ' + te_escJs(te_jsDstName(b.dst)) + (b.dstEP ? ':' + te_escJs(b.dstEP) : '') + '</span>'
+            + '<button class="obj-mnu-btn" onclick="te_jsApplyBind(' + i + ',true)" title="Выполнить сейчас: Bind">🔗</button>'
+            + '<button class="obj-mnu-btn" onclick="te_jsApplyBind(' + i + ',false)" title="Выполнить сейчас: Unbind">🔓</button>'
+            + '<button class="obj-mnu-btn" onclick="te_jsDel(\'binds\',' + i + ')" title="Удалить">🗑</button>'
+            + '</div>';
+    });
+    h += '</div>';
+
+    // --- REPORTS (настраиваются из карточки объекта, строка cfg_report ✏️) ---
+    h += '<div class="obj-mnu-divider"></div><div class="obj-mnu-section"><div class="obj-mnu-row"><label class="obj-mnu-label">Репорты</label>'
+        + '<span style="font-size:11px;color:var(--text-muted)">настройка — из карточки объекта (строка cfg_report ✏️)</span></div>';
+    if (!js.reports.length) h += '<div style="font-size:11px;color:#bbb;padding:2px 6px">— пусто —</div>';
+    js.reports.forEach(function(r, i) {
+        var rkey = (r.ep || '') + (r.cluster || '') + (r.attr || '');
+        var rlabel = '';
+        try { if (te_file && te_file.Report && te_file.Report[rkey]) rlabel = te_file.Report[rkey].label + ' · '; } catch(e) {}
+        h += '<div class="obj-mnu-row" style="border:1px solid var(--border2);border-radius:4px;padding:3px 5px;margin:2px 0">'
+            + '<b>' + te_escJs(rlabel + te_jsClusterName(r.cluster)) + '</b>'
+            + '<span class="obj-mnu-prev">Dt:<b>' + te_escJs(r.dataType || '') + '</b> ' + te_hexDec(r.min) + '..' + te_hexDec(r.max) + 's Δ' + te_hexDec(r.change) + '</span>'
+            + '<button class="obj-mnu-btn" onclick="te_jsApplyReport(' + i + ')" title="Выполнить сейчас: настроить репорт">▶</button>'
+            + '<button class="obj-mnu-btn" onclick="te_jsDelReport(' + i + ')" title="Удалить (и из объекта)">🗑</button>'
+            + '</div>';
+    });
+    h += '</div>';
+
+    // --- GROUPS (только если у устройства есть кластер Groups 0004, иначе не работает) ---
+    if (te_jsHasGroups()) {
+    h += '<div class="obj-mnu-divider"></div><div class="obj-mnu-section"><div class="obj-mnu-row"><label class="obj-mnu-label">Группы</label>'
+        + '<span style="font-size:11px;color:var(--text-muted)">прописать группу в устройство (бэк — следующим этапом)</span></div>';
+    if (!js.groups.length) h += '<div style="font-size:11px;color:#bbb;padding:2px 6px">— пусто —</div>';
+    js.groups.forEach(function(g, i) {
+        h += '<div class="obj-mnu-row" style="border:1px solid var(--border2);border-radius:4px;padding:3px 5px;margin:2px 0">'
+            + '<span class="obj-mnu-prev" style="font-family:monospace">group ' + te_escJs(g.addr || '') + ' → EP ' + te_escJs(g.ep || '') + '</span>'
+            + '<button class="obj-mnu-btn" onclick="te_jsDel(\'groups\',' + i + ')" title="Удалить">🗑</button>'
+            + '</div>';
+    });
+    var grpOpts = '';
+    try {
+        (window.groups || []).forEach(function(gr) {
+            grpOpts += '<option value="' + te_escJs(gr.adress) + '">' + te_escJs(gr.adress) + ' — ' + te_escJs(gr.name) + '</option>';
+        });
+    } catch(e) {}
+    h += '<div class="obj-mnu-row" style="flex-wrap:wrap">'
+        + '<input id="te_js_g_addr" class="obj-mnu-dt-input" style="width:70px" list="te_js_g_list" placeholder="Addr" title="Адрес группы hex">'
+        + '<datalist id="te_js_g_list">' + grpOpts + '</datalist>'
+        + '<input id="te_js_g_ep" class="obj-mnu-dt-input" style="width:36px" placeholder="EP">'
+        + '<button class="obj-mnu-btn obj-mnu-btn-primary" onclick="te_jsAddGroup()" title="Добавить группу">+ Add</button>'
+        + '</div></div>';
+    } // te_jsHasGroups
+
+    h += '</div>';
+    return h;
+};
+
+// Есть ли у устройства кластер Groups (0004) хоть в одном EP — иначе членство в группах не работает
+te_jsHasGroups = function() {
+    try {
+        var eps = (window.te_file && te_file.EP) || {};
+        for (var epId in eps) {
+            if (!eps.hasOwnProperty(epId)) continue;
+            var cl = (eps[epId].ClI || []).concat(eps[epId].ClO || []);
+            for (var i = 0; i < cl.length; i++) {
+                if (String(cl[i]).toUpperCase() === '0004') return true;
+            }
+        }
+    } catch(e) {}
+    return false;
+};
+
+te_refreshJoinSetup = function() {
+    var el = document.getElementById('te_JoinSetup');
+    if (!el) return;
+    try { el.innerHTML = te_joinSetupHtml(); } catch(e) { console.warn('te JoinSetup refresh', e); }
+    try { te_primeJsCache(); } catch(e) {}
+    // Живое превью слева — перерисовать с юнитами сразу, без сейва
+    try {
+        var w = document.getElementById("te_DeviceWidget");
+        if (w && window.te_file) w.innerHTML = getWidget(te_file);
+    } catch(e) {}
+};
+
+te_jsVal = function(id) {
+    var el = document.getElementById(id);
+    return el ? (el.value || '').trim() : '';
+};
+
+// ---------- WRITES: всё правится инлайном, onchange сохраняет (без режимов) ----------
+te_jsAddUnit = function() {
+    if (!window.te_file) return;
+    var js = te_normJoinSetup(te_file);
+    var n = js.writes.length + 1;
+    js.writes.push({
+        id: 'w' + Date.now().toString(36),
+        unitname: 'Юнит ' + n, label: 'Юнит ' + n, kind: 'select', entity_category: '',
+        ep: '', cluster: '', attr: '', manuf: '0000', dataType: '', value: '', options: []
+    });
+    te_jsDirty();
+    te_refreshJoinSetup();
+};
+
+// Поле записи (label/cat/hex/value) — hex чистим в верхний регистр
+te_jsSetF = function(i, f, v) {
+    if (!window.te_file) return;
+    var w = te_normJoinSetup(te_file).writes[i];
+    if (!w) return;
+    v = (v || '').trim();
+    if (f === 'label') {
+        var old = w.label;
+        w.label = v;
+        if (!w.unitname || w.unitname === old) w.unitname = v;
+    } else if (f === 'ep' || f === 'cluster' || f === 'attr' || f === 'manuf' || f === 'dataType') {
+        w[f] = v.toUpperCase();
+    } else {
+        w[f] = v;
+    }
+    te_jsDirty();
+    te_refreshJoinSetup();
+};
+
+// Переименование юнита целиком (все записи с этим unitname)
+te_jsSetUnit = function(el) {
+    if (!window.te_file || !el) return;
+    var old = el.dataset.old || '', nw = (el.value || '').trim() || old;
+    if (nw === old) return;
+    te_normJoinSetup(te_file).writes.forEach(function(w) {
+        if ((w.unitname || w.label || '') === old) w.unitname = nw;
+    });
+    te_jsDirty();
+    te_refreshJoinSetup();
+};
+
+// Поле варианта (значение, название)
+te_jsSetVar = function(i, j, f, v) {
+    if (!window.te_file) return;
+    var w = te_normJoinSetup(te_file).writes[i];
+    if (!w || !w.options || !w.options[j]) return;
+    w.options[j][f] = (v || '').trim();
+    te_jsDirty();
+    te_refreshJoinSetup();
+};
+
+te_jsDel = function(list, i) {
+    if (!window.te_file) return;
+    var js = te_normJoinSetup(te_file);
+    if (js[list]) js[list].splice(i, 1);
+    te_jsDirty();
+    te_refreshJoinSetup();
+};
+
+// Дубли: один EP+кластер+атрибут у нескольких записей.
+// НЕ дубль: select-записи одного юнита на одном атрибуте — они сольются в один селект.
+te_jsDupKeys = function(js) {
+    var byKey = {};
+    try {
+        (js.writes || []).forEach(function(w) {
+            var k = ((w.ep || '') + (w.cluster || '') + (w.attr || '')).toUpperCase();
+            if (!k) return;
+            (byKey[k] = byKey[k] || []).push(w);
+        });
+    } catch(e) {}
+    var m = {};
+    Object.keys(byKey).forEach(function(k) {
+        var lst = byKey[k];
+        if (lst.length < 2) return;
+        var u0 = lst[0].unitname || lst[0].label || '';
+        var merged = lst.every(function(w) {
+            return (w.kind || 'select') === 'select' && (w.unitname || w.label || '') === u0;
+        });
+        if (!merged) m[k] = lst.length;
+    });
+    return m;
+};
+
+// Смена типа юнита прямо из шапки блока
+te_jsSetKind = function(i, kind) {
+    if (!window.te_file) return;
+    var w = te_normJoinSetup(te_file).writes[i];
+    if (!w) return;
+    w.kind = kind;
+    if (kind === 'select') {
+        if (!w.options || !w.options.length) {
+            var v = w.value || '00';
+            w.options = [{ v: v, l: v }];
+            w.value = v;
+        }
+    } else {
+        if (w.options && w.options.length) w.value = w.options[0].v;
+        delete w.options;
+    }
+    te_jsDirty();
+    te_refreshJoinSetup();
+};
+
+// Варианты селекта: добавление строкой, правка — прямо в полях варианта
+te_jsAddVariant = function(i) {
+    if (!window.te_file) return;
+    var w = te_normJoinSetup(te_file).writes[i];
+    if (!w) return;
+    var vel = document.getElementById('te_js_ov_' + i);
+    var lel = document.getElementById('te_js_ol_' + i);
+    var v = vel ? vel.value.trim() : '', l = lel ? lel.value.trim() : '';
+    if (!v) { window.zespAlert && zespAlert('Укажи значение варианта', { title: 'JoinSetup' }); return; }
+    w.options = w.options || [];
+    w.options.push({ v: v, l: l || v });
+    if (!w.value) w.value = v;
+    te_jsDirty();
+    te_refreshJoinSetup();
+};
+
+// Проверить вариант: записать его значение в устройство (и запомнить как текущее)
+te_jsTestVariant = function(i, j) {
+    if (!window.te_file) return;
+    var w = te_normJoinSetup(te_file).writes[i];
+    if (!w || !w.options || !w.options[j]) return;
+    w.value = w.options[j].v;
+    te_jsDirty();
+    te_refreshJoinSetup();
+    te_jsApplyWrite(i);
+};
+
+te_jsDelVariant = function(i, j) {
+    if (!window.te_file) return;
+    var w = te_normJoinSetup(te_file).writes[i];
+    if (!w || !w.options) return;
+    var gone = w.options.splice(j, 1)[0];
+    if (gone && String(w.value) === String(gone.v)) w.value = (w.options[0] && w.options[0].v) || '';
+    te_jsDirty();
+    te_refreshJoinSetup();
+};
+
+te_jsApplyWrite = function(i) {
+    if (!window.te_file || !te_file.Device) return;
+    var js = te_normJoinSetup(te_file);
+    var w = js.writes[i];
+    if (!w) return;
+    // Выбор юнита: снимаем selected с одногруппников (реплей пишет выбранный)
+    var u = w.unitname || w.label || '';
+    js.writes.forEach(function(o) {
+        if ((o.unitname || o.label || '') === u) delete o.selected;
+    });
+    w.selected = true;
+    te_jsDirty();
+    te_refreshJoinSetup();
+    var json = {
+        u16ShortAddr: te_file.Device,
+        u8SrcEndPoint: '01',
+        u8DstEndPoint: w.ep,
+        u16ClusterID: w.cluster,
+        u8Direction: '00',
+        u8ManuSpecific: (w.manuf && w.manuf !== '0000') ? '01' : '00',
+        u16ManuID: w.manuf || '0000',
+        u16AttribID: w.attr,
+        u8AttribType: w.dataType,
+        au8Data: w.value,
+        u8DataLen: '01'
+    };
+    WSsend('writeAtribute|' + JSON.stringify(json));
+};
+
+te_jsReadWrite = function(i) {
+    if (!window.te_file || !te_file.Device) return;
+    var w = te_normJoinSetup(te_file).writes[i];
+    if (!w) return;
+    WSsend('reqAtribute|' + te_file.Device + '|' + w.ep + '|' + w.cluster + '|' + w.attr + '|' + (w.manuf || '0000'));
+};
+
+// ---------- BINDS ----------
+// ---------- человекочитаемые имена для секции ----------
+te_jsClusterName = function(cl) {
+    try {
+        cl = (cl || '').toUpperCase();
+        if (window.te_ClassterAttr && te_ClassterAttr[cl] && te_ClassterAttr[cl].n) return te_ClassterAttr[cl].n;
+    } catch(e) {}
+    return 'Cluster_' + (cl || '?');
+};
+
+te_jsDstName = function(dst) {
+    if (!dst) return '—';
+    if (dst === 'COORD') return 'координатор';
+    var m = /^GROUP:(.+)$/i.exec(dst);
+    if (m) {
+        try {
+            var gr = (window.groups || []).find(function(g) { return (g.adress || '').toUpperCase() === m[1].toUpperCase(); });
+            if (gr) return 'группа ' + gr.adress + ' (' + gr.name + ')';
+        } catch(e) {}
+        return 'группа ' + m[1];
+    }
+    try {
+        var d = (window.deviceList || []).find(function(z) { return z.IEEE === dst; });
+        if (d) return d.Name || d.ModelId || dst;
+    } catch(e) {}
+    return dst;
+};
+
+te_hexDec = function(hex) {
+    var n = parseInt(hex, 16);
+    return isNaN(n) ? '?' : n;
+};
+
+te_jsApplyBind = function(i, bind) {
+    if (!window.te_file) return;
+    var b = te_normJoinSetup(te_file).binds[i];
+    if (!b) return;
+    var dst = b.dst === 'COORD' ? '' : b.dst;
+    var gm = /^GROUP:(.+)$/i.exec(dst || '');
+    if (gm) dst = gm[1];
+    if (!dst) {
+        try {
+            var zc = (window.deviceList || []).find(function(z) { return z.DevType === 'ZC'; });
+            if (zc) dst = zc.IEEE;
+        } catch(e) {}
+    }
+    var req = {};
+    req[bind ? 'BIND_REQUEST' : 'UNBIND_REQUEST'] = {
+        _u64TargetExtAddr: te_file.IEEE,
+        u8TargetEndPoint: b.ep,
+        u16ClusterID: b.cluster,
+        _u64DstAddr: dst,
+        u8DstEndPoint: b.dstEP || '',
+        u8DstAddrMode: parseInt(b.dstMode || '3', 10)
+    };
+    WSsend(JSON.stringify(req));
+};
+
+// ---------- REPORTS ----------
+// Удаление из секции + чистка cfg_report у объекта (синк в обе стороны)
+te_jsDelReport = function(i) {
+    if (!window.te_file) return;
+    var js = te_normJoinSetup(te_file);
+    var r = js.reports[i];
+    if (r) {
+        var key = (r.ep || '') + (r.cluster || '') + (r.attr || '');
+        try { if (te_file.Report && te_file.Report[key]) te_file.Report[key].cfg_report = ''; } catch(e) {}
+        var view = document.getElementById(key + '_te_cfg_report_view');
+        if (view) view.innerHTML = '<span style="color:#bbb">—</span>';
+    }
+    js.reports.splice(i, 1);
+    te_jsDirty();
+    te_refreshJoinSetup();
+};
+
+te_jsApplyReport = function(i) {
+    if (!window.te_file || !te_file.Device) return;
+    var r = te_normJoinSetup(te_file).reports[i];
+    if (!r) return;
+    var json = {
+        u16ShortAddr: te_file.Device,
+        u8SrcEndPoint: '01',
+        u8DstEndPoint: r.ep,
+        u16ClusterID: r.cluster,
+        u16MinInterval: r.min,
+        u16MaxInterval: r.max,
+        u16TimeOut: '0000',
+        u8Change: r.change
+    };
+    WSsend('ConfigReportReg|' + JSON.stringify(json));
+};
+
+// ---------- GROUPS ----------
+te_jsAddGroup = function() {
+    if (!window.te_file) return;
+    var js = te_normJoinSetup(te_file);
+    var g = { addr: te_jsVal('te_js_g_addr').toUpperCase().padStart(4, '0'), ep: te_jsVal('te_js_g_ep').toUpperCase() };
+    if (!g.addr || !g.ep) { window.zespAlert && zespAlert('Заполни Addr и EP', { title: 'JoinSetup' }); return; }
+    js.groups.push(g);
+    te_jsDirty();
+    te_refreshJoinSetup();
 };
 
 // ============================================================
@@ -2136,6 +2719,9 @@ te_applyCfgReportEditor = function() {
 
   te_file.Report[obj].cfg_report = cfg;
 
+  // Дублируем в JoinSetup.reports — источник для настройки при подключении
+  try { te_jsUpsertReport(obj, cfg); } catch(e) {}
+
   // Обновляем превью в строке таблицы
   const view = document.getElementById(obj + '_te_cfg_report_view');
   if (view) {
@@ -2152,9 +2738,125 @@ te_applyCfgReportEditor = function() {
 te_clearCfgReport = function(obj) {
   if (!obj) return;
   te_file.Report[obj].cfg_report = '';
+  try {
+    var js = te_normJoinSetup(te_file);
+    js.reports = js.reports.filter(function(r) { return (r.ep + r.cluster + r.attr) !== obj; });
+  } catch(e) {}
   const view = document.getElementById(obj + '_te_cfg_report_view');
   if (view) view.innerHTML = '<span style="color:#bbb">—</span>';
   te_syncLive(true);
+  te_refreshJoinSetup();
+};
+
+// Синхронизация cfg_report объекта → JoinSetup.reports (ключ — полный obj EEPPCCCCAAAA)
+te_jsUpsertReport = function(obj, cfg) {
+  var js = te_normJoinSetup(te_file);
+  var ep = obj.substring(0, 2), cl = obj.substring(2, 6), at = obj.substring(6, 10);
+  var found = false;
+  js.reports.forEach(function(r) {
+    if ((r.ep + r.cluster + r.attr) === obj) {
+      r.ep = ep; r.cluster = cl; r.attr = at;
+      r.dataType = cfg.DataType; r.min = cfg.MinInterval; r.max = cfg.MaxInterval; r.change = cfg.Change;
+      found = true;
+    }
+  });
+  if (!found) js.reports.push({ ep: ep, cluster: cl, attr: at, dataType: cfg.DataType, min: cfg.MinInterval, max: cfg.MaxInterval, change: cfg.Change });
+};
+
+// ===== BIND EDITOR (строка Bind в карточке объекта → JoinSetup.binds, ключ EP+cluster) =====
+te_currentBindObj = null;
+
+te_findBind = function(ep, cl) {
+  try {
+    var js = te_normJoinSetup(te_file);
+    for (var i = 0; i < js.binds.length; i++) {
+      if ((js.binds[i].ep || '').toUpperCase() === ep && (js.binds[i].cluster || '').toUpperCase() === cl) return js.binds[i];
+    }
+  } catch(e) {}
+  return null;
+};
+
+te_bindPreview = function(obj) {
+  try {
+    var b = te_findBind(obj.substring(0, 2), obj.substring(2, 6));
+    if (!b) return '<span style="color:#bbb">—</span>';
+    var dst = b.dst === 'COORD' ? 'координатор' : te_escJs(b.dst);
+    return '→ <b>' + dst + '</b>' + (b.dstEP ? ':' + te_escJs(b.dstEP) : '');
+  } catch(e) { return '<span style="color:#bbb">—</span>'; }
+};
+
+te_openBindEditor = function(obj) {
+  te_currentBindObj = obj;
+  var ep = obj.substring(0, 2), cl = obj.substring(2, 6);
+  document.getElementById('te_be_obj').textContent = ep + ' / ' + cl;
+  var sel = document.getElementById('te_be_dst');
+  var html = '';
+  try {
+    var devs = window.deviceList || [];
+    devs.forEach(function(z) { if (z.DevType === 'ZC') html += '<option value="COORD">⭐ Координатор' + (z.Name ? ' (' + te_escJs(z.Name) + ')' : '') + '</option>'; });
+    devs.forEach(function(z) {
+      if (z.DevType === 'ZR' || z.DevType === 'ZED') html += '<option value="' + te_escJs(z.IEEE) + '">' + te_escJs(z.Name || z.ModelId || z.IEEE) + '</option>';
+    });
+    (window.groups || []).forEach(function(gr) {
+      html += '<option value="GROUP:' + te_escJs(gr.adress) + '">🗄 ' + te_escJs(gr.adress) + ' — ' + te_escJs(gr.name) + '</option>';
+    });
+  } catch(e) {}
+  sel.innerHTML = html || '<option value="COORD">⭐ Координатор</option>';
+  var cur = te_findBind(ep, cl);
+  sel.value = (cur && cur.dst) ? cur.dst : 'COORD';
+  if (cur && cur.dst && sel.value !== cur.dst) {
+    var o = document.createElement('option'); o.value = cur.dst; o.textContent = cur.dst + ' (нет в сети)';
+    sel.appendChild(o); sel.value = cur.dst;
+  }
+  document.getElementById('te_be_dstep').value = (cur && cur.dstEP) || '01';
+  te_be_syncEp();
+  document.getElementById('te_bindEditorWnd').style.display = 'flex';
+};
+
+te_be_syncEp = function() {
+  var sel = document.getElementById('te_be_dst');
+  var epIn = document.getElementById('te_be_dstep');
+  if (!sel || !epIn) return;
+  if (/^GROUP:/.test(sel.value || '')) { epIn.value = ''; epIn.disabled = true; }
+  else { epIn.disabled = false; }
+};
+
+te_applyBindEditor = function() {
+  var obj = te_currentBindObj;
+  if (!obj || !window.te_file) return;
+  var ep = obj.substring(0, 2).toUpperCase(), cl = obj.substring(2, 6).toUpperCase();
+  var dst = document.getElementById('te_be_dst').value;
+  var dstEP = document.getElementById('te_be_dstep').value.trim().toUpperCase();
+  var mode = '3';
+  if (/^GROUP:/.test(dst)) { dstEP = ''; mode = '1'; }
+  else if (!dstEP) { mode = '1'; }
+  var js = te_normJoinSetup(te_file);
+  var b = te_findBind(ep, cl);
+  if (b) { b.dst = dst; b.dstEP = dstEP; b.dstMode = mode; }
+  else js.binds.push({ ep: ep, cluster: cl, dst: dst, dstEP: dstEP, dstMode: mode });
+  var view = document.getElementById(obj + '_te_bind_view');
+  if (view) view.innerHTML = te_bindPreview(obj);
+  te_syncLive(true);
+  te_refreshJoinSetup();
+  te_closeBindEditor();
+};
+
+te_clearBind = function(obj) {
+  if (!obj || !window.te_file) return;
+  var ep = obj.substring(0, 2).toUpperCase(), cl = obj.substring(2, 6).toUpperCase();
+  try {
+    var js = te_normJoinSetup(te_file);
+    js.binds = js.binds.filter(function(b) { return !((b.ep || '').toUpperCase() === ep && (b.cluster || '').toUpperCase() === cl); });
+  } catch(e) {}
+  var view = document.getElementById(obj + '_te_bind_view');
+  if (view) view.innerHTML = '<span style="color:#bbb">—</span>';
+  te_syncLive(true);
+  te_refreshJoinSetup();
+};
+
+te_closeBindEditor = function() {
+  document.getElementById('te_bindEditorWnd').style.display = 'none';
+  te_currentBindObj = null;
 };
 te_updateDeviceField = function(field, value) {
     if (!te_file) return;
@@ -3021,7 +3723,7 @@ var TE_CSS="\n\
     word-break: break-all;\n\
 }\n\
 ";
-var TE_BODY="\n\n\n<div style='position:absolute;display:flex; align-items: flex-start;' id='te_d'>\n<div style=\"flex-shrink:0; display:flex; flex-direction:column; overflow:hidden;\">\n  <div id=\"te_DeviceWidget\" style=\"flex-shrink:0;\"></div>\n  <!-- SNIFF PANEL — постоянная левая колонка, не пропадает при навигации -->\n  <div id=\"te_sniffPanel\" style=\"display:none; flex-shrink:0;\">\n    <div class=\"sniff-header\">\n      <span>🎧 Sniff</span>\n      <div style=\"display:flex;gap:5px;align-items:center;\">\n        <span id=\"te_sniffCount\" class=\"sniff-count\">0</span>\n        <button class=\"sniff-add-all-btn\" onclick=\"te_sniffAddAll()\" title=\"Добавить все объекты\">+ All</button>\n        <button class=\"sniff-clear-btn\" onclick=\"te_clearSniff()\" title=\"Очистить\">🗑</button>\n      </div>\n    </div>\n    <div id=\"te_sniffList\" class=\"sniff-list\"></div>\n  </div>\n</div>\n<div id=\"te_DeviceJson\"></div>\t\n</div>\n\n<!-- CFG REPORT EDITOR MODAL -->\n<div id=\"te_cfgReportEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal cre-modal\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>⚙️ Конфигурация репорта</span>\n      <button class=\"ce-close\" onclick=\"te_closeCfgReportEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body cre-body\">\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">DataType</label>\n        <select class=\"cre-select\" id=\"te_cre_DataType\" onchange=\"te_cre_syncType()\">\n          <option value=\"\">— выбрать —</option>\n          <option value=\"10\">10h · BOOLEAN</option>\n          <option value=\"18\">18h · BITMAP8</option>\n          <option value=\"19\">19h · BITMAP16</option>\n          <option value=\"20\">20h · UINT8</option>\n          <option value=\"21\">21h · UINT16</option>\n          <option value=\"22\">22h · UINT24</option>\n          <option value=\"23\">23h · UINT32</option>\n          <option value=\"28\">28h · INT8</option>\n          <option value=\"29\">29h · INT16</option>\n          <option value=\"2a\">2Ah · INT24</option>\n          <option value=\"30\">30h · ENUM8</option>\n          <option value=\"31\">31h · ENUM16</option>\n          <option value=\"41\">41h · OCTSTR</option>\n          <option value=\"42\">42h · STRING</option>\n        </select>\n        <input class=\"cre-input cre-hex\" id=\"te_cre_DataType_hex\" placeholder=\"hex\" maxlength=\"4\" title=\"hex вручную\" oninput=\"te_cre_syncSel()\">\n      </div>\n      <div class=\"cre-divider\"></div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">MinInterval</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_MinInterval\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"1\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_MinInterval_hex\">0001</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">MaxInterval</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_MaxInterval\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"300\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_MaxInterval_hex\">012C</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">TimeOut</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_TimeOut\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"0\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_TimeOut_hex\">0000</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Change</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_Change\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"порог (дес)\" value=\"1\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_Change_hex\">0001</span>\n      </div>\n      <div class=\"cre-hint\">Ввод в десятичных · hex рассчитывается автоматически</div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeCfgReportEditor()\">Отмена</button>\n      <button class=\"ce-btn-cancel\" onclick=\"te_clearCfgReport(te_currentCfgObj);te_closeCfgReportEditor();\" style=\"background:#f8d8d8;border-color:var(--red);\">✖ Очистить</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyCfgReportEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- YA REP EDITOR MODAL -->\n<div id=\"te_yaRepEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal\" style=\"width:500px;max-height:85vh;\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>🏠 Редактор Яндекс</span>\n      <button class=\"ce-close\" onclick=\"te_closeYaRepEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body\" style=\"padding:0;display:flex;flex-direction:column;gap:0;\">\n\n      <!-- Список шаблонов -->\n      <div style=\"display:flex;height:260px;border-bottom:1px solid var(--border);\">\n        <!-- Левая панель: категории + элементы -->\n        <div id=\"te_yre_list\" style=\"width:200px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--border);padding:4px 0;font-size:12px;\"></div>\n        <!-- Правая панель: описание выбранного -->\n        <div style=\"flex:1;padding:8px;overflow-y:auto;font-size:11px;color:var(--muted);\">\n          <div class=\"ce-section-title\">Предпросмотр</div>\n          <pre id=\"te_yre_preview\" style=\"font-size:10px;color:var(--text);white-space:pre-wrap;word-break:break-all;margin:0;background:var(--bg2);border-radius:4px;padding:6px;min-height:60px;\"></pre>\n          <div class=\"ce-divider\"></div>\n          <div class=\"ce-section-title\">Опции</div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Retrievable</label>\n            <input type=\"checkbox\" id=\"te_yre_retrievable\" class=\"ce-check\" onchange=\"te_yre_updateFlags()\">\n          </div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Reportable</label>\n            <input type=\"checkbox\" id=\"te_yre_reportable\" class=\"ce-check\" onchange=\"te_yre_updateFlags()\">\n          </div>\n          <div class=\"ce-divider\"></div>\n          <div class=\"ce-section-title\">Multi-device</div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Включить</label>\n            <input type=\"checkbox\" id=\"te_yre_multi\" class=\"ce-check\" onchange=\"te_yre_toggleMulti()\">\n          </div>\n          <div id=\"te_yre_multi_fields\" style=\"display:none;\">\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Name</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mname\" oninput=\"te_yre_updateMulti()\">\n            </div>\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Room</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mroom\" oninput=\"te_yre_updateMulti()\">\n            </div>\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Type</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mtype\" list=\"te_yre_types\" oninput=\"te_yre_updateMulti()\">\n              <datalist id=\"te_yre_types\">\n                <option value=\"devices.types.light\">\n                <option value=\"devices.types.socket\">\n                <option value=\"devices.types.switch\">\n                <option value=\"devices.types.thermostat\">\n                <option value=\"devices.types.thermostat.ac\">\n                <option value=\"devices.types.media_device\">\n                <option value=\"devices.types.media_device.tv\">\n                <option value=\"devices.types.media_device.tv_box\">\n                <option value=\"devices.types.media_device.receiver\">\n                <option value=\"devices.types.openable\">\n                <option value=\"devices.types.openable.curtain\">\n                <option value=\"devices.types.humidifier\">\n                <option value=\"devices.types.purifier\">\n                <option value=\"devices.types.vacuum_cleaner\">\n                <option value=\"devices.types.cooking.kettle\">\n                <option value=\"devices.types.cooking.coffee_maker\">\n                <option value=\"devices.types.cooking.multicooker\">\n                <option value=\"devices.types.sensor\">\n                <option value=\"devices.types.sensor.motion\">\n                <option value=\"devices.types.sensor.door\">\n                <option value=\"devices.types.sensor.water_leak\">\n                <option value=\"devices.types.sensor.smoke\">\n                <option value=\"devices.types.sensor.gas\">\n                <option value=\"devices.types.sensor.vibration\">\n                <option value=\"devices.types.sensor.button\">\n                <option value=\"devices.types.other\">\n              </datalist>\n            </div>\n          </div>\n        </div>\n      </div>\n\n      <!-- none режим -->\n      <div style=\"padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;\">\n        <span style=\"font-size:11px;color:var(--muted);\">Установить none (отключить репортинг):</span>\n        <button class=\"ce-btn-cancel\" style=\"font-size:11px;padding:2px 10px;\" onclick=\"te_setYaRepNone()\">none</button>\n      </div>\n\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeYaRepEditor()\">Отмена</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyYaRepEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- CLASS EDITOR MODAL -->\n<div id=\"te_classEditorWnd\" style=\"display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:9999; align-items:center; justify-content:center; background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal\">\n    <div class=\"ce-header\">\n      <span>🏷️ Редактор класса</span>\n      <button class=\"ce-close\" onclick=\"te_closeClassEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body\">\n      <div class=\"ce-row\">\n        <label class=\"ce-label\">Role</label>\n        <select class=\"ce-select ce-select-role\" id=\"ce_role_sel\" onchange=\"te_onCeRoleChange(this.value)\"></select>\n      </div>\n      <div class=\"ce-divider\"></div>\n      <div id=\"ce_dc_wrap\"></div>\n      <div class=\"ce-section-title\">Свойства</div>\n      <div id=\"ce_props\"></div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeClassEditor()\">Отмена</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyClassEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n";
+var TE_BODY="\n\n\n<div style='position:absolute;display:flex; align-items: flex-start;' id='te_d'>\n<div style=\"flex-shrink:0; display:flex; flex-direction:column; overflow:hidden;\">\n  <div id=\"te_DeviceWidget\" style=\"flex-shrink:0;\"></div>\n  <!-- SNIFF PANEL — постоянная левая колонка, не пропадает при навигации -->\n  <div id=\"te_sniffPanel\" style=\"display:none; flex-shrink:0;\">\n    <div class=\"sniff-header\">\n      <span>🎧 Sniff</span>\n      <div style=\"display:flex;gap:5px;align-items:center;\">\n        <span id=\"te_sniffCount\" class=\"sniff-count\">0</span>\n        <button class=\"sniff-add-all-btn\" onclick=\"te_sniffAddAll()\" title=\"Добавить все объекты\">+ All</button>\n        <button class=\"sniff-clear-btn\" onclick=\"te_clearSniff()\" title=\"Очистить\">🗑</button>\n      </div>\n    </div>\n    <div id=\"te_sniffList\" class=\"sniff-list\"></div>\n  </div>\n</div>\n<div id=\"te_DeviceJson\"></div>\t\n</div>\n\n<!-- CFG REPORT EDITOR MODAL -->\n<div id=\"te_cfgReportEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal cre-modal\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>⚙️ Конфигурация репорта</span>\n      <button class=\"ce-close\" onclick=\"te_closeCfgReportEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body cre-body\">\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">DataType</label>\n        <select class=\"cre-select\" id=\"te_cre_DataType\" onchange=\"te_cre_syncType()\">\n          <option value=\"\">— выбрать —</option>\n          <option value=\"10\">10h · BOOLEAN</option>\n          <option value=\"18\">18h · BITMAP8</option>\n          <option value=\"19\">19h · BITMAP16</option>\n          <option value=\"20\">20h · UINT8</option>\n          <option value=\"21\">21h · UINT16</option>\n          <option value=\"22\">22h · UINT24</option>\n          <option value=\"23\">23h · UINT32</option>\n          <option value=\"28\">28h · INT8</option>\n          <option value=\"29\">29h · INT16</option>\n          <option value=\"2a\">2Ah · INT24</option>\n          <option value=\"30\">30h · ENUM8</option>\n          <option value=\"31\">31h · ENUM16</option>\n          <option value=\"41\">41h · OCTSTR</option>\n          <option value=\"42\">42h · STRING</option>\n        </select>\n        <input class=\"cre-input cre-hex\" id=\"te_cre_DataType_hex\" placeholder=\"hex\" maxlength=\"4\" title=\"hex вручную\" oninput=\"te_cre_syncSel()\">\n      </div>\n      <div class=\"cre-divider\"></div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">MinInterval</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_MinInterval\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"1\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_MinInterval_hex\">0001</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">MaxInterval</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_MaxInterval\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"300\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_MaxInterval_hex\">012C</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">TimeOut</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_TimeOut\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"0\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_TimeOut_hex\">0000</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Change</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_Change\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"порог (дес)\" value=\"1\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_Change_hex\">0001</span>\n      </div>\n      <div class=\"cre-hint\">Ввод в десятичных · hex рассчитывается автоматически</div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeCfgReportEditor()\">Отмена</button>\n      <button class=\"ce-btn-cancel\" onclick=\"te_clearCfgReport(te_currentCfgObj);te_closeCfgReportEditor();\" style=\"background:#f8d8d8;border-color:var(--red);\">✖ Очистить</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyCfgReportEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- BIND EDITOR MODAL -->\n<div id=\"te_bindEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal cre-modal\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>🔗 Бинд кластера</span>\n      <button class=\"ce-close\" onclick=\"te_closeBindEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body cre-body\">\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Объект</label>\n        <span class=\"cre-hex-preview\" id=\"te_be_obj\" style=\"min-width:90px\">—</span>\n      </div>\n      <div class=\"cre-divider\"></div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Получатель</label>\n        <select class=\"cre-select\" id=\"te_be_dst\" onchange=\"te_be_syncEp()\"></select>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Dst EP</label>\n        <input class=\"cre-input cre-dec\" id=\"te_be_dstep\" placeholder=\"01\" maxlength=\"2\">\n      </div>\n      <div class=\"cre-hint\">Координатор / устройство / группа (GROUP:0001). Пустой Dst EP = бинд на группу. Сохраняется в JoinSetup.binds</div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeBindEditor()\">Отмена</button>\n      <button class=\"ce-btn-cancel\" onclick=\"te_clearBind(te_currentBindObj);te_closeBindEditor();\" style=\"background:#f8d8d8;border-color:var(--red);\">✖ Очистить</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyBindEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- YA REP EDITOR MODAL -->\n<div id=\"te_yaRepEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal\" style=\"width:500px;max-height:85vh;\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>🏠 Редактор Яндекс</span>\n      <button class=\"ce-close\" onclick=\"te_closeYaRepEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body\" style=\"padding:0;display:flex;flex-direction:column;gap:0;\">\n\n      <!-- Список шаблонов -->\n      <div style=\"display:flex;height:260px;border-bottom:1px solid var(--border);\">\n        <!-- Левая панель: категории + элементы -->\n        <div id=\"te_yre_list\" style=\"width:200px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--border);padding:4px 0;font-size:12px;\"></div>\n        <!-- Правая панель: описание выбранного -->\n        <div style=\"flex:1;padding:8px;overflow-y:auto;font-size:11px;color:var(--muted);\">\n          <div class=\"ce-section-title\">Предпросмотр</div>\n          <pre id=\"te_yre_preview\" style=\"font-size:10px;color:var(--text);white-space:pre-wrap;word-break:break-all;margin:0;background:var(--bg2);border-radius:4px;padding:6px;min-height:60px;\"></pre>\n          <div class=\"ce-divider\"></div>\n          <div class=\"ce-section-title\">Опции</div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Retrievable</label>\n            <input type=\"checkbox\" id=\"te_yre_retrievable\" class=\"ce-check\" onchange=\"te_yre_updateFlags()\">\n          </div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Reportable</label>\n            <input type=\"checkbox\" id=\"te_yre_reportable\" class=\"ce-check\" onchange=\"te_yre_updateFlags()\">\n          </div>\n          <div class=\"ce-divider\"></div>\n          <div class=\"ce-section-title\">Multi-device</div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Включить</label>\n            <input type=\"checkbox\" id=\"te_yre_multi\" class=\"ce-check\" onchange=\"te_yre_toggleMulti()\">\n          </div>\n          <div id=\"te_yre_multi_fields\" style=\"display:none;\">\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Name</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mname\" oninput=\"te_yre_updateMulti()\">\n            </div>\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Room</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mroom\" oninput=\"te_yre_updateMulti()\">\n            </div>\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Type</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mtype\" list=\"te_yre_types\" oninput=\"te_yre_updateMulti()\">\n              <datalist id=\"te_yre_types\">\n                <option value=\"devices.types.light\">\n                <option value=\"devices.types.socket\">\n                <option value=\"devices.types.switch\">\n                <option value=\"devices.types.thermostat\">\n                <option value=\"devices.types.thermostat.ac\">\n                <option value=\"devices.types.media_device\">\n                <option value=\"devices.types.media_device.tv\">\n                <option value=\"devices.types.media_device.tv_box\">\n                <option value=\"devices.types.media_device.receiver\">\n                <option value=\"devices.types.openable\">\n                <option value=\"devices.types.openable.curtain\">\n                <option value=\"devices.types.humidifier\">\n                <option value=\"devices.types.purifier\">\n                <option value=\"devices.types.vacuum_cleaner\">\n                <option value=\"devices.types.cooking.kettle\">\n                <option value=\"devices.types.cooking.coffee_maker\">\n                <option value=\"devices.types.cooking.multicooker\">\n                <option value=\"devices.types.sensor\">\n                <option value=\"devices.types.sensor.motion\">\n                <option value=\"devices.types.sensor.door\">\n                <option value=\"devices.types.sensor.water_leak\">\n                <option value=\"devices.types.sensor.smoke\">\n                <option value=\"devices.types.sensor.gas\">\n                <option value=\"devices.types.sensor.vibration\">\n                <option value=\"devices.types.sensor.button\">\n                <option value=\"devices.types.other\">\n              </datalist>\n            </div>\n          </div>\n        </div>\n      </div>\n\n      <!-- none режим -->\n      <div style=\"padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;\">\n        <span style=\"font-size:11px;color:var(--muted);\">Установить none (отключить репортинг):</span>\n        <button class=\"ce-btn-cancel\" style=\"font-size:11px;padding:2px 10px;\" onclick=\"te_setYaRepNone()\">none</button>\n      </div>\n\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeYaRepEditor()\">Отмена</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyYaRepEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- CLASS EDITOR MODAL -->\n<div id=\"te_classEditorWnd\" style=\"display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:9999; align-items:center; justify-content:center; background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal\">\n    <div class=\"ce-header\">\n      <span>🏷️ Редактор класса</span>\n      <button class=\"ce-close\" onclick=\"te_closeClassEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body\">\n      <div class=\"ce-row\">\n        <label class=\"ce-label\">Role</label>\n        <select class=\"ce-select ce-select-role\" id=\"ce_role_sel\" onchange=\"te_onCeRoleChange(this.value)\"></select>\n      </div>\n      <div class=\"ce-divider\"></div>\n      <div id=\"ce_dc_wrap\"></div>\n      <div class=\"ce-section-title\">Свойства</div>\n      <div id=\"ce_props\"></div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeClassEditor()\">Отмена</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyClassEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n";
 
 window.WinEngine && window.WinEngine.register({
   id:"templateedit",
@@ -3049,7 +3751,7 @@ window.WinEngine && window.WinEngine.register({
     var parts=p.split("#");
     var IEEE = parts.length>1 ? parts[1] : "";
     if(IEEE){ te_fileName=IEEE; window.te_fileLoaded=false; window.te_retryOnce=false; try{te_parseFile(IEEE);}catch(e){console.log("te parse",e);} if(window.WSsend) WSsend("getDeviceList"); }
-    else { te_file={Name:"",Location:"",IEEE:"",Report:{}}; try{te_drawJson(te_file);}catch(e){} }
+    else { te_file={Name:"",Location:"",IEEE:"",Report:{}}; te_normJoinSetup(te_file); try{te_drawJson(te_file);}catch(e){} }
     try{ te_wMain_cbResizeEnd(); }catch(e){}
     var dw0=document.getElementById("te_DeviceWidget");
     if(dw0){ dw0.addEventListener("touchend",te_DeviceWidgetHandler); dw0.addEventListener("click",te_DeviceWidgetHandler); }
