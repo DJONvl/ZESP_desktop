@@ -160,6 +160,9 @@
     try {
       var ri = getRoleInfo(value);
       var role = ri.roleBase, attr = ri.classObj;
+      // Роли ламп разделились (light_onoff/light_level/light_color/light_color_temp),
+      // а ветка ниже одна — case 'light'. Нормализуем, как в widgets.js.
+      if (role === 'light_onoff' || role === 'light_level' || role === 'light_color' || role === 'light_color_temp') role = 'light';
       var device_class = '';
       try { device_class = value.class.device_class; } catch (e) { try { device_class = attr.device_class || ''; } catch (e2) {} }
       if (!device_class) device_class = role;

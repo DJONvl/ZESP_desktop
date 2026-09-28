@@ -291,6 +291,16 @@
             });
         }
 
+        // Закрытие по клику вне панели (крестик остаётся).
+        // Клик по кнопке-колоколу игнорируем — иначе открытие тут же закроется.
+        document.addEventListener('click', (e) => {
+            const panel = document.getElementById('notifi_cntr');
+            if (!panel || !panel.classList.contains('nc_open')) return;
+            const t = e.target;
+            if (t && t.closest && (t.closest('#notifi_cntr') || t.closest('#notifi_btn'))) return;
+            panel.classList.remove('nc_open');
+        }, true);
+
         updateBadge();
     }
 

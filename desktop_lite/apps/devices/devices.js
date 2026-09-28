@@ -458,6 +458,17 @@
         displayDevicesByLocation(currentLocation || 'Все');
       };
       if (window.eventE) window.eventE.on('updateDeviceList', node._state.onDev);
+      // Репорт = событие устройства: двигаем lastSeen в списке,
+      // иначе таймер ниже пересчитывает время от устаревшего значения.
+      node._state.onRep = function (pair) {
+        var rep = pair && pair[0], ieee = pair && pair[1];
+        if (!rep || !ieee) return;
+        var t = rep.time || Date.now();
+        for (var i = 0; i < deviceList.length; i++) {
+          if (deviceList[i].IEEE === ieee) { deviceList[i].lastSeen = t; break; }
+        }
+      };
+      if (window.eventE) window.eventE.on('report', node._state.onRep);
 
       // Запрос изнач. данных и обновление lastSeen по таймеру.
       if (window.websocket && websocket.readyState === 1) window.WSsend('getDeviceList');
@@ -504,6 +515,7 @@
       if (node._state) {
         if (node._state.updateTimer) clearInterval(node._state.updateTimer);
         if (window.eventE && node._state.onDev) eventE.off('updateDeviceList', node._state.onDev);
+        if (window.eventE && node._state.onRep) eventE.off('report', node._state.onRep);
         if (node._state.keydown) document.removeEventListener('keydown', node._state.keydown);
       }
       removeSwipe();

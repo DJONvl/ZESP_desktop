@@ -115,7 +115,8 @@ window.updateProgress = new ProgressBarWidget();
       '.zesp-cf-btns button{padding:7px 18px;border-radius:8px;font-size:13px}' +
       '.zesp-cf-ok{background:var(--accent);border:1px solid var(--accent);color:#fff;font-weight:600}' +
       '.zesp-cf-ok:hover{background:var(--accent-dark)}' +
-      '.zesp-cf-ok.danger{background:var(--red);border-color:var(--red)}' +
+      '.zesp-cf-ok.zesp-danger{background:var(--red);border-color:var(--red);color:#fff}' +
+      '.zesp-cf-ok.zesp-danger:hover{background:var(--red);filter:brightness(1.15)}' +
       '.zesp-cf-cancel{background:var(--bg3);border:1px solid var(--border2);color:var(--text)}';
     document.head.appendChild(s);
   }
@@ -171,7 +172,7 @@ window.updateProgress = new ProgressBarWidget();
       var btns = document.createElement('div');
       btns.className = 'zesp-cf-btns';
       var ok = document.createElement('button');
-      ok.className = 'zesp-cf-ok' + (o.danger ? ' danger' : '');
+      ok.className = 'zesp-cf-ok' + (o.danger ? ' zesp-danger' : '');
       ok.textContent = o.okText || 'OK';
       ok.addEventListener('click', function () { close(true); });
       btns.appendChild(ok);
