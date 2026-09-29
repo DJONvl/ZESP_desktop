@@ -335,7 +335,7 @@ L.flush = function () {
 // подхватываем выбор языка при приходе конфига; грузим все известные словари
 // id -> папка словаря (devicemgr живёт в apps/devicemanager/)
 window.L = L;
-var L_DICT_DIRS = { settings: 'settings', devicemgr: 'devicemanager', devices: 'devices', scenes: 'scenes', yammanager: 'yammanager', zigbeemap: 'zigbeemap', templateedit: 'templateedit', sh3d: 'sh3d', blockly: 'blockly', desktop: 'desktop', groups: 'groups' };
+var L_DICT_DIRS = { settings: 'settings', devicemgr: 'devicemanager', devices: 'devices', scenes: 'scenes', yammanager: 'yammanager', zigbeemap: 'zigbeemap', templateedit: 'templateedit', sh3d: 'sh3d', blockly: 'blockly', desktop: 'desktop', groups: 'groups', logviewer: 'logviewer' };
 if (typeof eventE !== 'undefined') {
   eventE.on('jsconfig', function (cfg) {
     var v = cfg && cfg.APP && cfg.APP.Lang && cfg.APP.Lang.val;

@@ -21,6 +21,8 @@ var configRetry = null;
 function onOpen(evt) {
 	WSsend("getDeviceList");
 	WSsend('loadConfig')
+	// wsopen: переподписка персональных лент (logviewer и др.) после обрыва.
+	eventE.emit('wsopen');
 	if (configRetry) clearInterval(configRetry);
 	configRetry = setInterval(function () {
 		if (window.jsconfig) { clearInterval(configRetry); configRetry = null; return; }
@@ -163,6 +165,11 @@ function parseSocket(msg) {
 			eventE.emit('report', [JSON.parse(z[1]), z[2]])		
 		}
 
+		// Живая лента лога (виджет logviewer): log|<logfmt>, история
+		// logHist|<json-массив>, служебное logCtl|<текст>.
+		if (z[0] === "log") { eventE.emit('log', z.slice(1).join('|')); }
+		if (z[0] === "logHist") { try { eventE.emit('logHist', JSON.parse(z.slice(1).join('|'))); } catch (e) {} }
+		if (z[0] === "logCtl") { eventE.emit('logCtl', z.slice(1).join('|')); }
 
 		if (z[0] === "join") {
 			document.getElementById("joinstatus").innerHTML += z[1];
