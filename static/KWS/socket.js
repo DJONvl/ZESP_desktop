@@ -41,6 +41,57 @@ function SaveJson(path, data) { WSsend('SaveJson|' + path + '|' + data); }
 //function SaveFile(path,data){WSsend('SaveFile|'+path+'|'+data);}
 function SaveFile(path, data) { WSsend(JSON.stringify({ "SaveFile": { "path": path, "data": data } })) }
 
+// grpRemoveMember(groupIeee, memberIeee) — вычеркнуть слушателя из Members группы.
+window.grpRemoveMember = function (groupIeee, memberIeee) {
+	try {
+		eventE.once('deviceFile:/Devices/' + groupIeee, function (data) {
+			try {
+				if (!data || data === 'NULL') return;
+				var g = JSON.parse(data);
+				g.Members = (g.Members || []).filter(function (m) { return m !== memberIeee; });
+				SaveJson('/Devices/' + groupIeee, JSON.stringify(g));
+			} catch (e) {}
+		});
+		WSsend('LoadJson|/Devices/' + groupIeee);
+	} catch (e) {}
+};
+// группы = объединение кластеров слушателей: тянет недостающие ClI в EP 01,
+// синтезирует Report-контролы (optimistic, без опроса) и дописывает Members.
+// Вызывают менеджер (квикэдд) и templateedit при добавлении членства.
+window.grpExtendSurface = function (groupIeee, memberIeee, epClusters) {
+	try {
+		eventE.once('deviceFile:/Devices/' + groupIeee, function (data) {
+			try {
+				if (!data || data === 'NULL') return;
+				var g = JSON.parse(data);
+				g.EP = g.EP || {}; g.EP['01'] = g.EP['01'] || { PrfId: '0104', ClI: [], ClO: [] };
+				g.EP['01'].ClI = g.EP['01'].ClI || [];
+				g.Report = g.Report || {}; g.Members = g.Members || [];
+				var ctlMap = {
+					'0006': [{ key: '0100060000', label: 'On_Off', role: 'switch', dataType: '10', cls: { optimistic: true, icon: 'mdi:lightbulb' } }],
+					'0008': [{ key: '0100080000', label: 'Level', role: 'light_level', dataType: '20', cls: { brightness_min: 0, brightness_max: 254 } }],
+					'0300': [{ key: '0103000000', label: 'Color', role: 'light_color', dataType: '20', cls: { color_modes: 'rgb' } },
+					          { key: '0103000007', label: 'ColorTemp', role: 'light_color_temp', dataType: '21', cls: { min_mireds: 153, max_mireds: 500 } }]
+				};
+				(epClusters || []).forEach(function (cl) {
+					cl = String(cl || '').toUpperCase();
+					var ms = ctlMap[cl];
+					if (!ms) return;
+					if (g.EP['01'].ClI.indexOf(cl) === -1) g.EP['01'].ClI.push(cl);
+					ms.forEach(function (m) {
+						if (!g.Report[m.key]) {
+							g.Report[m.key] = { label: m.label, val: '', mat: '1', role: m.role, parsed: '', retain: '0', ya_rep: 'none', class: m.cls, polling: 0, debounce: 0, dataType: m.dataType };
+						}
+					});
+				});
+				if (memberIeee && g.Members.indexOf(memberIeee) === -1) g.Members.push(memberIeee);
+				SaveJson('/Devices/' + groupIeee, JSON.stringify(g));
+			} catch (e) { console.warn('grpExtendSurface', e); }
+		});
+		WSsend('LoadJson|/Devices/' + groupIeee);
+	} catch (e) {}
+};
+
 
 
 function parseSocket(msg) {

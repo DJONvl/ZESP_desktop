@@ -8,7 +8,7 @@ function teShowAbout(){}
 var te_mock={show:function(){},hide:function(){},bringToFront:function(){},destroy:function(){},clickClose:function(){},render:function(){}};
 var te_cm1={setItemState:function(){},setState:function(){}};
 window.te_timers=[];
-function te_reset(){ var v=["file","fileName","filePath","docChanged","ClassterAttr","tmpFile","dragItem","dragStartIndex","dragStartY","dragStartX","dragOffsetY","isDragging","placeholder","dragContainer","currentEditObj","currentCfgObj","currentYaObj","currentYaData","sniffSelected","jsEditIdx","currentBindObj","jsVarEdit"]; v.forEach(function(v2){ try{ window["te_"+v2]=null; }catch(e){} }); }
+function te_reset(){ var v=["file","fileName","filePath","docChanged","ClassterAttr","tmpFile","dragItem","dragStartIndex","dragStartY","dragStartX","dragOffsetY","isDragging","placeholder","dragContainer","currentEditObj","currentCfgObj","currentYaObj","currentYaData","sniffSelected","jsEditIdx","currentBindObj","jsVarEdit","jsNewGroup","groupsReq"]; v.forEach(function(v2){ try{ window["te_"+v2]=null; }catch(e){} }); }
 function te_openFromManager(ieee){ if(window.WinEngine) WinEngine.open("templateedit",{params:"1#"+ieee}); }
 
 
@@ -1679,28 +1679,40 @@ te_joinSetupHtml = function() {
     });
     h += '</div>';
 
-    // --- GROUPS (только если у устройства есть кластер Groups 0004, иначе не работает) ---
+    // --- GROUPS: устройство СЛУШАЕТ группу (нужен 0004). Бинд = устройство ШЛЁТ — он в строке Bind ---
     if (te_jsHasGroups()) {
+    te_ensureGroups();
     h += '<div class="obj-mnu-divider"></div><div class="obj-mnu-section"><div class="obj-mnu-row"><label class="obj-mnu-label">Группы</label>'
-        + '<span style="font-size:11px;color:var(--text-muted)">прописать группу в устройство (бэк — следующим этапом)</span></div>';
+        + '<span style="font-size:11px;color:var(--text-muted)">устройство слушает группу · применяется при подключении</span></div>';
     if (!js.groups.length) h += '<div style="font-size:11px;color:#bbb;padding:2px 6px">— пусто —</div>';
     js.groups.forEach(function(g, i) {
         h += '<div class="obj-mnu-row" style="border:1px solid var(--border2);border-radius:4px;padding:3px 5px;margin:2px 0">'
-            + '<span class="obj-mnu-prev" style="font-family:monospace">group ' + te_escJs(g.addr || '') + ' → EP ' + te_escJs(g.ep || '') + '</span>'
-            + '<button class="obj-mnu-btn" onclick="te_jsDel(\'groups\',' + i + ')" title="Удалить">🗑</button>'
+            + '<b>' + te_escJs(g.addr || '') + '</b>'
+            + '<span style="font-size:11px;color:var(--text-muted)">' + te_escJs(te_jsGroupName(g.addr)) + '</span>'
+            + '<span class="obj-mnu-prev">→ EP ' + te_escJs(g.ep || '') + '</span>'
+            + '<button class="obj-mnu-btn" onclick="te_jsApplyGroup(' + i + ')" title="Прописать группу в устройство сейчас">▶</button>'
+            + '<button class="obj-mnu-btn" onclick="te_jsDelGroup(' + i + ')" title="Убрать везде: из устройства и из файла">🗑</button>'
             + '</div>';
     });
-    var grpOpts = '';
+    var eps = te_jsEpList();
+    var eOpts = eps.map(function(e) {
+        return '<option value="' + te_escJs(e.ep) + '">EP ' + te_escJs(e.ep) + (e.has4 ? ' · 0004' : '') + '</option>';
+    }).join('');
+    var gOpts = '';
     try {
         (window.groups || []).forEach(function(gr) {
-            grpOpts += '<option value="' + te_escJs(gr.adress) + '">' + te_escJs(gr.adress) + ' — ' + te_escJs(gr.name) + '</option>';
+            gOpts += '<option value="' + te_escJs((gr.adress || '').toUpperCase()) + '">' + te_escJs((gr.adress || '').toUpperCase()) + ' — ' + te_escJs(gr.name || '') + '</option>';
         });
     } catch(e) {}
+    gOpts += '<option value="NEW">+ новая…</option>';
     h += '<div class="obj-mnu-row" style="flex-wrap:wrap">'
-        + '<input id="te_js_g_addr" class="obj-mnu-dt-input" style="width:70px" list="te_js_g_list" placeholder="Addr" title="Адрес группы hex">'
-        + '<datalist id="te_js_g_list">' + grpOpts + '</datalist>'
-        + '<input id="te_js_g_ep" class="obj-mnu-dt-input" style="width:36px" placeholder="EP">'
-        + '<button class="obj-mnu-btn obj-mnu-btn-primary" onclick="te_jsAddGroup()" title="Добавить группу">+ Add</button>'
+        + '<select id="te_js_g_sel" class="obj-mnu-dt-input" style="width:150px" onchange="te_jsNewGroupToggle()" title="Группа">' + gOpts + '</select>'
+        + '<select id="te_js_g_ep" class="obj-mnu-dt-input" style="width:90px" title="Эндпоинт устройства">' + eOpts + '</select>'
+        + '<span id="te_js_g_new" style="display:' + (window.te_jsNewGroup ? 'flex' : 'none') + ';gap:3px;align-items:center">'
+        + '<input id="te_js_g_name" class="obj-mnu-dt-input" style="width:90px" placeholder="Имя" title="Имя новой группы">'
+        + '<input id="te_js_g_newaddr" class="obj-mnu-dt-input" style="width:60px" placeholder="Addr" title="Адрес hex, 4 символа">'
+        + '</span>'
+        + '<button class="obj-mnu-btn obj-mnu-btn-primary" onclick="te_jsAddGroup()" title="Добавить">+</button>'
         + '</div></div>';
     } // te_jsHasGroups
 
@@ -2013,14 +2025,108 @@ te_jsApplyReport = function(i) {
 };
 
 // ---------- GROUPS ----------
+// EP устройства списком (с 0004 первые), глобальные группы — догрузка для пикера
+te_jsEpList = function() {
+    var eps = [];
+    try {
+        var EPs = (window.te_file && te_file.EP) || {};
+        Object.keys(EPs).forEach(function(ep) {
+            var cl = (EPs[ep].ClI || []).concat(EPs[ep].ClO || []);
+            var has4 = cl.some(function(c) { return String(c).toUpperCase() === '0004'; });
+            eps.push({ ep: ep, has4: has4 });
+        });
+        eps.sort(function(a, b) { return ((b.has4 ? 1 : 0) - (a.has4 ? 1 : 0)); });
+    } catch(e) {}
+    return eps;
+};
+
+te_jsGroupName = function(addr) {
+    try {
+        var g = (window.groups || []).find(function(gr) { return (gr.adress || '').toUpperCase() === String(addr || '').toUpperCase(); });
+        if (g) return g.name || '';
+    } catch(e) {}
+    return '';
+};
+
+te_ensureGroups = function() {
+    if (window.te_groupsReq) return;
+    window.te_groupsReq = true;
+    try {
+        eventE.on('groups', te_onGroups);
+        WSsend('LoadJson|/groups.json');
+    } catch(e) {}
+};
+
+te_onGroups = function() {
+    try { eventE.off('groups', te_onGroups); } catch(e) {}
+    try { te_refreshJoinSetup(); } catch(e) {}
+};
+
+te_jsNewGroupToggle = function() {
+    var s = document.getElementById('te_js_g_sel');
+    var box = document.getElementById('te_js_g_new');
+    window.te_jsNewGroup = !!(s && s.value === 'NEW');
+    if (box) box.style.display = window.te_jsNewGroup ? 'flex' : 'none';
+};
+
 te_jsAddGroup = function() {
     if (!window.te_file) return;
     var js = te_normJoinSetup(te_file);
-    var g = { addr: te_jsVal('te_js_g_addr').toUpperCase().padStart(4, '0'), ep: te_jsVal('te_js_g_ep').toUpperCase() };
-    if (!g.addr || !g.ep) { window.zespAlert && zespAlert('Заполни Addr и EP', { title: 'JoinSetup' }); return; }
-    js.groups.push(g);
+    var sel = te_jsVal('te_js_g_sel');
+    var ep = te_jsVal('te_js_g_ep').toUpperCase();
+    if (!ep) { window.zespAlert && zespAlert('Выбери EP', { title: 'Группы' }); return; }
+    var addr = sel;
+    if (sel === 'NEW' || !sel) {
+        var nm = te_jsVal('te_js_g_name'), na = te_jsVal('te_js_g_newaddr').toUpperCase();
+        if (!/^[0-9A-F]{4}$/.test(na)) { window.zespAlert && zespAlert('Адрес группы — 4 hex-символа', { title: 'Группы' }); return; }
+        if (!nm) { window.zespAlert && zespAlert('Укажи имя группы', { title: 'Группы' }); return; }
+        window.groups = window.groups || [];
+        if (!window.groups.some(function(gr) { return (gr.adress || '').toUpperCase() === na; })) {
+            window.groups.push({ name: nm, adress: na, devices: [] });
+            WSsend('SaveJson|/groups.json|' + JSON.stringify(window.groups));
+        }
+        addr = na;
+    } else {
+        addr = sel.toUpperCase();
+        if (!/^[0-9A-F]{4}$/.test(addr)) { window.zespAlert && zespAlert('Битый адрес группы', { title: 'Группы' }); return; }
+    }
+    if (js.groups.some(function(g) { return g.addr === addr && g.ep === ep; })) {
+        window.zespAlert && zespAlert('Уже есть', { title: 'Группы' });
+        return;
+    }
+    js.groups.push({ addr: addr, ep: ep });
+    window.te_jsNewGroup = false;
     te_jsDirty();
     te_refreshJoinSetup();
+    // Поверхность группы: дотянуть кластеры EP + записать слушателя
+    try {
+        var ecl = [];
+        if (te_file.EP && te_file.EP[ep]) ecl = (te_file.EP[ep].ClI || []).concat(te_file.EP[ep].ClO || []);
+        if (window.grpExtendSurface) window.grpExtendSurface('GROUP_' + addr, te_file.IEEE, ecl);
+    } catch(e) {}
+};
+
+// Прописать сейчас на живое устройство
+te_jsApplyGroup = function(i) {
+    if (!window.te_file || !te_file.Device) return;
+    var g = te_normJoinSetup(te_file).groups[i];
+    if (!g) return;
+    WSsend('groupAdd|' + te_file.Device + '|' + g.ep + '|' + g.addr);
+};
+
+// Убрать везде: из устройства (best-effort) и из файла
+te_jsDelGroup = function(i) {
+    if (!window.te_file) return;
+    var js = te_normJoinSetup(te_file);
+    var g = js.groups[i];
+    if (!g) return;
+    js.groups.splice(i, 1);
+    te_jsDirty();
+    te_refreshJoinSetup();
+    if (te_file.Device) {
+        try { WSsend('groupRemove|' + te_file.Device + '|' + g.ep + '|' + g.addr); } catch(e) {}
+    }
+    try { if (window.grpRemoveMember) window.grpRemoveMember('GROUP_' + g.addr, te_file.IEEE); } catch(e) {}
 };
 
 // ============================================================

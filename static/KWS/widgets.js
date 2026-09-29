@@ -257,11 +257,36 @@ function widgetEvnt(id, val) {
 	var json = { "DEVICE_CMD": { "cmd": cmd, "obj": obj, "value": val } }
 	WSsend(JSON.stringify(json))	
 	console.log(json)
+	// Группы без репортов: запоминаем отправленное, иначе перерисовка
+	// из пустых parsed откинет контрол назад (grpState читает getWidget)
+	try {
+		if (obj && obj.indexOf('GROUP_') === 0 && cmd !== 'setup' && cmd !== 'select') {
+			window.grpState = window.grpState || {};
+			var cur = window.grpState[obj];
+			if (cmd === 'on_off') {
+				if (val === 2 || val === '2') {
+					var n = parseInt(cur != null ? cur : 0, 10) ? 0 : 1;
+					window.grpState[obj] = n;
+				} else {
+					window.grpState[obj] = (val === 1 || val === '1' || val === true || val === 'on') ? 1 : 0;
+				}
+			} else if (cmd === 'level' || cmd === 'fan_speed' || cmd === 'number' || cmd === 'colorT' || cmd === 'color_temp' || cmd === 'color') {
+				window.grpState[obj] = val;
+			}
+		}
+		if (obj && obj.indexOf('GROUP_') === 0 && cmd === 'select') {
+			window.grpState = window.grpState || {};
+			window.grpState[obj] = val;
+		}
+	} catch (e) {}
 }
 
 function cfgDev(IEEE) {
 	if (IEEE && IEEE != '[object Object]') {
-		if (typeof WinEngine !== 'undefined') { WinEngine.open('templateedit', { params: '1#' + IEEE }); }
+		if (typeof WinEngine !== 'undefined') {
+			if (String(IEEE).indexOf('GROUP_') === 0) WinEngine.open('groups');
+			else WinEngine.open('templateedit', { params: '1#' + IEEE });
+		}
 	}
 }
 function redrawWidget(IEEE) {
@@ -272,6 +297,23 @@ function redrawWidget(IEEE) {
 function getWidget(IEEE) {
 	var dev
 	if (typeof IEEE === 'string') { dev = deviceList.find(function (dev) { return dev.IEEE == IEEE }) } else { dev = IEEE }
+
+	// Группы: подменяем parsed оптимистичным состоянием (репортов нет).
+	// Копию, чтобы не пачкать deviceList.
+	try {
+		if (dev && dev.DevType === 'GRP' && window.grpState) {
+			var patched = {};
+			for (var rk in dev.Report) {
+				if (!dev.Report.hasOwnProperty(rk)) continue;
+				var re = {};
+				for (var fk in dev.Report[rk]) re[fk] = dev.Report[rk][fk];
+				var sv = window.grpState[dev.IEEE + '#' + rk];
+				if (sv !== undefined) { re.parsed = sv; re.val = sv; }
+				patched[rk] = re;
+			}
+			dev = Object.assign({}, dev, { Report: patched });
+		}
+	} catch (e) {}
 
 	//function sortObjectByRole(obj) {const sortedEntries = Object.entries(obj).sort((a, b) => {const roleA = a[1].role;const roleB = b[1].role;return roleA.localeCompare(roleB);});return Object.//fromEntries(sortedEntries);}
 //	dev.Report = sortObjectByRole(dev.Report);

@@ -135,6 +135,7 @@
   function statusHtml(d) {
     var cnt = d.Report ? Object.keys(d.Report).length : 0;
     var cls = 'offline', lbl = t('st.offline', 'Офлайн');
+    if (d.DevType === 'GRP') { cls = 'online'; lbl = t('st.online', 'Онлайн'); cnt = (d.Members || []).length; }
     if (d.Leave && d.Leave !== 0) { cls = 'left'; lbl = t('st.left', 'Покинуло сеть'); }
     else if (d.lastSeen && (Date.now() / 1000 - tsSec(d.lastSeen)) < 300) { cls = 'online'; lbl = t('st.online', 'Онлайн'); }
     var out = '<span class="dm-dot ' + cls + '"></span><span class="txt">' + lbl + '</span>';
@@ -158,6 +159,12 @@
   // ── виджет устройства (перенос deviceManager._vidget) ────────────────
   function widgetHtml(device, key, value) {
     try {
+      // Группы без репортов: оптимистичное состояние из grpState (ставит widgetEvnt),
+      // иначе каждый ререндер таблицы роняет контролы в дефолт. Копия — deviceList не трогаем.
+      if (device.DevType === 'GRP' && window.grpState) {
+        var sv = window.grpState[device.IEEE + '#' + key];
+        if (sv !== undefined) value = Object.assign({}, value, { parsed: sv, val: sv });
+      }
       var ri = getRoleInfo(value);
       var role = ri.roleBase, attr = ri.classObj;
       // Роли ламп разделились (light_onoff/light_level/light_color/light_color_temp),
@@ -599,7 +606,7 @@
       case 'del': if (d) WSsend('removeDevice|' + d.Device + '|' + dev); break;
       case 'clean': if (d) WSsend('removeDevice|' + d.Device + '|' + dev + '|force'); break;
       case 'edit': if (window.WinEngine && WinEngine.open) WinEngine.open('templateedit', { params: '1#' + d.IEEE }); break;
-      case 'group': dm.groupUI(); break;
+      case 'group': dm.addToGroupUI(dev); break;
       case 'scenes': if (window.WinEngine && WinEngine.open) WinEngine.open('scenes', { params: '1#' + d.IEEE }); break;
       case 'add':
         openModal('join');
@@ -745,35 +752,15 @@ dm.setBleTpl = function (dev, adr, name) {
     }
   };
 
-  // ── группы ──
+  // ── группы: администрирование переехало в приложение groups ──
+  // Тулбар и контекст открывают его; вся логика — в apps/groups/groups.js.
   dm.groupUI = function () {
-    openModal('group');
-    eventE.on('groups', dm.group);
-    dm.group(groups);
+    if (window.WinEngine) WinEngine.open('groups');
   };
-  dm.group = function (data) {
-    var c = document.getElementById('GroupStatus');
-    if (!c) return;
-    var html = '<table class="dm-group-table">';
-    for (var i = 0; i < data.length; i++) {
-      html += '<tr><td><span style="color:var(--accent)">' + escapeHtml(data[i].adress) + '</span></td><td style="width:100%">' + escapeHtml(data[i].name) + '</td><td><button onclick="dm.delGroup(' + i + ')">Del</button></td></tr>';
-    }
-    html += '</table>';
-    c.innerHTML = html;
-  };
-  dm.addGroup = function () {
-    var adr = document.getElementById('group_adress').value.padStart(4, '0').toUpperCase();
-    var name = document.getElementById('group_name').value;
-    if (!name) return;
-    groups.push({ name: name, adress: adr, devices: [] });
-    WSsend('SaveJson|/groups.json|' + JSON.stringify(groups));
-    WSsend('LoadJson|/groups.json');
-    document.getElementById('group_adress').value = ''; document.getElementById('group_name').value = '';
-  };
-  dm.delGroup = function (num) {
-    groups.splice(num, 1);
-    WSsend('SaveJson|/groups.json|' + JSON.stringify(groups));
-    WSsend('LoadJson|/groups.json');
+  dm.addToGroupUI = function (ieee) {
+    if (window.WinEngine) WinEngine.open('groups', { params: ieee });
+    // single-окно: повторный open может не вызвать setup — дёргаем предвыбор напрямую
+    setTimeout(function () { try { if (window.grpAddToUI) grpAddToUI(ieee); } catch (e) {} }, 350);
   };
 
   // ── Bind ──
@@ -940,15 +927,6 @@ dm.setBleTpl = function (dev, adr, name) {
         '</div><div class="dm-join-scroll"></div></div>' +
       '</div></div>' +
 
-      '<div class="dm-modal" id="dm_modal_group"><div class="dm-modal-box">' +
-        '<div class="dm-modal-head"><span data-i18n="modal.group">Менеджер групп</span><span class="dm-modal-close" onclick="dm.closeModal(\'group\')">✕</span></div>' +
-        '<div class="dm-modal-body"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
-          '<span style="color:var(--faint)">id</span><input id="group_adress" style="width:64px">' +
-          '<span style="color:var(--faint)">Name</span><input id="group_name" style="flex:1">' +
-          '<button onclick="dm.addGroup()">+</button></div>' +
-          '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px;height:260px;overflow-y:auto" id="GroupStatus"></div>' +
-        '</div></div></div>' +
-
       '<div class="dm-modal" id="dm_modal_bind"><div class="dm-modal-box">' +
         '<div class="dm-modal-head"><span data-i18n="modal.bind">Привязка (Bind)</span><span class="dm-modal-close" onclick="dm.closeModal(\'bind\')">✕</span></div>' +
         '<div class="dm-modal-body" id="dmBindStatus"></div></div></div>' +
@@ -996,7 +974,6 @@ dm.setBleTpl = function (dev, adr, name) {
       if (st.onDev) eventE.off('updateDeviceList', st.onDev);
       if (st.agoTimer) { clearInterval(st.agoTimer); st.agoTimer = null; }
       eventE.off('ArBle', dm.ble);
-      eventE.off('groups', dm.group);
       eventE.off('bindStatus', dm.onBindStatus);
       stopAddTimer();
       stopSecTimer();
