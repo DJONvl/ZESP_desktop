@@ -55,7 +55,7 @@
 .dm-table input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--text);border:2px solid var(--accent);cursor:pointer}
 .dm-table select,.dm-table input{background:var(--bg);color:var(--text);border:1px solid var(--border2);border-radius:4px;padding:3px 6px;font-size:12px;outline:none}
 .dm-table select:focus{border-color:var(--accent)}
-.dm-modal{position:fixed;inset:0;z-index:2147483100;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.dm-modal{position:fixed;inset:0;z-index:2147483100;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center}
 .dm-modal.show{display:flex}
 .dm-modal-box{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.5);width:min(460px,94vw);max-height:88vh;display:flex;flex-direction:column}
 .dm-modal-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px}
@@ -609,7 +609,7 @@
       case 'group': dm.addToGroupUI(dev); break;
       case 'scenes': if (window.WinEngine && WinEngine.open) WinEngine.open('scenes', { params: '1#' + d.IEEE }); break;
       case 'add':
-        openModal('join');
+        dm.zigbeeUI();
         WSsend('addDevice|' + (d ? d.Device : ''));
         startAddTimer();
         break;
@@ -621,6 +621,9 @@
   function closeModal(name) {
     var m = document.getElementById('dm_modal_' + name); if (m) m.classList.remove('show');
     if (name === 'join') {
+      // Гасим join на координаторе и BLE-скан: иначе после закрытия окна
+      // сеть остаётся открытой, а скан жрёт эфир/батарею.
+      try { if (typeof WSsend === 'function') { WSsend('addDeviceDone'); WSsend('BLEscan|"false"'); } } catch (e) {}
       stopAddTimer();
       stopSecTimer();
       var box = document.querySelector('#dm_modal_join .dm-join-scroll'); if (box) box.innerHTML = '';
@@ -906,7 +909,7 @@ dm.setBleTpl = function (dev, adr, name) {
       '<button class="wbtn" data-waction="close">✕</button></div></div>' +
       '<div class="window-body" style="padding:0;overflow:hidden"><div class="dm">' +
         '<div class="dm-toolbar">' +
-          '<button class="dm-btn" data-i18n="tb.add" onclick="dm.openModal(\'join\')">➕ Добавить</button>' +
+          '<button class="dm-btn" data-i18n="tb.add" onclick="dm.zigbeeUI()">➕ Добавить</button>' +
           '<button class="dm-btn" data-i18n="tb.groups" onclick="dm.groupUI()">🗄 Группы</button>' +
           '<button class="dm-btn" data-i18n="tb.bind" onclick="dm.bindUI()">🔗 Bind</button>' +
           '<button class="dm-btn" data-i18n="tb.init" onclick="dm.reset()">♻️ Инит</button>' +
