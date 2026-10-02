@@ -4,6 +4,7 @@
 
 (function () {
   'use strict';
+  console.log('zigbeemap.js v8 (no fit on focus)');
 
   var DIR = '/img/';
   var EDGE_LENGTH_MAIN = 150;
@@ -24,7 +25,11 @@
   var curInd = 0;
   var messages2send = [];
   var tim_map = null;
-  var edgeFilter = { child: true, sibling: true, parent: true, other: true, bed: true };
+  var autoFitted = false;
+  var mapLoading = false;
+  var edgeFilter = { child: true, sibling: true, parent: true, other: true, bed: true, group: true };
+  // Диагностика пройдена: группы рисуются. true — показывать GRP-узлы со связями.
+  var SHOW_GROUPS = true;
 
   // ── ленивая загрузка vis-network ──
   var visLoading = false;
@@ -79,14 +84,23 @@
       if (messages2send.length) {
         curInd = 0;
         messages2send.shift();
-        WSsend(messages2send[0].cmd);
-        scheduleTimeout();
+        if (messages2send.length) { WSsend(messages2send[0].cmd); scheduleTimeout(); }
+        else finishLoad();
       }
     }, 3000);
   }
   function nextMsg() {
     messages2send.shift();
     if (messages2send.length) { WSsend(messages2send[0].cmd); scheduleTimeout(); }
+    else finishLoad();
+  }
+
+  // Финальная центровка, когда LQI-очередь опустела (все ответы получены).
+  // Без анимации: посреди живой физики animated-fit в старой vis глючит.
+  function finishLoad() {
+    if (!network) { mapLoading = false; return; }
+    mapLoading = false;
+    try { network.fit(); } catch (e) {}
   }
 
   function listenerLQI_RSP(tmp) {
@@ -94,6 +108,7 @@
     if (!tmp || tmp.error) {
       curInd = 0; messages2send.shift();
       if (messages2send.length) WSsend(messages2send[0].cmd);
+      else finishLoad();
       return;
     }
     if (tim_map) clearTimeout(tim_map);
@@ -117,6 +132,7 @@
     } else {
       curInd = 0; messages2send.shift();
       if (messages2send.length) WSsend(messages2send[0].cmd);
+      else finishLoad();
     }
   }
 
@@ -135,6 +151,8 @@
     nodes = [];
     edges = [];
     messages2send = [];
+    autoFitted = false;
+    mapLoading = true;
     if (nodesDS) nodesDS.clear();
     if (edgesDS) edgesDS.clear();
     messages2send.push({ cmd: 'LQI_REQ|0000|0', nwkAddr: '0000' });
@@ -150,16 +168,54 @@
     nodes = [];
     edges = [];
     nodes.push({ mass: 2, id: 0, label: 'ZESP_Coordinator', image: DIR + 'zesp.png', shape: 'circularImage', color: { background: '#f4f6fa', border: '#8a94a8' } });
+    var groups = [];
     for (var i = 1; i < deviceList.length; i++) {
       var device = deviceList[i];
       if (device.DevType === 'YAM') continue;
+      // Группы — не радиососеди. Пока SHOW_GROUPS=false — пропускаем полностью.
+      if (device.DevType === 'GRP') { if (SHOW_GROUPS) groups.push(device); continue; }
       var mid = ModelIdDev(device.IEEE);
       var deviceId = parseInt(device.Device, 16);
+      // Адреса нет (BLE-виртуалки, MQTT-импорт): отдельный узел строковым id
+      // (числовой NaN отравил бы физику) + прямая связь с координатором.
+      if (isNaN(deviceId)) {
+        var vid = 'virt:' + device.IEEE;
+        nodes.push({ mass: 2, id: vid, label: mid + '\n' + device.IEEE, image: deviceIconSrc(device.IEEE) || imgSrc(device, mid), shape: 'circularImage', color: { background: '#f4f6fa', border: '#8a94a8' } });
+        edges.push({ id: vid + '>0', from: vid, to: 0, length: EDGE_LENGTH_MAIN, kind: 'bed' });
+        continue;
+      }
       var nodeData = { mass: 2, id: deviceId, label: mid + '\n' + device.IEEE, image: deviceIconSrc(device.IEEE) || imgSrc(device, mid), shape: 'circularImage', color: { background: '#f4f6fa', border: '#8a94a8' } };
       if (device.DevType === 'ZR') { nodeData.color.border = 'gold'; nodeData.borderWidth = 3; }
       else if (device.DevType === 'BED') { edges.push({ id: deviceId + '>0', from: deviceId, to: 0, length: EDGE_LENGTH_MAIN, kind: 'bed' }); }
       nodes.push(nodeData);
     }
+    // Узлы групп (строковый id — без конфликта с сетевыми адресами)
+    // + пунктирные рёбра группа → участник
+    groups.forEach(function (g) {
+      var addr = (g.Device || '').toUpperCase();
+      var gid = 'grp:' + (addr || g.IEEE);
+      nodes.push({
+        mass: 3, id: gid,
+        label: (g.Name || addr) + '\nGRP ' + addr,
+        shape: 'box',
+        color: { background: '#fdf3e0', border: '#e67e22' },
+        borderWidth: 2, font: { color: '#7e5109' }
+      });
+      (g.Members || []).forEach(function (ieee) {
+        for (var k = 1; k < deviceList.length; k++) {
+          if (deviceList[k].IEEE === ieee) {
+            var mId = parseInt(deviceList[k].Device, 16);
+            if (isNaN(mId)) return;
+            edges.push({
+              id: gid + '>' + mId, from: gid, to: mId,
+              label: 'grp', length: EDGE_LENGTH_SUB,
+              kind: 'group', color: '#9b59b6', dashes: true
+            });
+            break;
+          }
+        }
+      });
+    });
   }
 
   function relKind(rel, devType) {
@@ -177,13 +233,18 @@
       if (nodes.length === 0) buildNodes();
 
       if (dev.NeighborLqiList) {
+        var srcId = parseInt(dev.src_addr, 16);
         dev.NeighborLqiList.forEach(function (neighbor) {
           var neighborId = parseInt(neighbor.NetworkAddress, 16);
+          // Битые адреса из эфира — пропускаем, иначе NaN ломает физику
+          if (isNaN(neighborId) || isNaN(srcId)) return;
+          var lqi = parseInt(neighbor.LQI, 16);
+          var lqiLabel = isNaN(lqi) ? '' : lqi.toString();
           var nmid = tryname(ModelIdDev(neighbor.ExtendedAddress));
           if (!nodes.some(function (n) { return n.id === neighborId; })) {
             nodes.push({ id: neighborId, label: nmid + '\n' + neighbor.ExtendedAddress, image: deviceIconSrc(neighbor.ExtendedAddress) || (DIR + nmid + '.jpg'), shape: 'circularImage', color: { background: '#f4f6fa', border: '#8a94a8' } });
             var newKind = relKind(neighbor.Relationship, neighbor.DeviceType);
-            var newEdge = { id: parseInt(dev.src_addr, 16) + '>' + neighborId, label: parseInt(neighbor.LQI, 16).toString(), from: parseInt(dev.src_addr, 16), to: neighborId, length: EDGE_LENGTH_SUB, kind: newKind };
+            var newEdge = { id: srcId + '>' + neighborId, label: lqiLabel, from: srcId, to: neighborId, length: EDGE_LENGTH_SUB, kind: newKind };
             if (newKind === 'child') newEdge.color = 'white';
             else if (newKind === 'sibling') { newEdge.color = 'gold'; newEdge.dashes = true; newEdge.length = EDGE_LENGTH_MAIN * 2; }
             else if (newKind === 'parent') newEdge.color = 'green';
@@ -191,11 +252,11 @@
           } else {
             var edKind = relKind(neighbor.Relationship, neighbor.DeviceType);
             var edgeData = {
-              id: parseInt(dev.src_addr, 16) + '>' + neighborId,
-              label: parseInt(neighbor.LQI, 16).toString(),
-              from: parseInt(dev.src_addr, 16),
+              id: srcId + '>' + neighborId,
+              label: lqiLabel,
+              from: srcId,
               to: neighborId,
-              length: parseInt(neighbor.LQI, 16),
+              length: isNaN(lqi) ? EDGE_LENGTH_SUB : lqi,
               kind: edKind
             };
             if (edKind === 'child') edgeData.color = 'white';
@@ -233,11 +294,48 @@
     nodesDS = new vis.DataSet([]);
     edgesDS = new vis.DataSet([]);
     network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, {
-      interaction: { hover: true },
+      interaction: { hover: true, dragNodes: true, dragView: true, zoomView: true },
       autoResize: true,
       nodes: { shape: 'box' },
-      layout: { improvedLayout: true }
+      layout: { improvedLayout: false },
+      physics: {
+        enabled: true,
+        stabilization: { enabled: true, iterations: 300, updateInterval: 25 }
+      }
     });
+
+    // Центровка один раз за загрузку — когда физика устаканилась.
+    // reqMap сбрасывает флаг, поэтому после ручного обновления тоже отцентрует.
+    network.on('stabilized', function () {
+      if (autoFitted || !network) return;
+      autoFitted = true;
+      try { network.fit(); } catch (e) {}
+    });
+
+    // Окна — div'ы внутри страницы: их ресайз не видит autoResize vis
+    // (следит только за окном браузера) — буфер canvas рассинхронизируется
+    // с CSS-размером и клики/drag идут мимо. Синхронизируем вручную.
+    function syncSize() {
+      if (!network) return;
+      var w = container.clientWidth, h = container.clientHeight;
+      if (!w || !h) return;
+      try {
+        network.setSize(w, h);
+        network.redraw();
+      } catch (e) {}
+    }
+    syncSize();
+    if (typeof ResizeObserver === 'function') {
+      try {
+        if (node._state.mapRO) node._state.mapRO.disconnect();
+        var ro = new ResizeObserver(function () {
+          if (!node._state || node._state.destroyed || !network) return;
+          syncSize();
+        });
+        ro.observe(container);
+        node._state.mapRO = ro;
+      } catch (e) {}
+    }
 
     if (node && node._state.loopTimer) clearInterval(node._state.loopTimer);
     node._state.loopTimer = setInterval(function () {
@@ -277,6 +375,15 @@
       try {
         var obj = params.nodes[0];
         if (obj === undefined) return;
+        // Узел группы — виджета устройства нет, игнорируем
+        if (typeof obj === 'string' && obj.indexOf('grp:') === 0) return;
+        // Виртуальный узел (BLE/MQTT без адреса) — IEEE зашит в id
+        if (typeof obj === 'string' && obj.indexOf('virt:') === 0) {
+          var vieee = obj.slice(5);
+          var vdw = $(DEV_WID_ID);
+          if (vdw) { vdw.innerHTML = getWidget(vieee); vdw.style.visibility = 'visible'; }
+          return;
+        }
         var hd = obj.toString(16).padStart(4, '0').toUpperCase();
         var ieee = null;
         for (var i = 0; i < deviceList.length; i++) if (deviceList[i].Device === hd) { ieee = deviceList[i].IEEE; break; }
@@ -291,6 +398,8 @@
     tim_map = setTimeout(function () {
       if (tim_map) clearTimeout(tim_map);
       parseMap({ src_addr: '0000', Status: '00', NeighborTableEntries: '00', StartIndex: '00', NeighborTableListCount: '00', NeighborLqiList: [] });
+      // Страховка: LQI-ответы так и не пришли — показать хотя бы узлы и отцентровать
+      if (mapLoading && messages2send.length) finishLoad();
     }, 3000);
   }
 
@@ -321,7 +430,8 @@
       '<label class="zb-tgl"><input type="checkbox" checked onchange="zigbeeMapToggleEdge(\'sibling\',this.checked)">соседи</label>' +
       '<label class="zb-tgl"><input type="checkbox" checked onchange="zigbeeMapToggleEdge(\'parent\',this.checked)">родители</label>' +
       '<label class="zb-tgl"><input type="checkbox" checked onchange="zigbeeMapToggleEdge(\'other\',this.checked)">другое</label>' +
-      '<label class="zb-tgl"><input type="checkbox" checked onchange="zigbeeMapToggleEdge(\'bed\',this.checked)">прямые</label></div>' +
+      '<label class="zb-tgl"><input type="checkbox" checked onchange="zigbeeMapToggleEdge(\'bed\',this.checked)">прямые</label>' +
+      '<label class="zb-tgl"><input type="checkbox" checked onchange="zigbeeMapToggleEdge(\'group\',this.checked)">группы</label></div>' +
       '<div class="wbtns"><button class="wbtn min" data-waction="min">–</button>' +
       '<button class="wbtn max" data-waction="max">▢</button>' +
       '<button class="wbtn" data-waction="close">✕</button></div></div>' +
@@ -349,13 +459,34 @@
       }
 
       loadVis(function () {
-        if (node._state.destroyed) return;
-        buildNetwork(node);
+        if (!node._state || node._state.destroyed) return;
+        // Сеть создаём после reflow: синхронно после appendChild у контейнера
+        // ещё нулевой размер и canvas vis остаётся пустым.
+        var run = function () {
+          if (!node._state || node._state.destroyed) return;
+          buildNetwork(node);
+        };
+        if (typeof requestAnimationFrame === 'function') {
+          requestAnimationFrame(function () {
+            if (!node._state || node._state.destroyed) return;
+            requestAnimationFrame(run);
+          });
+        } else {
+          setTimeout(run, 50);
+        }
       });
     },
 
     activate() {
-      if (network) { try { network.redraw(); network.fit(); } catch (e) {} }
+      // Без fit: центровка — только при загрузке (stabilized/finishLoad).
+      // fit при фокусе дёргал камеру под курсором — клики и drag шли мимо.
+      if (network) {
+        try {
+          var c = $(CANVAS_ID);
+          if (c && c.clientWidth && c.clientHeight) network.setSize(c.clientWidth, c.clientHeight);
+          network.redraw();
+        } catch (e) {}
+      }
     },
 
     destroy(node) {
@@ -367,6 +498,9 @@
       }
       if (tim_map) clearTimeout(tim_map);
       tim_map = null;
+      autoFitted = false;
+      mapLoading = false;
+      if (node._state.mapRO) { try { node._state.mapRO.disconnect(); } catch (e) {} }
       if (node._state.loopTimer) clearInterval(node._state.loopTimer);
       if (network) { try { network.destroy(); } catch (e) {} }
       network = null;

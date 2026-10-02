@@ -120,6 +120,9 @@ function parseSocket(msg) {
 			eventE.emit('ArBle', JSON.parse(z[1]));
 			console.log(JSON.parse(z[1]))
 		}
+		if (z[0] === "haddisc") {
+			try { eventE.emit('haddisc', JSON.parse(z.slice(1).join("|"))); } catch (e) {}
+		}
 		if (z[0] === "RESP_ZCL_CLUSTER") {
 			//eventE.emit('ArBle', JSON.parse(z[1]));
 
@@ -174,6 +177,31 @@ function parseSocket(msg) {
 		if (z[0] === "join") {
 			document.getElementById("joinstatus").innerHTML += z[1];
 			document.getElementById("joinstatus").scrollIntoView({ behavior: 'smooth', block: 'end' });
+		}
+		// Нет шаблона под модель — структурированное предложение генерации.
+		// joinNoTemplate|IEEE|ModelId|ManufName
+		if (z[0] === "joinNoTemplate") {
+			try {
+				eventE.emit('joinNoTemplate', { ieee: z[1] || '', model: z[2] || '', manuf: z.slice(3).join('|') || '' });
+			} catch (e) {}
+		}
+		// Генерация: полный ЖСОН — открыть в редакторе без сохранения.
+		// genTemplateResult|IEEE|base64(json)
+		if (z[0] === "genTemplateResult") {
+			try {
+				var raw = atob(z.slice(2).join('|'));
+				var obj = JSON.parse(decodeURIComponent(escape(raw)));
+				eventE.emit('genTemplateResult', { ieee: z[1] || '', json: obj });
+			} catch (e) { console.warn('genTemplateResult', e); }
+		}
+		// Генерация: несколько кандидатов — список на выбор.
+		// genTemplateCandidates|IEEE|base64([{model,vendor}])
+		if (z[0] === "genTemplateCandidates") {
+			try {
+				var craw = atob(z.slice(2).join('|'));
+				var cands = JSON.parse(decodeURIComponent(escape(craw)));
+				eventE.emit('genTemplateCandidates', { ieee: z[1] || '', candidates: cands });
+			} catch (e) { console.warn('genTemplateCandidates', e); }
 		}
 		//var htmlj=$('#joinstatus').append(z[1]);
 		if (z[0] === "removedDevice") {
@@ -361,12 +389,12 @@ function Hex(d, padding) {
 }
 function widgetReport(rep) {
 	try {
-		const ind = deviceList.findIndex(device => device.Device === rep.ShortAddr);
+		const ind = deviceList.findIndex(device => (rep.IEEE && device.IEEE === rep.IEEE) || (rep.ShortAddr && device.Device === rep.ShortAddr));
 		if (ind === -1) return;
 		const dev = deviceList[ind];
 
 		// Ключ репорта: приоритет rep.Obj (виртуальные/BLE/Tuya), иначе собираем из частей
-		const attrID = rep.Obj || `${rep.EndPoint}${rep.ClusterId}${rep.AttribId}`;
+		const attrID = rep.Obj || rep.Object || `${rep.EndPoint}${rep.ClusterId}${rep.AttribId}`;
 
 		// Обновляем deviceList в памяти
 		try {

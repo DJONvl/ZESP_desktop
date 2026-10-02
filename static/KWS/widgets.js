@@ -433,7 +433,7 @@ function getWidget(IEEE) {
 						// Действия для поддержки белого цвета
 					}
 //					if (value.label == "00158D0007503DF3_bulb") {
-						var state = (parseInt(value.parsed) == 1) ? "checked" : ""
+						var state = isOnVal(value.parsed) ? "checked" : ""
 						tpl += `<div id="z${idw}"  style="margin-bottom: 25px; width: 65px; height: 65px; background:silver; border-radius: 54px; filter: brightness(100%); "><img class="bulbw" src='./static/icons/bulb.png'/></div>`
 
 						tpl += `<div class="switch flex">`
@@ -483,7 +483,7 @@ function getWidget(IEEE) {
 				// Роль уже говорит, какой виджет рисовать — условий по лейблам нет.
 				// Каждый виджет заканчивается открывающим <div> под общий закрывающий </div> итерации.
 				{
-					var state = (parseInt(value.parsed) == 1) ? "checked" : ""
+					var state = isOnVal(value.parsed) ? "checked" : ""
 					tpl += `<div id="z${idw}" style="margin-bottom:25px;width:65px;height:65px;background:silver;border-radius:54px;filter:brightness(100%);"><img class="bulbw" src='./static/icons/bulb.png'/></div>`
 					tpl += `<div class="switch flex">`
 					tpl += `<div class="icon flex">${getIconSvg("light_bulb")}</div>`
@@ -542,9 +542,7 @@ function getWidget(IEEE) {
 
 				break;
 			case "switch":
-			let states = {"on": [1,"1", true, "on", "вкл"],"off": [0,"0", false, "off", "выкл"]};
-			let stateValue = Object.entries(states).find(([key, values]) => values.includes(value.parsed))?.[0];
-			    state = stateValue === "on" ? "checked" : "";
+				state = isOnVal(value.parsed) ? "checked" : "";
 									
 				tpl += `<div class="switch flex">`
 				tpl += `<div class="icon flex">${getIconSvg(device_class)}</div>`;
@@ -729,7 +727,7 @@ function getWidget(IEEE) {
 			}
 
 			case 'fan': {
-				const fanOn    = [1,'1',true,'on','ON'].includes(value.parsed);
+				const fanOn    = isOnVal(value.parsed);
 				const fanState = fanOn ? 'checked' : '';
 				const speed    = (attr && value.speed != null) ? value.speed : 0;
 				tpl += `<div class="switch flex">`;
@@ -856,6 +854,10 @@ function getWidget(IEEE) {
 // Кэш проекций JoinSetup.writes: ieee -> {state, writes}. Грузится лениво, один раз.
 window.jsCache = window.jsCache || {};
 function jsEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+// isOnVal — нормализованное сравнение on/off для Parsed:
+// бэк присылает Parsed строкой ("true"/"ON"/"1"), регистр и тип гуляют
+// (особенно у HAD-импорта с чужого брокера).
+function isOnVal(v) { var s = String(v == null ? '' : v).toLowerCase().trim(); return s === '1' || s === 'true' || s === 'on' || s === 'вкл'; }
 
 function setupRowHtml(ieee, w, forceLabel) {
 	var id = ieee + '#setup:' + w.id;

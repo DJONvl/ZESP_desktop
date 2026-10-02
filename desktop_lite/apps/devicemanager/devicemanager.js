@@ -624,6 +624,7 @@
       // Гасим join на координаторе и BLE-скан: иначе после закрытия окна
       // сеть остаётся открытой, а скан жрёт эфир/батарею.
       try { if (typeof WSsend === 'function') { WSsend('addDeviceDone'); WSsend('BLEscan|"false"'); } } catch (e) {}
+      if (window.eventE) eventE.off('haddisc', dm.onHadDisc);
       stopAddTimer();
       stopSecTimer();
       var box = document.querySelector('#dm_modal_join .dm-join-scroll'); if (box) box.innerHTML = '';
@@ -727,10 +728,72 @@ dm.setBleTpl = function (dev, adr, name) {
     WSsend('BLEscan|"true"');
   };
   function setJoinTab(id) {
-    ['dm_tab_zigbee', 'dm_tab_ble'].forEach(function (t) {
+    ['dm_tab_zigbee', 'dm_tab_ble', 'dm_tab_had'].forEach(function (t) {
       var b = document.getElementById(t); if (b) b.classList.toggle('active', t === id);
     });
   }
+  // Видимость вкладки Импорт — только при активном discovery-импорте в конфиге.
+  dm.updateHadTab = function () {
+    var tab = document.getElementById('dm_tab_had'); if (!tab) return;
+    var on = !!(window.jsconfig && window.jsconfig.MQTT && window.jsconfig.MQTT.mqttDiscowery === '1');
+    tab.style.display = on ? '' : 'none';
+  };
+  // ── HAD discovery import ──
+  function hadEsc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  dm.hadUI = function () {
+    openModal('join');
+    setJoinTab('dm_tab_had');
+    dm.updateHadTab();
+    var box = document.querySelector('#dm_modal_join .dm-join-scroll');
+    if (box) box.innerHTML = '<div style="margin-bottom:6px"><b>' + t('had.found', 'Найдено') + '</b> ' +
+      '<button class="dm-btn" onclick="dm.hadAllowAll()">' + t('had.addall', 'Добавить всё') + '</button></div>' +
+      '<div id="had_list"><i>' + t('had.loading', 'Загрузка...') + '</i></div>' +
+      '<div style="margin:8px 0 4px"><b>' + t('had.inbase', 'В базе') + '</b></div><div id="had_base"></div>';
+    eventE.off('haddisc', dm.onHadDisc); eventE.on('haddisc', dm.onHadDisc);
+    dm.renderHadBase();
+    WSsend('had_list');
+  };
+  dm.onHadDisc = function (data) {
+    st.hadLast = data || [];
+    var box = document.getElementById('had_list'); if (!box) return;
+    if (!data || !data.length) {
+      box.innerHTML = '<i>' + t('had.empty', 'Ничего не найдено — чужих discovery-конфигов на брокере нет.') + '</i>';
+      return;
+    }
+    var html = '';
+    data.forEach(function (d) {
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border)">' +
+        '<div style="flex:1;min-width:0"><b>' + hadEsc(d.name || d.ieee) + '</b>' +
+        '<div style="color:var(--faint);font-size:11px">' + hadEsc(d.model || '') + ' · ' + hadEsc((d.components || []).join(', ')) + ' · ' + hadEsc(d.ieee) + '</div></div>' +
+        '<button class="dm-btn" onclick="dm.hadAllow(\'' + hadEsc(d.ieee) + '\')">' + t('had.add', 'Добавить') + '</button>' +
+        '<button class="dm-btn" onclick="dm.hadHide(\'' + hadEsc(d.ieee) + '\')">' + t('had.hide', 'Игнорировать') + '</button></div>';
+    });
+    box.innerHTML = html;
+  };
+  dm.hadAllow = function (ieee) { WSsend('had_allow|' + ieee); };
+  dm.hadHide = function (ieee) { WSsend('had_hide|' + ieee); };
+  dm.hadAllowAll = function () {
+    (st.hadLast || []).forEach(function (d) { WSsend('had_allow|' + d.ieee); });
+  };
+  // Секция «в базе»: HAD из deviceList, удаление — force (из базы + файл).
+  dm.renderHadBase = function () {
+    var box = document.getElementById('had_base'); if (!box) return;
+    var list = (typeof deviceList !== 'undefined' ? deviceList : []).filter(function (d) { return d && d.DevType === 'HAD'; });
+    if (!list.length) { box.innerHTML = '<i>—</i>'; return; }
+    var html = '';
+    list.forEach(function (d) {
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border)">' +
+        '<div style="flex:1;min-width:0"><b>' + hadEsc(d.Name || d.IEEE) + '</b>' +
+        '<div style="color:var(--faint);font-size:11px">' + hadEsc(d.ModelId || '') + ' · ' + hadEsc(d.IEEE) + '</div></div>' +
+        '<button class="dm-btn" onclick="dm.hadDel(\'' + hadEsc(d.IEEE) + '\')">' + t('had.del', 'Удалить') + '</button></div>';
+    });
+    box.innerHTML = html;
+  };
+  dm.hadDel = function (ieee) { WSsend('removeDevice||' + ieee + '|force'); };
   dm.zigbeeUI = function () {
     openModal('join');
     setJoinTab('dm_tab_zigbee');
@@ -765,7 +828,84 @@ dm.setBleTpl = function (dev, adr, name) {
     // single-окно: повторный open может не вызвать setup — дёргаем предвыбор напрямую
     setTimeout(function () { try { if (window.grpAddToUI) grpAddToUI(ieee); } catch (e) {} }, 350);
   };
-
+  // Нет шаблона под модель — кнопка генерации через сервер шаблонов (этап 1).
+  dm.onJoinNoTemplate = function (d) {
+    try {
+      var box = document.getElementById('joinstatus');
+      if (!box) return;
+      var row = document.createElement('div');
+      row.style.margin = '6px 0';
+      var b = document.createElement('button');
+      b.className = 'dm-btn';
+      b.textContent = '📦 Сгенерировать шаблон (' + (d.model || '?') + ')';
+      b.title = 'Запросить шаблон на сервере шаблонов';
+      b.onclick = function () { dm.genTemplate(d.ieee); };
+      row.appendChild(b);
+      box.appendChild(row);
+      box.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    } catch (e) {}
+  };
+  dm.genTemplate = function (ieee) {
+    WSsend('genTemplate|' + ieee);
+  };
+  dm.genTemplate2 = function (ieee, model, vendor) {
+    WSsend('genTemplate|' + ieee + '|' + model + '|' + vendor);
+  };
+  // Полный ЖСОН с сервера: доливаем IEEE/адрес из интервью, сохраняем
+  // в Devices/IEEE (непроверенное чистится через Clean, в Devtemplates
+  // попадает только явной кнопкой Tpl) и показываем кнопку перехода.
+  // По кнопке: джоин завершается, модалка закрывается, открывается редактор.
+  dm.onGenTemplateResult = function (d) {
+    try {
+      var obj = d.json || {};
+      var cur = (window.deviceList || []).find(function (x) { return x.IEEE === d.ieee; });
+      obj.IEEE = d.ieee;
+      if (cur) {
+        if (cur.Device) obj.Device = cur.Device;
+        if (cur.Name) obj.Name = cur.Name;
+        if (cur.Location) obj.Location = cur.Location;
+        if (cur.DevType) obj.DevType = cur.DevType;
+      }
+      WSsend('SaveJson|/Devices/' + d.ieee + '|' + JSON.stringify(obj));
+      eventE.once('updateDeviceList', function () {
+        try {
+          var box = document.getElementById('joinstatus');
+          if (!box) {
+            if (window.WinEngine) WinEngine.open('templateedit', { params: '1#' + d.ieee });
+            return;
+          }
+          var row = document.createElement('div');
+          row.style.margin = '6px 0';
+          var b = document.createElement('button');
+          b.className = 'dm-btn';
+          b.textContent = '📝 Открыть в редакторе';
+          b.onclick = function () {
+            try { dm.closeModal('join'); } catch (e) {}
+            if (window.WinEngine) WinEngine.open('templateedit', { params: '1#' + d.ieee });
+          };
+          row.appendChild(b);
+          box.appendChild(row);
+          box.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        } catch (e) {}
+      });
+    } catch (e) {}
+  };
+  // Несколько кандидатов — кнопки выбора в окно джойна.
+  dm.onGenTemplateCandidates = function (d) {
+    try {
+      var box = document.getElementById('joinstatus');
+      if (!box) return;
+      (d.candidates || []).forEach(function (c) {
+        var b = document.createElement('button');
+        b.className = 'dm-btn';
+        b.style.margin = '2px 4px 2px 0';
+        b.textContent = (c.vendor || '') + ' — ' + (c.model || '');
+        b.onclick = function () { dm.genTemplate2(d.ieee, c.model, c.vendor); };
+        box.appendChild(b);
+      });
+      box.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    } catch (e) {}
+  };
   // ── Bind ──
   // ponytail: координатор (ZC) первым, без дублей
   function dstAllOpts() {
@@ -927,6 +1067,7 @@ dm.setBleTpl = function (dev, adr, name) {
         '<div class="dm-modal-body"><div class="dm-tabs">' +
           '<button class="dm-tab" id="dm_tab_zigbee" data-i18n="tab.zigbee" onclick="dm.zigbeeUI()">Zigbee</button>' +
           '<button class="dm-tab" id="dm_tab_ble" data-i18n="tab.ble" onclick="dm.bleUI()">BLE</button>' +
+          '<button class="dm-tab" id="dm_tab_had" data-i18n="tab.had" style="display:none" onclick="dm.hadUI()">Импорт</button>' +
         '</div><div class="dm-join-scroll"></div></div>' +
       '</div></div>' +
 
@@ -949,12 +1090,17 @@ dm.setBleTpl = function (dev, adr, name) {
     setup(node) {
       node._state = { onDev: null };
       if (window.L) L.ready('devicemgr').then(function () { L.applyLang(node, 'devicemgr'); });
-      st.onDev = function () { renderTable(); };
+      st.onDev = function () { renderTable(); dm.renderHadBase(); };
       if (window.eventE) eventE.on('updateDeviceList', st.onDev);
+      if (window.eventE) eventE.on('jsconfig', dm.updateHadTab);
+      dm.updateHadTab();
       // живой пересчёт «назад» (с/мин/ч/дн), пропуск пока редактируется ячейка
       if (st.agoTimer) clearInterval(st.agoTimer);
       st.agoTimer = setInterval(function () { if (!st.editing) renderTable(); }, 5000);
       if (window.eventE) eventE.on('bindStatus', dm.onBindStatus);
+      if (window.eventE) eventE.on('joinNoTemplate', dm.onJoinNoTemplate);
+      if (window.eventE) eventE.on('genTemplateResult', dm.onGenTemplateResult);
+      if (window.eventE) eventE.on('genTemplateCandidates', dm.onGenTemplateCandidates);
       if (window.websocket && websocket.readyState === 1) window.WSsend('getDeviceList');
       renderTable();
       node.addEventListener('click', function (e) {
@@ -975,9 +1121,13 @@ dm.setBleTpl = function (dev, adr, name) {
     },
     destroy(node) {
       if (st.onDev) eventE.off('updateDeviceList', st.onDev);
+      if (window.eventE) eventE.off('jsconfig', dm.updateHadTab);
       if (st.agoTimer) { clearInterval(st.agoTimer); st.agoTimer = null; }
       eventE.off('ArBle', dm.ble);
       eventE.off('bindStatus', dm.onBindStatus);
+      eventE.off('joinNoTemplate', dm.onJoinNoTemplate);
+      eventE.off('genTemplateResult', dm.onGenTemplateResult);
+      eventE.off('genTemplateCandidates', dm.onGenTemplateCandidates);
       stopAddTimer();
       stopSecTimer();
       st.editing = null;
