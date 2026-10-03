@@ -1,15 +1,15 @@
-// groups.js — приложение «Группы»: администрирование Zigbee-групп.
-// GRP-устройства (Devices/GROUP_XXXX из Devtemplates/GROUP).
-// Точки входа: WinEngine.open('groups') или WinEngine.open('groups', {params: ieee})
-// (предвыбор устройства для добавления).
-// Зависимости: socket.js (WSsend/SaveJson/eventE/deviceList/groups), zesp-globals.js (L).
+// groups.js — "Groups" app: Zigbee group administration.
+// GRP devices (Devices/GROUP_XXXX from Devtemplates/GROUP).
+// Entry points: WinEngine.open('groups') or WinEngine.open('groups', {params: ieee})
+// (preselect a device to add).
+// Dependencies: socket.js (WSsend/SaveJson/eventE/deviceList/groups), zesp-globals.js (L).
 var grp_node = null;
 var grp_bodyEl = null;
 
 function grpCloseWindow() { if (window.WinEngine && grp_node) { try { WinEngine.close(grp_node); } catch (e) {} } }
 function grpSetTitle(a) { var t = grp_node && grp_node.querySelector('.wtitle'); if (t && a && a.length) t.textContent = a[0]; }
 
-// ---------- состояние ----------
+// ---------- state ----------
 window.grp_state = window.grp_state || { tpl: null, migDone: false, atgIeee: null, atgNew: false };
 
 // ---------- helpers ----------
@@ -54,7 +54,7 @@ function grpMembersHtml(members) {
     return '<div>· ' + grpEscape(ieee) + ' <span style="color:var(--red)">(нет в сети)</span></div>';
   }).join('');
 }
-// Группа слушателя — для кнопки × (первое совпадение)
+// Listener's group — for the × button (first match)
 function grpMemberGroup(ieee) {
   var gs = grpList();
   for (var i = 0; i < gs.length; i++) {
@@ -62,7 +62,7 @@ function grpMemberGroup(ieee) {
   }
   return '';
 }
-// Убрать слушателя: из Members группы + снять членство из файла устройства + live remove
+// Remove a listener: from the group Members + drop membership from the device file + live remove
 function grpKick(gIeee, ieee) {
   if (!gIeee || !ieee) return;
   try {
@@ -83,7 +83,7 @@ function grpKick(gIeee, ieee) {
           return !(x.addr === gAddr);
         });
         if (removed.length) SaveJson('/Devices/' + ieee, JSON.stringify(dev));
-        // Живая команда на устройство — по EP каждого снятого членства
+        // Live command to the device — per EP of each removed membership
         if (d && d.Device) removed.forEach(function (x) {
           WSsend('groupRemove|' + d.Device + '|' + x.ep + '|' + gAddr);
         });
@@ -97,7 +97,7 @@ function grpEdit(ieee) {
   if (window.WinEngine) WinEngine.open('templateedit', { params: '1#' + ieee });
 }
 
-// ---------- создание / удаление ----------
+// ---------- create / delete ----------
 function grpCreate(adr, name, cb) {
   adr = (adr || '').toUpperCase();
   if (!/^[0-9A-F]{4}$/.test(adr)) { window.zespAlert && zespAlert('Адрес группы — 4 hex-символа', { title: 'Группы' }); return; }
@@ -136,7 +136,7 @@ function grpDel(ieee) {
   var g = grpList().find(function (z) { return z.IEEE === ieee; });
   if (!g) return;
   var members = g.Members || [];
-  // Непустую не даём: сначала убрать слушателей (× у каждого)
+  // Refuse a non-empty one: remove listeners first (× on each)
   if (members.length) {
     var names = members.map(function (m) {
       var d = (window.deviceList || []).find(function (z) { return z.IEEE === m; });
@@ -148,7 +148,7 @@ function grpDel(ieee) {
   WSsend('removeDevice|' + (g.Device || '') + '|' + ieee + '|force');
   eventE.once('updateDeviceList', function () { grpRefresh(); });
 }
-// Разовая миграция legacy groups.json → GROUP-файлы
+// One-time migration legacy groups.json → GROUP files
 function grpMigrate() {
   if (window.grp_state.migDone) return; window.grp_state.migDone = true;
   try {
@@ -167,7 +167,7 @@ function grpMigrate() {
   } catch (e) {}
 }
 
-// ---------- добавление устройства в группу ----------
+// ---------- adding a device to a group ----------
 function grpEpList(ieee) {
   var eps = [];
   try {
@@ -256,7 +256,7 @@ function grpAddToDo() {
   }
 }
 
-// ---------- каркас окна ----------
+// ---------- window frame ----------
 var GRP_CSS = '\n' +
   '.g-btn{padding:2px 8px;font-size:12px;border:1px solid var(--border2);border-radius:4px;background:var(--bg3);cursor:pointer;color:var(--text);white-space:nowrap}\n' +
   '.g-btn:hover{background:var(--hover)}\n' +
@@ -309,7 +309,7 @@ window.WinEngine && window.WinEngine.register({
       node._state.upd = function () { grpRefresh(); };
       eventE.on('updateDeviceList', node._state.upd);
     }
-    // params = IEEE устройства для быстрого добавления
+    // params = device IEEE for quick add
     try {
       var p = (opts && opts.params) || '';
       if (p && p !== 'new') grpAddToUI(p);

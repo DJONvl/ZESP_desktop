@@ -78,7 +78,7 @@ loadAgent=function(aname,cb){
       agent.animate();
       setTimeout(function(){agent.play('Wave')},600);
       var _el=agent._el;if(_el){_el.style.position='fixed';_el.style.bottom='';_el.style.right='';var _zz=(window.getZoom?window.getZoom():1),_w=_el.offsetWidth||124,_h=_el.offsetHeight||124;_el.style.left=(window.innerWidth/_zz-_w-20)+'px';_el.style.top=(window.innerHeight/_zz-_h-20)+'px'};
-      // --- zoom-фикс clippy: библиотека считает позицию/drag в viewport-px ---
+      // --- zoom fix for clippy: the library computes position/drag in viewport px ---
       (function(){
         var gz=function(){return (window.getZoom?window.getZoom():1)};
         var vw=function(){return window.innerWidth/gz()};
@@ -94,7 +94,7 @@ loadAgent=function(aname,cb){
         agent._finishDrag=function(){this._zoff=null;return origFinish()};
         if(agent._balloon){var bal=agent._balloon,origBalR=bal.reposition.bind(bal);bal.reposition=function(){origBalR();var z=gz();if(z!==1&&bal._balloon){var b=bal._balloon;if(b.style.left)b.style.left=(parseFloat(b.style.left)/z)+'px';if(b.style.top)b.style.top=(parseFloat(b.style.top)/z)+'px'}}}
       })();
-      // ── встройка чата в балун ──
+      // ── embed the chat into the balloon ──
       var bal=agent._balloon._balloon, cnt=agent._balloon._content;
       if(bal&&cnt){
        bal.style.minWidth='300px';bal.style.maxWidth='360px';bal.style.background='#1a1a2e';bal.style.color='#e0e0e0';bal.style.border='1px solid #2a2a3a';bal.style.borderRadius='12px';bal.style.padding='0';bal.style.boxShadow='0 4px 20px rgba(0,0,0,0.5)';
@@ -102,9 +102,9 @@ loadAgent=function(aname,cb){
        bal.style.fontFamily="'Segoe UI',Tahoma,sans-serif";bal.style.fontSize='13px';bal.style.cursor='default';
        cnt.style.maxWidth='none';cnt.style.minWidth='auto';cnt.style.padding='0';cnt.style.lineHeight='1.4';
        cnt.innerHTML='<div id="zcMsgs" style="overflow-y:auto;padding:8px;min-height:60px;max-height:200px;scrollbar-width:thin;scrollbar-color:#2a2a3a #0f0f1a;"></div><div id="zcRow" style="display:flex;padding:6px 8px;border-top:1px solid #2a2a3a;gap:4px;"><input id="zcIn" placeholder="Напишите..." autocomplete="off" x-webkit-speech style="flex:1;background:#0f0f1a;border:1px solid #2a2a3a;padding:6px 10px;border-radius:8px;color:#fff;font-size:13px;outline:none;"><button id="zcSpk" style="background:#2a2a3a;border:none;padding:6px 8px;border-radius:8px;color:#aaa;cursor:pointer;font-size:13px;">🔊</button><button id="zcMic" style="background:#2a2a3a;border:none;padding:6px 8px;border-radius:8px;color:#aaa;cursor:pointer;font-size:13px;">🎤</button><button id="zcSend" style="background:#2a2a3a;border:none;padding:6px 8px;border-radius:8px;color:#aaa;cursor:pointer;font-size:13px;">➤</button></div>';
-       // стили для скроллбара в zcMsgs
+       // styles for the scrollbar in zcMsgs
        var st=document.createElement('style');st.textContent='#zcMsgs::-webkit-scrollbar{width:4px}#zcMsgs::-webkit-scrollbar-track{background:#0f0f1a}#zcMsgs::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:4px}#zcMsgs>div{padding:4px 8px;margin:2px 0;border-radius:8px;font-size:12px;white-space:pre-wrap;word-break:break-word;user-select:text;cursor:pointer;transition:opacity.15s}#zcMsgs>div.zc-user{background:#0d4a5c;color:#e0f0ff}#zcMsgs>div.zc-asst{background:#2a2a3a;color:#e0e0e0;border:1px solid #3a3a4a}#zcMsgs>div.zc-err{background:#3a1a1a;color:#f66;border:1px solid #5a2a2a}#zcMsgs>div.zc-wait{color:#888;font-style:italic}';bal.appendChild(st);
-       // обработчики
+       // handlers
        document.getElementById('zcSend').addEventListener('click',zc_sendInBalloon);
        document.getElementById('zcSpk').addEventListener('click',function(){zc_ttsOn=!zc_ttsOn;this.textContent=zc_ttsOn?'🔊':'🔇'});
        var input=document.getElementById('zcIn');
@@ -113,18 +113,18 @@ loadAgent=function(aname,cb){
        input.addEventListener('focus',function(){if(window.agent)window.agent.play('CheckingSomething')});
       var zsr=zc_initSR(),isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
       if(zsr&&!isMobile){zsr.onresult=function(e){input.value=e.results[e.results.length-1][0].transcript;zc_sendInBalloon()};document.getElementById('zcMic').addEventListener('click',function(){if(window.agent)window.agent.play('CheckingSomething');input.focus();try{zsr.start()}catch(e){}})}else{document.getElementById('zcMic').addEventListener('click',function(){if(window.agent)window.agent.play('CheckingSomething');input.focus()});document.getElementById('zcMic').style.display=''}
-       // двойной клик/тап — показать/скрыть балун
+       // double click/tap — show/hide the balloon
         function toggleBal(){if(bal.hasAttribute('hidden')){bal.removeAttribute('hidden');requestAnimationFrame(function(){var zm=(window.getZoom?window.getZoom():1),vW=window.innerWidth/zm,vH=window.innerHeight/zm,bH=bal.offsetHeight||280;bal.style.left=Math.max(4,(vW-320)/2)+'px';bal.style.top=Math.max(4,(vH-bH)/2)+'px';input.focus()})}else bal.setAttribute('hidden','true')}
        _el.addEventListener('dblclick',toggleBal);
        var _lt=0,_lx=0,_ly=0;
        _el.addEventListener('touchstart',function(e){_lx=e.touches[0].clientX;_ly=e.touches[0].clientY},true);
        _el.addEventListener('touchend',function(e){var c=e.changedTouches[0],dx=Math.abs(c.clientX-_lx),dy=Math.abs(c.clientY-_ly);if(dx>15||dy>15)return;var n=Date.now();if(n-_lt<400){_lt=0;toggleBal()}else _lt=n},true);
-       // клик по сообщению — копировать
+       // click on a message — copy it
        document.getElementById('zcMsgs').addEventListener('click',function(e){var d=e.target.closest('.zc-user,.zc-asst');if(d){navigator.clipboard.writeText(d.textContent);d.style.opacity='0.5';setTimeout(function(){d.style.opacity='1'},200)}});
       }
-      // скрыть старый оверлей
+      // hide the old overlay
       var ov=document.getElementById('clippyOverlay');if(ov)ov.style.display='none';
-      // перехват speak — рендерить в чат вместо балуна
+      // intercept speak — render into the chat instead of the balloon
       agent.speak=function(t){if(t!=null&&document.getElementById('zcMsgs')){var m=document.getElementById('zcMsgs'),d=document.createElement('div');d.className='zc-asst';d.textContent=String(t);m.appendChild(d);m.scrollTop=m.scrollHeight}};
       if(typeof cb==='function')cb(agent);
     },
@@ -156,7 +156,7 @@ var ZC={mcpUrl:zc_autoAddr};
 var zc_ocSession=null;
 var zc_ttsOn=true;
 
-// defaults если jsconfig.Brain отсутствует
+// defaults if jsconfig.Brain is missing
 var zc_defaults={
  provider:{val:'none',list:['none','opencode','openai','deepseek','ollama']},
  opencode_url:'http://'+location.hostname+':4096',opencode_model:'opencode-go/qwen3.7-plus',
@@ -171,7 +171,7 @@ function zc_load(){
  var oldP=zc_provider(),oldM=zc_cfg().model;
  for(var k in b)ZC[k]=b[k];
  ZC.mcpUrl=zc_autoAddr;
- // сброс сессии при смене провайдера или модели
+ // reset the session when the provider or model changes
  if(zc_ocSession&&(oldP!==zc_provider()||oldM!==zc_cfg().model))zc_ocSession=null;
 }
 function zc_provider(){var p=ZC.provider;return(typeof p==='object'?p.val:p)||'opencode'}
@@ -193,7 +193,7 @@ async function zc_devs(){
  return m?JSON.parse(m[0]):[];
 }
 
-// тупой прокси через бекенд
+// dumb proxy via the backend
 async function zc_proxy(url,method,body,headers){
  var r=await fetch('/brain/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:url,method:method||'GET',body:body,headers:headers})});
  if(!r.ok)throw new Error(r.status+' '+r.statusText);

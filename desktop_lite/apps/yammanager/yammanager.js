@@ -1,7 +1,7 @@
-// yammanager.js — виджет «YAM Manager» (порт static/apps/YAMmanager.app на WinEngine).
-// Управление Яндекс.Станциями + аудиостриминг.
-// Зависимости: socket.js (WSsend/eventE), zesp-globals.js.
-// $ — локальный хелпер по id (в lite нет jQuery).
+// yammanager.js — "YAM Manager" widget (port of static/apps/YAMmanager.app to WinEngine).
+// Yandex.Station control + audio streaming.
+// Dependencies: socket.js (WSsend/eventE), zesp-globals.js.
+// $ — local id helper (no jQuery in lite).
 
 (function () {
   'use strict';
@@ -13,12 +13,12 @@
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  // ── состояние ──
+  // ── state ──
   var pollTimer = null;
   var selectedDevice = null;
   var speakerData = {};
 
-  // ── WS-реакции ──
+  // ── WS reactions ──
   function onWS(data, evtName) {
     var st = function (html) { var e = $('yam_status'); if (e) e.innerHTML = html; };
     if (evtName === 'speakerList') {
@@ -44,7 +44,7 @@
     }
   }
 
-  // ── список / layout ──
+  // ── list / layout ──
   function updateLayout() {
     var ml = $('yam_main_layout');
     if (!ml) return;
@@ -111,7 +111,7 @@
     $('yam_list').innerHTML = html;
   }
 
-  // ── выбор / плоллинг ──
+  // ── selection / polling ──
   function selectDevice(deviceID) {
     selectedDevice = deviceID;
     var ml = $('yam_main_layout');
@@ -180,7 +180,7 @@
 
   function cmd(action, deviceID) { $('yam_status').innerHTML = '⏳ ' + action + ' ' + deviceID + '...'; window.WSsend(action + '|' + deviceID); }
 
-  // ── команды (глобальные — из inline onclick) ──
+  // ── commands (global — from inline onclick) ──
   window.yamToggle = function () { toggleList(); };
   window.yamCloud = function () { $('yam_status').innerHTML = '⏳ Загрузка из облака...'; window.WSsend('speakerCloudLoad'); };
   window.yamDiscover = function () { $('yam_status').innerHTML = '⏳ Поиск колонок в сети...'; window.WSsend('speakerDiscover'); };
@@ -314,7 +314,7 @@
     '.tts-section button{padding:10px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;background:#1565c0;color:#fff;}' +
     '.tts-section button:hover{background:#1976d2;}';
 
-  // ── регистрация виджета ──
+  // ── widget registration ──
   window.WinEngine.register({
     id: 'yam',
     title: 'YAM Manager',

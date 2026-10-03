@@ -1,8 +1,8 @@
-// blockly.js — виджет «Blockly» (порт static/apps/blockly.app на WinEngine).
-// Редактор блоков ZESP: workspace.xml + toolbox.xml, генерация категорий из deviceList,
-// переключатель Blockly/JS (ace), экспорт XML/PNG, подсветка по событию report,
-// сохранение в workspace.xml + script.js (SaveJson) + WSsend('initBlockly').
-// Зависимости: blockly.js, msg/ru.js (MSG), ace.js, custom_blockly.js, socket.js, deviceList.
+// blockly.js — "Blockly" widget (port of static/apps/blockly.app to WinEngine).
+// ZESP block editor: workspace.xml + toolbox.xml, category generation from deviceList,
+// Blockly/JS switcher (ace), XML/PNG export, highlight on report events,
+// save to workspace.xml + script.js (SaveJson) + WSsend('initBlockly').
+// Dependencies: blockly.js, msg/ru.js (MSG), ace.js, custom_blockly.js, socket.js, deviceList.
 
 (function () {
   'use strict';
@@ -23,7 +23,7 @@
   var editor = null;    // ace editor
   var exiting = false;
 
-  // ---------- подсветка по событию report ----------
+  // ---------- highlight on report events ----------
   function evtReport(data) {
     var ieee;
     if (data && data.length > 0) ieee = data[0].IEEE || data[1];
@@ -55,7 +55,7 @@
     }, duration);
   }
 
-  // ---------- модалки экспорта/импорта ----------
+  // ---------- export/import modals ----------
   function modal(html) {
     var d = document.createElement('div');
     d.innerHTML = '<div style="position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;z-index:9999">' +
@@ -113,7 +113,7 @@
     w.querySelector('#blCancelBtn').onclick = function () { w.remove(); };
   }
 
-  // ---------- экспорт PNG ----------
+  // ---------- PNG export ----------
   function blockToSvg(block) {
     var svgRoot = block.getSvgRoot();
     var bbox = svgRoot.getBBox();
@@ -148,7 +148,7 @@
     }, 'image/png');
   }
 
-  // ---------- генерация JS-кода ----------
+  // ---------- JS code generation ----------
   function mkClean() {
     var fn = 'cleanBlockly = function(){\n';
     var blocks = ws.getAllBlocks();
@@ -178,7 +178,7 @@
   }
   var node = null;
 
-  // ---------- блоки/JS ----------
+  // ---------- blocks/JS ----------
   function showBlocks() { node.querySelector('.bl-div').style.display = 'block'; node.querySelector('.bl-js').style.display = 'none'; }
   function showJs() { showCode(); node.querySelector('.bl-div').style.display = 'none'; node.querySelector('.bl-js').style.display = 'block'; }
   function toggleToolbar() {
@@ -187,7 +187,7 @@
     Blockly.svgResize(ws);
   }
 
-  // ---------- сохранение ----------
+  // ---------- saving ----------
   function saveFile() {
     var xmlDom = Blockly.Xml.workspaceToDom(ws, true);
     var xmlText = Blockly.Xml.domToPrettyText(xmlDom);
@@ -204,7 +204,7 @@
     });
   }
 
-  // ---------- init блокли ----------
+  // ---------- blockly init ----------
   function blocklyInit() {
     var blocklyDiv = node.querySelector('.bl-div');
     if (typeof MSG === 'object') {
@@ -233,7 +233,7 @@
     Blockly.svgResize(ws);
   }
 
-  // ---------- сброс (для переинициализации после прихода deviceList) ----------
+  // ---------- reset (for re-init after deviceList arrives) ----------
   function resetEditor() {
     if (editor) { try { editor.destroy(); } catch (e) {} editor = null; }
     if (ws) { try { ws.dispose(); } catch (e) {} ws = null; }
@@ -245,10 +245,10 @@
     var wb = document.getElementById('workspaceBlocks'); if (wb) wb.remove();
   }
 
-  // ---------- загрузка workspace.xml + toolbox.xml ----------
+  // ---------- workspace.xml + toolbox.xml loading ----------
   function loadXml() {
     Promise.all(['workspace.xml', 'toolbox.xml'].map(function (file) {
-      // файла может не быть (чистая установка) — тогда пустой workspace вместо 404-страницы
+      // the file may not exist (fresh install) — then an empty workspace instead of a 404 page
       return fetch(file).then(function (r) { return r.ok ? r.text() : '<xml xmlns="https://developers.google.com/blockly/xml"></xml>'; });
     })).then(function (xmls) {
       xmls.forEach(function (xml) {
@@ -278,8 +278,8 @@
           }
           doc = parser.parseFromString(xml, 'application/xml');
         }
-        // XML-определения (toolbox/workspace) должны быть в DOM для getElementById,
-        // но не должны светиться текстом под редактором — прячем явно.
+        // XML definitions (toolbox/workspace) must be in the DOM for getElementById,
+        // but must not leak as text under the editor — hide explicitly.
         try { doc.documentElement.setAttribute('style', 'display:none!important'); } catch (e) {}
         node.appendChild(doc.documentElement);
       });
@@ -324,7 +324,7 @@
         if (a === 'toolbar') return toggleToolbar();
       });
       if (window.eventE) eventE.on('report', evtReport);
-      // deviceList может прийти позже socket.js — при первом наполнении пересобираем тулбар
+      // deviceList may arrive later than socket.js — rebuild the toolbar on first fill
       n._state.onDev = function () {
         if (window.deviceList && window.deviceList.length) {
           if (window.eventE) eventE.off('updateDeviceList', n._state.onDev);
@@ -335,7 +335,7 @@
       if (window.eventE && (!window.deviceList || !window.deviceList.length)) {
         eventE.on('updateDeviceList', n._state.onDev);
       }
-      // ресайз: blockly-див пересчитываем по области окна
+      // resize: recalculate the blockly div against the window area
       var ro = new ResizeObserver(function () { resize(); });
       ro.observe(n.querySelector('.bl-area'));
       n._state.ro = ro;

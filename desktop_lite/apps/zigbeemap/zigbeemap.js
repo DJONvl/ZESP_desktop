@@ -1,6 +1,6 @@
-// zigbeemap.js — виджет «Zigbee Map» (порт static/apps/zigbeeMap.app на WinEngine).
-// Схема Zigbee-сети на vis.js (LQI). Зависимости: socket.js (deviceList/eventE/WSsend/Hex),
-// widgets.js (getWidget), zesp-globals.js. vis-network.min.js грузится лениво.
+// zigbeemap.js — "Zigbee Map" widget (port of static/apps/zigbeeMap.app to WinEngine).
+// Zigbee network diagram on vis.js (LQI). Dependencies: socket.js (deviceList/eventE/WSsend/Hex),
+// widgets.js (getWidget), zesp-globals.js. vis-network.min.js loads lazily.
 
 (function () {
   'use strict';
@@ -15,7 +15,7 @@
 
   var $ = function (id) { return document.getElementById(id); };
 
-  // ── состояние ──
+  // ── state ──
   var network = null;
   var nodesDS = null;
   var edgesDS = null;
@@ -28,10 +28,10 @@
   var autoFitted = false;
   var mapLoading = false;
   var edgeFilter = { child: true, sibling: true, parent: true, other: true, bed: true, group: true };
-  // Диагностика пройдена: группы рисуются. true — показывать GRP-узлы со связями.
+  // Diagnostics passed: groups render. true — show GRP nodes with links.
   var SHOW_GROUPS = true;
 
-  // ── ленивая загрузка vis-network ──
+  // ── lazy vis-network loading ──
   var visLoading = false;
   var visPending = [];
 
@@ -46,7 +46,7 @@
     document.head.appendChild(s);
   }
 
-  // ── хелперы ──
+  // ── helpers ──
   function ModelIdDev(Adr) {
     var ModelId = 'Unknown';
     if (Adr && Adr.length > 4) {
@@ -59,7 +59,7 @@
   function imgSrc(dev, modelId) { return (dev && dev.Img) ? dev.Img : DIR + modelId + '.jpg'; }
   function tryname(str) { return str; }
 
-  // SVG-иконка типа устройства (как в виджете «Устройства»), fallback — картинка .jpg.
+  // SVG icon of the device type (as in the "Devices" widget), fallback — .jpg picture.
   function deviceIconSrc(IEEE) {
     if (typeof renderDeviceTypeIcon !== 'function') return null;
     var dType = 'devices.types.other';
@@ -70,13 +70,13 @@
     var svg = renderDeviceTypeIcon(dType, 42, color) ||
               renderDeviceTypeIcon('devices.types.other', 42, color);
     if (!svg) return null;
-    // currentColor не наследуется в canvas — подставляем цвет явно
+    // currentColor is not inherited in canvas — substitute the color explicitly
     var html = svg.outerHTML.replace(/currentColor/g, color);
     if (html.indexOf('xmlns') === -1) html = html.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ');
     return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(html);
   }
 
-  // ── очередь запросов LQI ──
+  // ── LQI request queue ──
   function scheduleTimeout() {
     if (tim_map) clearTimeout(tim_map);
     tim_map = setTimeout(function () {
@@ -95,8 +95,8 @@
     else finishLoad();
   }
 
-  // Финальная центровка, когда LQI-очередь опустела (все ответы получены).
-  // Без анимации: посреди живой физики animated-fit в старой vis глючит.
+  // Final centering when the LQI queue is drained (all responses received).
+  // No animation: amid live physics animated-fit glitches in old vis.
   function finishLoad() {
     if (!network) { mapLoading = false; return; }
     mapLoading = false;
@@ -172,12 +172,12 @@
     for (var i = 1; i < deviceList.length; i++) {
       var device = deviceList[i];
       if (device.DevType === 'YAM') continue;
-      // Группы — не радиососеди. Пока SHOW_GROUPS=false — пропускаем полностью.
+      // Groups are not radio neighbors. While SHOW_GROUPS=false — skip entirely.
       if (device.DevType === 'GRP') { if (SHOW_GROUPS) groups.push(device); continue; }
       var mid = ModelIdDev(device.IEEE);
       var deviceId = parseInt(device.Device, 16);
-      // Адреса нет (BLE-виртуалки, MQTT-импорт): отдельный узел строковым id
-      // (числовой NaN отравил бы физику) + прямая связь с координатором.
+      // No address (BLE virtuals, MQTT import): separate node with a string id
+      // (numeric NaN would poison physics) + direct link to the coordinator.
       if (isNaN(deviceId)) {
         var vid = 'virt:' + device.IEEE;
         nodes.push({ mass: 2, id: vid, label: mid + '\n' + device.IEEE, image: deviceIconSrc(device.IEEE) || imgSrc(device, mid), shape: 'circularImage', color: { background: '#f4f6fa', border: '#8a94a8' } });
@@ -189,8 +189,8 @@
       else if (device.DevType === 'BED') { edges.push({ id: deviceId + '>0', from: deviceId, to: 0, length: EDGE_LENGTH_MAIN, kind: 'bed' }); }
       nodes.push(nodeData);
     }
-    // Узлы групп (строковый id — без конфликта с сетевыми адресами)
-    // + пунктирные рёбра группа → участник
+    // Group nodes (string id — no clash with network addresses)
+    // + dashed group → member edges
     groups.forEach(function (g) {
       var addr = (g.Device || '').toUpperCase();
       var gid = 'grp:' + (addr || g.IEEE);
@@ -222,7 +222,7 @@
     if (rel === 'Child') return 'child';
     if (rel === 'Sibling') return 'sibling';
     if (rel === 'Parent') return 'parent';
-    // Прошивка часто отдаёт Relationship=Unknown — классифицируем по типу устройства
+    // Firmware often reports Relationship=Unknown — classify by device type
     if (rel === 'PreviousChild' || devType === 'ZED') return 'child';
     if (devType === 'ZR' || devType === 'ZC') return 'sibling';
     return 'other';
@@ -236,7 +236,7 @@
         var srcId = parseInt(dev.src_addr, 16);
         dev.NeighborLqiList.forEach(function (neighbor) {
           var neighborId = parseInt(neighbor.NetworkAddress, 16);
-          // Битые адреса из эфира — пропускаем, иначе NaN ломает физику
+          // Broken over-the-air addresses — skip, otherwise NaN breaks physics
           if (isNaN(neighborId) || isNaN(srcId)) return;
           var lqi = parseInt(neighbor.LQI, 16);
           var lqiLabel = isNaN(lqi) ? '' : lqi.toString();
@@ -287,7 +287,7 @@
     network.redraw();
   }
 
-  // ── построение сети ──
+  // ── network building ──
   function buildNetwork(node) {
     var container = $(CANVAS_ID);
     if (!container) return;
@@ -304,17 +304,17 @@
       }
     });
 
-    // Центровка один раз за загрузку — когда физика устаканилась.
-    // reqMap сбрасывает флаг, поэтому после ручного обновления тоже отцентрует.
+    // Center once per load — when physics has settled.
+    // reqMap resets the flag, so it will center after a manual refresh too.
     network.on('stabilized', function () {
       if (autoFitted || !network) return;
       autoFitted = true;
       try { network.fit(); } catch (e) {}
     });
 
-    // Окна — div'ы внутри страницы: их ресайз не видит autoResize vis
-    // (следит только за окном браузера) — буфер canvas рассинхронизируется
-    // с CSS-размером и клики/drag идут мимо. Синхронизируем вручную.
+    // Windows are divs inside the page: vis autoResize does not see their resize
+    // (it watches only the browser window) — the canvas buffer desyncs from
+    // the CSS size and clicks/drag miss. We sync manually.
     function syncSize() {
       if (!network) return;
       var w = container.clientWidth, h = container.clientHeight;
@@ -375,9 +375,9 @@
       try {
         var obj = params.nodes[0];
         if (obj === undefined) return;
-        // Узел группы — виджета устройства нет, игнорируем
+        // Group node — no device widget, ignore
         if (typeof obj === 'string' && obj.indexOf('grp:') === 0) return;
-        // Виртуальный узел (BLE/MQTT без адреса) — IEEE зашит в id
+        // Virtual node (BLE/MQTT without address) — IEEE embedded in id
         if (typeof obj === 'string' && obj.indexOf('virt:') === 0) {
           var vieee = obj.slice(5);
           var vdw = $(DEV_WID_ID);
@@ -398,12 +398,12 @@
     tim_map = setTimeout(function () {
       if (tim_map) clearTimeout(tim_map);
       parseMap({ src_addr: '0000', Status: '00', NeighborTableEntries: '00', StartIndex: '00', NeighborTableListCount: '00', NeighborLqiList: [] });
-      // Страховка: LQI-ответы так и не пришли — показать хотя бы узлы и отцентровать
+      // Safety net: LQI responses never arrived — show at least the nodes and center
       if (mapLoading && messages2send.length) finishLoad();
     }, 3000);
   }
 
-  // ── глобальные кнопки ──
+  // ── global buttons ──
   window.zigbeeMapRefresh = function () { if (network) { reqMap(); } };
   window.zigbeeMapToggleEdge = function (kind, on) { edgeFilter[kind] = on; if (network) redrawMap(); };
 
@@ -414,7 +414,7 @@
     '.zb-tgl{display:inline-flex;align-items:center;gap:3px;font-size:12px;color:inherit;cursor:pointer;margin-left:10px;}' +
     '.zb-tgl input{margin:0;cursor:pointer;}';
 
-  // ── регистрация виджета ──
+  // ── widget registration ──
   window.WinEngine.register({
     id: 'zigbeemap',
     title: 'Zigbee Map',
@@ -449,7 +449,7 @@
       };
       node._state.wsOnLQI = function (tmp) { listenerLQI_RSP(tmp); };
       node._state.wsOnDevList = function () {
-        // deviceList пришёл/обновился после перезагрузки — перестроить карту
+        // deviceList arrived/updated after reload — rebuild the map
         if (network && deviceList && deviceList.length) reqMap();
       };
       if (window.eventE) {
@@ -460,8 +460,8 @@
 
       loadVis(function () {
         if (!node._state || node._state.destroyed) return;
-        // Сеть создаём после reflow: синхронно после appendChild у контейнера
-        // ещё нулевой размер и canvas vis остаётся пустым.
+        // Create the network after reflow: synchronously after appendChild the container
+        // still has zero size and the vis canvas stays empty.
         var run = function () {
           if (!node._state || node._state.destroyed) return;
           buildNetwork(node);
@@ -478,8 +478,8 @@
     },
 
     activate() {
-      // Без fit: центровка — только при загрузке (stabilized/finishLoad).
-      // fit при фокусе дёргал камеру под курсором — клики и drag шли мимо.
+      // No fit: centering — only on load (stabilized/finishLoad).
+      // fit on focus jerked the camera under the cursor — clicks and drag missed.
       if (network) {
         try {
           var c = $(CANVAS_ID);

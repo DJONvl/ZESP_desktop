@@ -1,16 +1,16 @@
-// zesp-globals.js — глобальные объекты, которые ожидает static/KWS/socket.js как есть.
-// Подключать ПОСЛЕ socket.js: на верхнем уровне socket.js делает var updateProgress={},
-// здесь он перезаписывается рабочей реализацией.
-// ponytail: минимальные рабочие стабы, без фреймворков; расширяются по мере переноса виджетов.
+// zesp-globals.js — global objects expected by static/KWS/socket.js as is.
+// Include AFTER socket.js: at top level socket.js does var updateProgress={},
+// here it is overwritten with the working implementation.
+// ponytail: minimal working stubs, no frameworks; extended as widgets are ported.
 
-// deviceList заполняется socket.js при alldev (WS может ответить раньше,
-// чем выполнится этот скрипт) — не перезаписываем уже пришедший список.
+// deviceList is filled by socket.js on alldev (WS may respond earlier,
+// than this script executes) — do not overwrite the already received list.
 var deviceList = (typeof window.deviceList !== 'undefined' && window.deviceList) ? window.deviceList : [];
 var CURVERSION = '';
 var groups = [];
 var jsconfig = null;
 
-// CSS.escape — полифилл (нет в некоторых браузерах/WebView; нужен socket.js и devices.js)
+// CSS.escape — polyfill (missing in some browsers/WebView; needed by socket.js and devices.js)
 if (typeof window.CSS !== 'undefined' && typeof window.CSS.escape !== 'function') {
   window.CSS.escape = function (str) {
     return String(str).replace(/[^a-zA-Z0-9_-]/g, function (ch) {
@@ -20,7 +20,7 @@ if (typeof window.CSS !== 'undefined' && typeof window.CSS.escape !== 'function'
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
-// Стаб, только если не подключён настоящий (KWS.js / notifi_center.js)
+// Stub, only if the real one is not connected (KWS.js / notifi_center.js)
 if (!window.Toast) {
   function Toast(opts) {
     opts = opts || {};
@@ -37,7 +37,7 @@ if (!window.Toast) {
 }
 
 // ── Notification Center ───────────────────────────────────────────────────────
-// Стаб, только если не подключён настоящий notifi_center.js
+// Stub, only if the real notifi_center.js is not connected
 if (!window.NC) {
   window.NC = {
     add: function (title, text, type) {
@@ -48,7 +48,7 @@ if (!window.NC) {
 }
 
 // ── Progress bar (update firmware) ────────────────────────────────────────────
-// Порт с static/KWS/progress.js, без жёстких цветов — на переменных тем.
+// Port from static/KWS/progress.js, no hardcoded colors — uses theme variables.
 if (typeof ProgressBarWidget === 'undefined') {
   class ProgressBarWidget {
     constructor() {
@@ -92,7 +92,7 @@ if (typeof ProgressBarWidget === 'undefined') {
 window.updateProgress = new ProgressBarWidget();
 
 // ── zespConfirm / zespAlert ───────────────────────────────────────────────────
-// Стилизованная замена нативных confirm()/alert() (те не в теме и с адресом сервера).
+// Styled replacement for native confirm()/alert() (those are unthemed and show the server address).
 // zespConfirm(message, opts) -> Promise<boolean>; opts: {title, okText, cancelText, danger, details:[{k,v}]}
 // zespAlert(message, opts) -> Promise<void>; opts: {title, okText}
 (function () {
@@ -206,8 +206,8 @@ window.updateProgress = new ProgressBarWidget();
   };
 })();
 
-// ── get_tile(dev) — tile устройства в списке устройств ───────────────────────
-// socket.js вызывает внутри widgetReport при каждом rep.
+// ── get_tile(dev) — device tile in the device list ───────────────────────
+// socket.js calls it inside widgetReport on every rep.
 function get_tile(device) {
   var el = document.createElement('div');
   el.setAttribute('data-ieee', device && device.IEEE || '');
@@ -218,20 +218,20 @@ function get_tile(device) {
 }
 window.get_tile = get_tile;
 
-// ── i18n: подключаемые словари <widget>.lp ──────────────────────────────────
-// Файлы: apps/<widget>/<lang>.lp (например apps/settings/ru.lp). Выбранный язык
-// берётся из jsconfig.APP.Lang.val, fallback цепочка: выбранный → en → ключ.
-// Использование: t('settings', 'ui.save') — строка; t('settings','ui.save',{n:3}) — {n}.
-// ponytail: плоский словарь, плейсхолдеры {name}; плюрализация не нужна пока.
+// ── i18n: pluggable <widget>.lp dictionaries ──────────────────────────────────
+// Files: apps/<widget>/<lang>.lp (e.g. apps/settings/ru.lp). The selected language
+// comes from jsconfig.APP.Lang.val, fallback chain: selected → en → key.
+// Usage: t('settings', 'ui.save') — string; t('settings','ui.save',{n:3}) — {n}.
+// ponytail: flat dictionary, {name} placeholders; no pluralization needed yet.
 var L = {};
 L.lang = 'en';
-L.dicts = {}; // dicts[widgetId][lang] = {ключ: строка}
-L._loaded = {}; // загруженные combo "widget/lang"
+L.dicts = {}; // dicts[widgetId][lang] = {key: string}
+L._loaded = {}; // loaded "widget/lang" combos
 
 L._pending = {}; // widgetId -> Promise.all
 
 L.load = function (widgetId, base) {
-  // id виджета может отличаться от имени папки словаря (devicemgr -> devicemanager)
+  // widget id may differ from the dictionary folder name (devicemgr -> devicemanager)
   var dir = (window.L_DICT_DIRS && L_DICT_DIRS[widgetId]) || widgetId;
   base = base || ('/desktop_lite/apps/' + dir + '/');
   var langs = [L.lang, 'en'];
@@ -253,13 +253,13 @@ L.load = function (widgetId, base) {
   return L._pending[widgetId] = Promise.all(pending);
 };
 
-// ready(widgetId) — Promise, который резолвится после загрузки словаря виджета.
+// ready(widgetId) — Promise that resolves after the widget dictionary is loaded.
 L.ready = function (widgetId) {
   if (!L._pending[widgetId]) L.load(widgetId);
   return L._pending[widgetId];
 };
 
-// t(widgetId, path, vars) — строка из словаря выбранного языка, fallback en, затем сам ключ.
+// t(widgetId, path, vars) — string from the selected language dictionary, fallback en, then the key itself.
 L.t = function (widgetId, path, vars) {
   var d = (L.dicts[widgetId] && L.dicts[widgetId][L.lang]) ||
           (L.dicts[widgetId] && L.dicts[widgetId].en) || {};
@@ -274,9 +274,9 @@ L.t = function (widgetId, path, vars) {
   return s;
 };
 
-// applyLang(root, widgetId) — подставляет текст во все [data-i18n="key"] внутри root.
-// ponytail: если перевода нет (словарь ещё не загружен), текст шаблона не трогаем,
-// иначе гонка загрузки затирает кнопки сырыми ключами.
+// applyLang(root, widgetId) — substitutes text into all [data-i18n="key"] inside root.
+// ponytail: if there is no translation (dictionary not loaded yet), leave template text untouched,
+// otherwise the load race overwrites buttons with raw keys.
 L.applyLang = function (root, widgetId) {
   (root || document).querySelectorAll('[data-i18n]').forEach(function (el) {
     var w = el.getAttribute('data-widget') || widgetId;
@@ -304,9 +304,9 @@ L.applyLang = function (root, widgetId) {
   });
 };
 
-// save(widgetId, lang, key, value) — накапливает правку в памяти (буфер dirty-файлов).
-// Ничего не шлёт на сервер: весь файл записывается один раз при flush().
-// ponytail: буфер ключ->значение, flush шлёт каждый изменённый файл целиком.
+// save(widgetId, lang, key, value) — accumulates the edit in memory (dirty-file buffer).
+// Sends nothing to the server: the whole file is written once on flush().
+// ponytail: key->value buffer, flush sends each changed file in full.
 L.pending = {}; // widgetId -> {lang: {key: value}}
 L.save = function (widgetId, lang, key, value) {
   if (!L.dicts[widgetId]) L.dicts[widgetId] = {};
@@ -317,7 +317,7 @@ L.save = function (widgetId, lang, key, value) {
   L.pending[widgetId][lang][key] = value;
 };
 
-// flush() — один SaveJson на каждый изменённый язык-пак (весь файл целиком), затем сброс буфера.
+// flush() — one SaveJson per changed language pack (whole file at once), then buffer reset.
 L.flush = function () {
   var flushed = 0;
   Object.keys(L.pending).forEach(function (wid) {
@@ -332,8 +332,8 @@ L.flush = function () {
   return flushed;
 };
 
-// подхватываем выбор языка при приходе конфига; грузим все известные словари
-// id -> папка словаря (devicemgr живёт в apps/devicemanager/)
+// pick up the language choice when config arrives; load all known dictionaries
+// id -> dictionary folder (devicemgr lives in apps/devicemanager/)
 window.L = L;
 var L_DICT_DIRS = { settings: 'settings', devicemgr: 'devicemanager', devices: 'devices', scenes: 'scenes', yammanager: 'yammanager', zigbeemap: 'zigbeemap', templateedit: 'templateedit', sh3d: 'sh3d', blockly: 'blockly', desktop: 'desktop', groups: 'groups', logviewer: 'logviewer' };
 if (typeof eventE !== 'undefined') {

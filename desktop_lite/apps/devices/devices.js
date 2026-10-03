@@ -1,10 +1,10 @@
-// devices.js — виджет «Устройства» ZESP (порт static/apps/dboard.app на WinEngine).
-// Оригиналы static/KWS/socket.js, static/KWS/widgets.js НЕ трогаем:
-// - deviceList / eventE / widgetReport — из socket.js;
+// devices.js — "Devices" widget for ZESP (port of static/apps/dboard.app to WinEngine).
+// Do NOT touch the originals static/KWS/socket.js, static/KWS/widgets.js:
+// - deviceList / eventE / widgetReport — from socket.js;
 // - getWidget / widgetEvt / getIconSvg / getDeviceClass / renderDeviceTypeIcon /
-//   DEVICE_TYPES_MAP / hsl / hsl2Hex — из widgets.js (подключён в lite.html как есть).
-// window.get_tile переопределяем, как это делал dboard.app, чтобы socket.js
-// (widgetReport) продолжал обновлять плитки в списке.
+//   DEVICE_TYPES_MAP / hsl / hsl2Hex — from widgets.js (included in lite.html as is).
+// We override window.get_tile as dboard.app did, so socket.js
+// (widgetReport) keeps updating the tiles in the list.
 
 (function () {
   var DEVICE_CSS = `
@@ -59,7 +59,7 @@
 @media (min-width:600px){.win-devices .devices-container{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}}
   `;
 
-  // ── Поиск (перенесено из dboard.app) ───────────────────────────────────────
+  // ── Search (ported from dboard.app) ───────────────────────────────────────
   function openSearch() {
     var bar = document.getElementById('db_search_bar');
     if (bar) { bar.style.display = 'flex'; var i = bar.querySelector('input'); if (i) i.focus(); }
@@ -89,7 +89,7 @@
     requestAnimationFrame(function () { grid.style.opacity = '1'; });
   }
 
-  // ── Рендер списка (перенос dboard.app renderDevices/display/loca) ─────────
+  // ── List render (port of dboard.app renderDevices/display/loca) ─────────
   var currentLocation = 'Все';
   var locations = ['Все'];
 
@@ -169,7 +169,7 @@
     }, 160);
   }
 
-  // ── Обновление lastSeen ──────────────────────────────────────────────
+  // ── lastSeen update ──────────────────────────────────────────────
   function timeInterval(interval) {
     if (interval < 0 || isNaN(interval)) return '—';
     if (interval >= 86400) return Math.floor(interval / 86400) + 'д';
@@ -191,11 +191,11 @@
     });
   }
 
-  // ── Swipe / keydown (перс dboard.app) ─────────────────────────────────
+  // ── Swipe / keydown (port of dboard.app) ─────────────────────────────────
   var swipeHandlers = {};
 
   function handleSwipe() {
-    removeSwipe(); // не дублировать обработчики при повторных alldev
+    removeSwipe(); // do not duplicate handlers on repeated alldev
     var xStart = null, yStart = null, swipeAxis = null, swipeLocked = false;
     var sl = document.getElementById('deviceGrid');
     if (!sl) return;
@@ -246,7 +246,7 @@
     swipeHandlers = {};
   }
 
-  // ── Виджет устройства (клик по плитке) ───────────────────────────────
+  // ── Device widget (tile click) ───────────────────────────────
   function showWidget(IEEE, e) {
     if (e) e.preventDefault();
     var widget = document.getElementById('DeviceWidget');
@@ -279,7 +279,7 @@
     showWidget(IEEE, event);
   }
 
-  // inline-обработчики в get_tile / template не видят замыкание — экспортируем.
+  // inline handlers in get_tile / template cannot see the closure — export them.
   window.item_sel = item_sel;
   window.quickToggle = quickToggle;
   window.filterSearch = filterSearch;
@@ -288,7 +288,7 @@
   window.openSearch = openSearch;
   window.hideWidget = hideWidget;
 
-  // ── Быстрый toggle ───────────────────────────────────────────────────
+  // ── Quick toggle ───────────────────────────────────────────────────
   var QUICK_TOGGLE_ROLES = ['switch', 'light'];
   var doubleReset = 0;
 
@@ -318,7 +318,7 @@
     btn.classList.toggle('qt-off', isOn);
   }
 
-  // ── get_tile — глобально, как в dboard.app (cокет widgetReport его зовёт) ─
+  // ── get_tile — global, as in dboard.app (the socket widgetReport calls it) ─
   window.get_tile = function (device) {
     try {
       var tile = document.createElement('div');
@@ -409,7 +409,7 @@
     } catch (e) { console.log('get_tile err:', e); }
   };
 
-  // ── Регистрация виджета ────────────────────────────────────────────────
+  // ── Widget registration ────────────────────────────────────────────────
   window.WinEngine.register({
     id: 'devices',
     title: 'Устройства',
@@ -438,7 +438,7 @@
       removeSwipe();
       node._state = { updateTimer: null, onDev: null, keydown: null };
 
-      // Рендер при обновлении deviceList (alldev) и при ручном обновлении.
+      // Render on deviceList update (alldev) and on manual refresh.
       node._state.onDev = function () {
         var grid = document.getElementById('deviceGrid');
         if (!grid) return;
@@ -446,7 +446,7 @@
         var list = document.querySelector('.location-list');
         if (list) {
           list.innerHTML = locations.map(function (l) { return '<div>' + l + '</div>'; }).join('');
-          // клик/pointer по локации
+          // click/pointer on a location
           list.querySelectorAll('div').forEach(function (div) {
             div.addEventListener('click', function () {
               var sel = div.innerText;
@@ -458,8 +458,8 @@
         displayDevicesByLocation(currentLocation || 'Все');
       };
       if (window.eventE) window.eventE.on('updateDeviceList', node._state.onDev);
-      // Репорт = событие устройства: двигаем lastSeen в списке,
-      // иначе таймер ниже пересчитывает время от устаревшего значения.
+      // A report = a device event: move lastSeen in the list,
+      // otherwise the timer below recounts time from a stale value.
       node._state.onRep = function (pair) {
         var rep = pair && pair[0], ieee = pair && pair[1];
         if (!rep || !ieee) return;
@@ -470,7 +470,7 @@
       };
       if (window.eventE) window.eventE.on('report', node._state.onRep);
 
-      // Запрос изнач. данных и обновление lastSeen по таймеру.
+      // Initial data request and lastSeen refresh on a timer.
       if (window.websocket && websocket.readyState === 1) window.WSsend('getDeviceList');
       handleSwipe();
 
@@ -491,11 +491,11 @@
         var b = e.target.closest('[data-action]');
         if (b && b.dataset.action === 'search') { openSearch(); }
       });
-      // Клик по оверлею закрывает виджет (JS-делегирование, без inline onclick в dboard).
+      // Overlay click closes the widget (JS delegation, no inline onclick from dboard).
       node.querySelector('#dboard_overlay').addEventListener('click', hideWidget);
-      // Клик по плитке / кнопке toggle делегируется глобальным функциям (inline onclick в get_tile).
+      // Tile / toggle-button clicks are delegated to global functions (inline onclick in get_tile).
 
-      // Если данные уже пришли — отрисовать сразу.
+      // If data already arrived — render immediately.
       if (deviceList.length) node._state.onDev();
 
       node._state.updateTimer = setInterval(updateLastSeen, 5000);
@@ -520,7 +520,7 @@
       }
       removeSwipe();
       hideWidget();
-      // Чистим DOM, чтобы socket widgetReport не находил висящие элементы.
+      // Clean up the DOM so the socket widgetReport finds no dangling elements.
       ['deviceGrid', 'locationList', 'DeviceWidget', 'dboard_overlay'].forEach(function (id) {
         var el = document.getElementById(id);
         if (el && el.parentNode) el.parentNode.removeChild(el);

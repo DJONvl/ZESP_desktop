@@ -71,9 +71,9 @@ function geticon(device_class) {
 }
 
 function getIconSvg(device_class,size=28,color="silver", value) {
-  let svgPath = `M3 3v18h18V3H3zm16 16H5V5h14v14z`; // Значение по умолчанию (пустой путь)
+  let svgPath = `M3 3v18h18V3H3zm16 16H5V5h14v14z`; // Default value (empty path)
 
-  //if (!device_class) return svgPath; // Или можно вернуть какой-то дефолтный SVG
+  //if (!device_class) return svgPath; // Or return some default SVG
 
   switch (device_class.toLocaleLowerCase()) {
     
@@ -257,8 +257,8 @@ function widgetEvnt(id, val) {
 	var json = { "DEVICE_CMD": { "cmd": cmd, "obj": obj, "value": val } }
 	WSsend(JSON.stringify(json))	
 	console.log(json)
-	// Группы без репортов: запоминаем отправленное, иначе перерисовка
-	// из пустых parsed откинет контрол назад (grpState читает getWidget)
+	// Groups without reports: remember what was sent, otherwise a redraw
+	// from empty parsed would push the control back (grpState is read by getWidget)
 	try {
 		if (obj && obj.indexOf('GROUP_') === 0 && cmd !== 'setup' && cmd !== 'select') {
 			window.grpState = window.grpState || {};
@@ -298,8 +298,8 @@ function getWidget(IEEE) {
 	var dev
 	if (typeof IEEE === 'string') { dev = deviceList.find(function (dev) { return dev.IEEE == IEEE }) } else { dev = IEEE }
 
-	// Группы: подменяем parsed оптимистичным состоянием (репортов нет).
-	// Копию, чтобы не пачкать deviceList.
+	// Groups: substitute parsed with the optimistic state (no reports).
+	// A copy, so deviceList stays clean.
 	try {
 		if (dev && dev.DevType === 'GRP' && window.grpState) {
 			var patched = {};
@@ -406,31 +406,31 @@ function getWidget(IEEE) {
 
 					if (supportedFeatures & SUPPORT_BRIGHTNESS) {
 						console.log("Brightness is supported");
-						// Действия для поддержки яркости
+						// Actions for brightness support
 					}
 					if (supportedFeatures & SUPPORT_COLOR_TEMP) {
 						console.log("Color temperature is supported");
-						// Действия для поддержки цветовой температуры
+						// Actions for color-temperature support
 					}
 					if (supportedFeatures & SUPPORT_EFFECT) {
 						console.log("Effect is supported");
-						// Действия для поддержки эффектов
+						// Actions for effects support
 					}
 					if (supportedFeatures & SUPPORT_FLASH) {
 						console.log("Flash is supported");
-						// Действия для поддержки мигания
+						// Actions for flashing support
 					}
 					if (supportedFeatures & SUPPORT_COLOR) {
 						console.log("Color is supported");
-						// Действия для поддержки цвета
+						// Actions for color support
 					}
 					if (supportedFeatures & SUPPORT_TRANSITION) {
 						console.log("Transition is supported");
-						// Действия для поддержки переходов
+						// Actions for transitions support
 					}
 					if (supportedFeatures & SUPPORT_WHITE_VALUE) {
 						console.log("White value is supported");
-						// Действия для поддержки белого цвета
+						// Actions for white-color support
 					}
 //					if (value.label == "00158D0007503DF3_bulb") {
 						var state = isOnVal(value.parsed) ? "checked" : ""
@@ -480,8 +480,8 @@ function getWidget(IEEE) {
 				}
 
 
-				// Роль уже говорит, какой виджет рисовать — условий по лейблам нет.
-				// Каждый виджет заканчивается открывающим <div> под общий закрывающий </div> итерации.
+				// The role already says which widget to draw — no label-based conditions.
+				// Each widget ends with an opening <div> for the shared closing </div> of the iteration.
 				{
 					var state = isOnVal(value.parsed) ? "checked" : ""
 					tpl += `<div id="z${idw}" style="margin-bottom:25px;width:65px;height:65px;background:silver;border-radius:54px;filter:brightness(100%);"><img class="bulbw" src='./static/icons/bulb.png'/></div>`
@@ -628,8 +628,8 @@ function getWidget(IEEE) {
 				let curTemp   = value.parsed || '—';
 				let setTemp   = (attr && attr.target_temp != null) ? attr.target_temp : (value.set_temp || '—');
 				let hvacMode  = (attr && attr.hvac_mode) ? attr.hvac_mode : (value.mode || 'off');
-				// modes могут прийти объектами [{value:'heat'}...] (ya_rep) — приводим к строкам,
-				// иначе кнопки рисуют [object Object]
+				// modes may arrive as objects [{value:'heat'}...] (ya_rep) — normalize to strings,
+				// otherwise buttons render [object Object]
 				const normHvacModes = function(m) {
 					if (Array.isArray(m)) return m.map(function(x){ return (x && typeof x === 'object') ? (x.value || x.name || x.mode || '') : String(x); }).map(function(s){ return String(s).trim(); }).filter(function(s){ return !!s; });
 					if (typeof m === 'string') return m.split(',').map(function(s){ return s.trim(); }).filter(function(s){ return !!s; });
@@ -641,7 +641,7 @@ function getWidget(IEEE) {
 				const maxTemp   = (attr && attr.max_temp) ? Number(attr.max_temp) : 35;
 				const tempStep  = (attr && attr.temp_step) ? Number(attr.temp_step) : 0.5;
 
-				// Термостат: режим из SystemMode (001C), темп/уставка из 0000/0012
+				// Thermostat: mode from SystemMode (001C), temp/setpoint from 0000/0012
 				if (isThermostat) {
 					const sysMap = {0:'off', 1:'auto', 3:'cool', 4:'heat', 7:'fan_only', 8:'dry'};
 					const sysVal = parseInt(dev.Report[sysKey].parsed, 10);
@@ -657,8 +657,8 @@ function getWidget(IEEE) {
 						const mc = caps.find(c => c.parameters && c.parameters.modes);
 						if (mc) { const ym = normHvacModes(mc.parameters.modes); if (ym.length) hvacModes = ym; }
 					} catch {}
-					// Кнопка выключения: SystemMode 0=off обязаны поддерживать все термостаты,
-					// но в ya_rep его часто нет — добавляем всегда (бэкенд climate_mode:"off" умеет).
+					// Off button: all thermostats must support SystemMode 0=off,
+					// but ya_rep often lacks it — always add (backend handles climate_mode:"off").
 					if (hvacModes.indexOf('off') === -1) hvacModes.unshift('off');
 				}
 
@@ -666,14 +666,14 @@ function getWidget(IEEE) {
 				const modeIcons  = {heat:'🔥', cool:'❄️', auto:'♻️', 'fan_only':'💨', dry:'💧', off:'⏸'};
 				const modeColor  = modeColors[hvacMode] || '#888';
 
-				// Текущая температура
+				// Current temperature
 				tpl += `<div class="switch flex" style="margin-bottom:4px;">`;
 				tpl += `<div class="icon flex">${getIconSvg('climate', 28, modeColor)}</div>`;
 				tpl += `<div class="labelObj">${value.label}</div>`;
 				tpl += `<span class="${id}" style="color:${modeColor};font-size:18px;font-weight:bold;">${curTemp}°</span>`;
 				tpl += `</div>`;
 
-				// Кнопки режимов
+				// Mode buttons
 				tpl += `<div class="switch flex" style="gap:2px;flex-wrap:wrap;justify-content:center;margin-bottom:4px;">`;
 				hvacModes.forEach(mode => {
 					const active = mode === hvacMode;
@@ -684,7 +684,7 @@ function getWidget(IEEE) {
 				});
 				tpl += `</div>`;
 
-				// Слайдер целевой температуры
+				// Target-temperature slider
 				tpl += `<div class="switch flex" style="margin-bottom:2px;">`;
 				tpl += `<span style="color:#aaa;font-size:12px;">🎯</span>`;
 				tpl += `<input class="${id} level" type="range" style="width:60%;margin:0 6px;"
@@ -695,7 +695,7 @@ function getWidget(IEEE) {
 				tpl += `<span id="clt_${idw}" style="color:#ff9800;font-size:14px;min-width:36px;text-align:right;">${setTemp!=='—'?setTemp:'20'}°</span>`;
 				tpl += `</div>`;
 
-				// Пустой div — будет закрыт общим </div> после switch
+				// Empty div — will be closed by the shared </div> after the switch
 				tpl += `<div>`;
 				break;
 			}
@@ -833,8 +833,8 @@ function getWidget(IEEE) {
 				tpl += `<span class="${id}" style="color:white;">${value.parsed || "?"}</span>`
 		}
 		} catch(e) {
-			// Кривой объект (нет role, битый class и т.п.) — дефолт-полоса,
-			// остальные объекты рисуются дальше, карточка не умирает
+			// Broken object (no role, corrupt class, etc.) — default strip,
+			// the remaining objects keep rendering, the card survives
 			console.warn('getWidget: broken obj, default strip:', key, e);
 			tpl += `<div class="switch flex">`
 			tpl += `<div class="icon flex">⚠️</div>`;
@@ -845,18 +845,18 @@ function getWidget(IEEE) {
 		}
 		tpl += `</div>`
 	}
-	// --- JoinSetup юниты: пустая категория — инлайн, config/diagnostic — в details ---
+	// --- JoinSetup units: empty category — inline, config/diagnostic — into details ---
 	try { tpl += renderSetupBlock(dev); } catch(e) { console.warn('setup block', e); }
 	tpl += `</div>`
 	return tpl
 }
 
-// Кэш проекций JoinSetup.writes: ieee -> {state, writes}. Грузится лениво, один раз.
+// JoinSetup.writes projection cache: ieee -> {state, writes}. Loaded lazily, once.
 window.jsCache = window.jsCache || {};
 function jsEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-// isOnVal — нормализованное сравнение on/off для Parsed:
-// бэк присылает Parsed строкой ("true"/"ON"/"1"), регистр и тип гуляют
-// (особенно у HAD-импорта с чужого брокера).
+// isOnVal — normalized on/off comparison for Parsed:
+// the backend sends Parsed as a string ("true"/"ON"/"1"), case and type vary
+// (especially for HAD import from a foreign broker).
 function isOnVal(v) { var s = String(v == null ? '' : v).toLowerCase().trim(); return s === '1' || s === 'true' || s === 'on' || s === 'вкл'; }
 
 function setupRowHtml(ieee, w, forceLabel) {
@@ -881,7 +881,7 @@ function setupRowHtml(ieee, w, forceLabel) {
 		});
 		if (!opts.length && w.value != null && w.value !== '') opts.push({ v: String(w.value), l: String(w.value) });
 		if (!opts.length) return '';
-		// Один вариант — дропдаун бессмысленен, показываем текст
+		// A single option — a dropdown is pointless, show text
 		if (opts.length < 2) {
 			var only = opts[0];
 			var txt = only.l !== only.v ? only.l + ' (' + only.v + ')' : only.v;
@@ -889,7 +889,7 @@ function setupRowHtml(ieee, w, forceLabel) {
 			h += `</div>`;
 			return h;
 		}
-		// Выбор только стейджит, запись — по OK (иначе случайный клик пишет в устройство)
+		// Selection only stages, writing happens on OK (otherwise a random click writes to the device)
 		h += `<select class="${jsEsc(id)}" onchange="jsCacheSet('${jsEsc(ieee)}','${jsEsc(w.id)}',this.value)" style="width:110px;">`;
 		opts.forEach(function(o) {
 			var sel = (o.v === String(w.value)) ? 'selected' : '';
@@ -911,7 +911,7 @@ function jsCacheSet(ieee, wid, val) {
 
 function renderSetupBlock(dev) {
 	if (!dev || !dev.IEEE) return '';
-	// В редакторе превью строится из te_file (там полный JoinSetup, флага может не быть)
+	// In the editor the preview is built from te_file (it has the full JoinSetup, the flag may be missing)
 	var localWrites = (dev.JoinSetup && dev.JoinSetup.writes) || [];
 	if (!dev.hasSetup && !localWrites.length) return '';
 	var ieee = dev.IEEE;
@@ -939,8 +939,8 @@ function renderSetupBlock(dev) {
 
 function setupBlockInner(ieee, writes) {
 	if (!writes || !writes.length) return '';
-	// Группировка по unitname. Несколько select-записей одного юнита —
-	// варианты одного дропдауна (каждая запись = вариант со своим адресом).
+	// Grouping by unitname. Several select records of one unit —
+	// variants of a single dropdown (each record = a variant with its own address).
 	var groups = {}, order = [];
 	writes.forEach(function(w) {
 		var u = w.unitname || w.unit || w.label || w.id || '';
@@ -971,8 +971,8 @@ function setupBlockInner(ieee, writes) {
 	return h;
 }
 
-// Один дропдаун из нескольких select-записей: каждая запись = вариант
-// (название + значение + свой адрес). Вложенные options тут не смотрятся.
+// One dropdown from several select records: each record = a variant
+// (name + value + its own address). Nested options are not considered here.
 function setupMergedSelectHtml(ieee, uname, entries) {
 	var opts = [];
 	entries.forEach(function(w) {
@@ -1048,7 +1048,7 @@ function hsl2Hex(h, s, l) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  Яндекс типы устройств — иконки, реестр, палитра выбора
+//  Yandex device types — icons, registry, selection palette
 // ═══════════════════════════════════════════════════════════════════
 
 const DEVICE_SVG_PATHS = {
@@ -1159,7 +1159,7 @@ const DEVICE_CATEGORIES = [
     {id:"devices.types.camera",label:"Камера"},{id:"devices.types.other",label:"Другое"}]},
 ];
 
-// Плоский Map: id → { id, label, color, bg, category, svgPath }
+// Flat Map: id → { id, label, color, bg, category, svgPath }
 const DEVICE_TYPES_MAP = new Map();
 for (const cat of DEVICE_CATEGORIES) {
   for (const t of cat.types) {
@@ -1173,14 +1173,14 @@ for (const cat of DEVICE_CATEGORIES) {
   }
 }
 
-/** Получить мета-объект типа устройства по id */
+/** Get the device-type meta object by id */
 function getDeviceType(id) { return DEVICE_TYPES_MAP.get(id) || null; }
 
 /**
- * Создать SVGElement для типа Яндекс устройства.
+ * Create an SVGElement for a Yandex device type.
  * @param {string} id         — devices.types.*
- * @param {number} [size=24]  — ширина/высота px
- * @param {string} [color]    — цвет; если не задан — из реестра
+ * @param {number} [size=24]  — width/height px
+ * @param {string} [color]    — color; if omitted — from the registry
  * @returns {SVGSVGElement|null}
  */
 function renderDeviceTypeIcon(id, size = 24, color = null) {
@@ -1198,8 +1198,8 @@ function renderDeviceTypeIcon(id, size = 24, color = null) {
 }
 
 /**
- * Палитра выбора типа Яндекс устройства.
- * Использование:
+ * Yandex device-type selection palette.
+ * Usage:
  *   const picker = new DeviceTypePicker({ value: js.type, onChange: v => ... });
  *   container.appendChild(picker.el);
  *   picker.getValue() / picker.setValue(id) / picker.destroy()
@@ -1209,7 +1209,7 @@ class DeviceTypePicker {
     this._value    = value;
     this._onChange = onChange;
     this._itemEls  = new Map();
-    this._expanded = false; // Состояние: развернут/свернут
+    this._expanded = false; // State: expanded/collapsed
     this._ensureStyles();
     this.el        = this._build();
     if (value) this._applySelection(value, false);
@@ -1287,11 +1287,11 @@ class DeviceTypePicker {
     const wrap = document.createElement('div');
     wrap.className = 'dtp-wrap';
     
-    // Preview с кликом для сворачивания/разворачивания
+    // Preview with a click to collapse/expand
     this._previewEl = document.createElement('div');
     this._previewEl.className = 'dtp-preview';
     this._previewEl.addEventListener('click', (e) => {
-      // Не сворачиваем при клике на кнопку очистки
+      // Don't collapse on the clear-button click
       if (!e.target.classList.contains('dtp-clear')) {
         this._toggleExpand();
       }
@@ -1299,7 +1299,7 @@ class DeviceTypePicker {
     this._setPreviewEmpty();
     wrap.appendChild(this._previewEl);
     
-    // Категории
+    // Categories
     this._catsEl = document.createElement('div');
     this._catsEl.className = 'dtp-cats';
     for (const cat of DEVICE_CATEGORIES) this._catsEl.appendChild(this._buildCat(cat));
@@ -1336,7 +1336,7 @@ class DeviceTypePicker {
     e.textContent = 'Выберите тип…';
     this._previewEl.appendChild(e);
     
-    // Добавляем стрелку
+    // Add an arrow
     const arrow = document.createElement('span');
     arrow.className = 'dtp-arrow';
     arrow.textContent = '▼';
@@ -1380,7 +1380,7 @@ class DeviceTypePicker {
 
   _select(id) {
     this._applySelection(id === this._value ? '' : id, true);
-    this._collapse(); // Сворачиваем после выбора
+    this._collapse(); // Collapse after selection
   }
 
   _applySelection(id, notify) {
@@ -1421,11 +1421,11 @@ class DeviceTypePicker {
     const cl = document.createElement('button'); cl.className = 'dtp-clear'; cl.type = 'button'; cl.title = 'Сбросить'; cl.textContent = '×';
     cl.addEventListener('click', (e) => { 
       e.stopPropagation(); 
-      this._select(id); // Сброс (выбор того же ID = снять выбор)
+      this._select(id); // Reset (selecting the same ID = deselect)
     });
     this._previewEl.appendChild(cl);
     
-    // Добавляем стрелку
+    // Add an arrow
     const arrow = document.createElement('span');
     arrow.className = 'dtp-arrow';
     arrow.textContent = '▼';

@@ -6,11 +6,12 @@ var websocket
 
 function testWebSocket() {
 	if (ZESPip == undefined) { ZESPip = window.location.hostname }
-	if (websocket) { websocket = null }
+	if (websocket) { try { websocket.onclose = null; websocket.close(); } catch (e) {} websocket = null; }
 	websocket = new WebSocket('ws://' + ZESPip + ':8181');
 	websocket.onopen = function (evt) { onOpen(evt) };
 	websocket.onmessage = function (evt) { onMessage(evt) };
 	websocket.onerror = function (evt) { onError(evt) };
+	websocket.onclose = function (evt) { onClose(evt) };
 
 
 }
@@ -19,9 +20,14 @@ function testWebSocket() {
 
 var configRetry = null;
 function onOpen(evt) {
+	// flush messages queued while the socket was down (clicks during reconnect)
+	if (wsQueue.length) {
+		var q = wsQueue; wsQueue = [];
+		for (var i = 0; i < q.length; i++) { try { websocket.send(q[i]); } catch (e) { console.log("socket error", e); } }
+	}
 	WSsend("getDeviceList");
 	WSsend('loadConfig')
-	// wsopen: переподписка персональных лент (logviewer и др.) после обрыва.
+	// wsopen: resubscribe personal feeds (logviewer etc.) after a break.
 	eventE.emit('wsopen');
 	if (configRetry) clearInterval(configRetry);
 	configRetry = setInterval(function () {
@@ -36,14 +42,31 @@ function onOpen(evt) {
 }
 function onMessage(evt) { parseSocket(evt); }
 function onError(evt) { console.log("socket error"); }
-function WSsend(message) { websocket.send(message); }
+function onClose(evt) {
+	console.log("socket closed, reconnecting");
+	scheduleReconnect();
+}
+var reconnectTimer = null;
+function scheduleReconnect() {
+	if (reconnectTimer) return;
+	reconnectTimer = setTimeout(function () { reconnectTimer = null; testWebSocket(); }, 1000);
+}
+// messages sent while the socket is down wait in the queue instead of
+// throwing "WebSocket is already in CLOSING or CLOSED state"
+var wsQueue = [];
+function WSsend(message) {
+	if (websocket && websocket.readyState === 1) { websocket.send(message); return; }
+	wsQueue.push(message);
+	if (wsQueue.length > 100) wsQueue.shift();
+	if (!websocket || websocket.readyState === 3) testWebSocket();
+}
 var checkWS = setInterval(function () { if (websocket.readyState != 1) { testWebSocket(); } }, 10000);
 testWebSocket();
 function SaveJson(path, data) { WSsend('SaveJson|' + path + '|' + data); }
 //function SaveFile(path,data){WSsend('SaveFile|'+path+'|'+data);}
 function SaveFile(path, data) { WSsend(JSON.stringify({ "SaveFile": { "path": path, "data": data } })) }
 
-// grpRemoveMember(groupIeee, memberIeee) — вычеркнуть слушателя из Members группы.
+// grpRemoveMember(groupIeee, memberIeee) — remove a listener from the group Members.
 window.grpRemoveMember = function (groupIeee, memberIeee) {
 	try {
 		eventE.once('deviceFile:/Devices/' + groupIeee, function (data) {
@@ -57,9 +80,9 @@ window.grpRemoveMember = function (groupIeee, memberIeee) {
 		WSsend('LoadJson|/Devices/' + groupIeee);
 	} catch (e) {}
 };
-// группы = объединение кластеров слушателей: тянет недостающие ClI в EP 01,
-// синтезирует Report-контролы (optimistic, без опроса) и дописывает Members.
-// Вызывают менеджер (квикэдд) и templateedit при добавлении членства.
+// groups = merged listener clusters: pulls missing ClI into EP 01,
+// synthesizes Report controls (optimistic, no polling) and appends Members.
+// Called by the manager (quick-add) and templateedit when adding membership.
 window.grpExtendSurface = function (groupIeee, memberIeee, epClusters) {
 	try {
 		eventE.once('deviceFile:/Devices/' + groupIeee, function (data) {
@@ -152,7 +175,7 @@ function parseSocket(msg) {
 		
 		if (z[0] === "/groups.json") { groups = JSON.parse(z[1]); eventE.emit('groups', groups); }
 		if (z[0] === "joinSetup") { eventE.emit('joinSetup:' + z[1], z.slice(2).join('|')); }
-		// Полный файл устройства/шаблона (JoinSetup и др.): deviceFile:/Devices/XXX
+		// Full device/template file (JoinSetup etc.): deviceFile:/Devices/XXX
 		if (z[0].indexOf('/Devices/')===0 || z[0].indexOf('/Devtemplates/')===0) { eventE.emit('deviceFile:'+z[0], z.slice(1).join('|')); }
 
 		if (z[0] === "LQI_RSP") { eventE.emit('LQI_RSP', JSON.parse(z[1])); console.log(z); }
@@ -168,24 +191,26 @@ function parseSocket(msg) {
 			eventE.emit('report', [JSON.parse(z[1]), z[2]])		
 		}
 
-		// Живая лента лога (виджет logviewer): log|<logfmt>, история
-		// logHist|<json-массив>, служебное logCtl|<текст>.
+		// Live log feed (logviewer widget): log|<logfmt>, history
+		// logHist|<json-array>, service logCtl|<text>.
 		if (z[0] === "log") { eventE.emit('log', z.slice(1).join('|')); }
 		if (z[0] === "logHist") { try { eventE.emit('logHist', JSON.parse(z.slice(1).join('|'))); } catch (e) {} }
 		if (z[0] === "logCtl") { eventE.emit('logCtl', z.slice(1).join('|')); }
 
 		if (z[0] === "join") {
-			document.getElementById("joinstatus").innerHTML += z[1];
-			document.getElementById("joinstatus").scrollIntoView({ behavior: 'smooth', block: 'end' });
+			var jsbox = document.getElementById("joinstatus");
+			if (!jsbox) return;
+			jsbox.innerHTML += z[1];
+			jsbox.scrollIntoView({ behavior: 'smooth', block: 'end' });
 		}
-		// Нет шаблона под модель — структурированное предложение генерации.
+		// No template for the model — a structured generation offer.
 		// joinNoTemplate|IEEE|ModelId|ManufName
 		if (z[0] === "joinNoTemplate") {
 			try {
 				eventE.emit('joinNoTemplate', { ieee: z[1] || '', model: z[2] || '', manuf: z.slice(3).join('|') || '' });
 			} catch (e) {}
 		}
-		// Генерация: полный ЖСОН — открыть в редакторе без сохранения.
+		// Generation: full JSON — open in the editor without saving.
 		// genTemplateResult|IEEE|base64(json)
 		if (z[0] === "genTemplateResult") {
 			try {
@@ -194,7 +219,7 @@ function parseSocket(msg) {
 				eventE.emit('genTemplateResult', { ieee: z[1] || '', json: obj });
 			} catch (e) { console.warn('genTemplateResult', e); }
 		}
-		// Генерация: несколько кандидатов — список на выбор.
+		// Generation: several candidates — a list to choose from.
 		// genTemplateCandidates|IEEE|base64([{model,vendor}])
 		if (z[0] === "genTemplateCandidates") {
 			try {
@@ -231,7 +256,7 @@ function parseSocket(msg) {
 		
 		if (z[0] === "notify") {
 			const notifyText = z[1] || '';
-			// Определяем тип по содержимому ответа от ZESP
+			// Detect the type from the ZESP reply contents
 			let notifyType  = 'info';
 			let notifyTitle = 'Уведомление';
 			if (/up-to-date/i.test(notifyText)) {
@@ -247,11 +272,11 @@ function parseSocket(msg) {
 				notifyType  = 'warning';
 				notifyTitle = '⚠️ Внимание';
 			}
-			// Добавляем в NotificationCenter (если подключён)
+			// Add to NotificationCenter (if connected)
 			if (window.NC) {
 				NC.add(notifyTitle, notifyText, notifyType);
 			} else {
-				// fallback — обычный Toast если NC не подключён
+				// fallback — plain Toast if NC is not connected
 				new Toast({ title: notifyTitle, text: notifyText, theme: 'light', autohide: true, interval: 0 });
 			}
 		}
@@ -304,23 +329,23 @@ function parseSocket(msg) {
 		
 		
 		// ── Automation engine messages ────────────────────────────────────────────
-		// debug|text — лог из console_log блока автоматизации
+		// debug|text — log from the automation console_log block
 		if (z[0] === "debug") {
 			console.log("[Automation]", z[1]);
 			eventE.emit('automationLog', { level: 'debug', text: z[1] });
 		}
-		// error|text — ошибка в автоматизации
+		// error|text — automation error
 		if (z[0] === "error") {
 			console.error("[Automation Error]", z[1]);
 			eventE.emit('automationLog', { level: 'error', text: z[1] });
 		}
-		// scripterror|text — ошибка загрузки скрипта
+		// scripterror|text — script load error
 		if (z[0] === "scripterror") {
 			console.error("[Script Error]", z[1]);
 			new Toast({ title: 'Automation Error', text: z[1], theme: 'dark', autohide: false, interval: 0 });
 			eventE.emit('scripterror', z[1]);
 		}
-		// highlight|blockId — подсветка конкретного блока (опционально, через block ID)
+		// highlight|blockId — highlight a specific block (optional, via block ID)
 		if (z[0] === "highlight") {
 			try {
 				const workspace = Blockly.getMainWorkspace();
@@ -393,10 +418,10 @@ function widgetReport(rep) {
 		if (ind === -1) return;
 		const dev = deviceList[ind];
 
-		// Ключ репорта: приоритет rep.Obj (виртуальные/BLE/Tuya), иначе собираем из частей
+		// Report key: rep.Obj takes priority (virtual/BLE/Tuya), otherwise assemble from parts
 		const attrID = rep.Obj || rep.Object || `${rep.EndPoint}${rep.ClusterId}${rep.AttribId}`;
 
-		// Обновляем deviceList в памяти
+		// Update the in-memory deviceList
 		try {
 			if (dev.Report[attrID]) {
 				dev.Report[attrID].parsed = rep.parsed;
@@ -405,20 +430,20 @@ function widgetReport(rep) {
 			dev.lastSeen = rep.time;
 		} catch {}
 
-		// Определяем роль и кластер для правильного масштабирования
+		// Detect role and cluster for correct scaling
 		const report   = dev.Report && dev.Report[attrID];
 		const role     = report ? report.role.split("&")[0] : "";
 		const cluster  = rep.ClusterId || attrID.substring(2, 6);
 		const val      = rep.parsed;
 
-		// CSS-класс элементов этого объекта
+		// CSS class of this object's elements
 		const cls = rep.IEEE + "#" + attrID;
 
-		// Признак boolean-состояния (on/off)
+		// Boolean-state (on/off) flag
 		const isOn = [1, "1", true, "on", "ON", "true", "ON"].includes(val);
 		const isOff = [0, "0", false, "off", "OFF", "false"].includes(val);
 
-		// --- обновляем tile в списке устройств (если есть) ---
+		// --- refresh the tile in the device list (if present) ---
 		const tileEl = document.getElementById(dev.IEEE);
 		if (tileEl) {
 			try {
@@ -428,7 +453,7 @@ function widgetReport(rep) {
 			} catch {}
 		}
 
-		// --- обходим все DOM-элементы с этим классом ---
+		// --- walk all DOM elements with this class ---
 		const ea = document.getElementsByClassName(cls);
 		for (let i = 0; i < ea.length; i++) {
 			const el = ea[i];
@@ -439,7 +464,7 @@ function widgetReport(rep) {
 					break;
 
 				case "SPAN":
-					// Вспышка красным → серый
+					// Flash red → gray
 					el.style.color = "red";
 					el.textContent = (val !== undefined && val !== null && val !== "") ? val : (rep.Data || "?");
 					const spanEl = el;
@@ -450,11 +475,11 @@ function widgetReport(rep) {
 					switch (el.type) {
 
 						case "checkbox": {
-							// Обновляем чекбокс
+							// Refresh the checkbox
 							if (isOn)  el.checked = true;
 							if (isOff) el.checked = false;
 
-							// Обновляем визуальный toggle-switch (span внутри label[for=id])
+							// Refresh the visual toggle-switch (span inside label[for=id])
 							try {
 								const label = document.querySelector(`label[for="${el.id}"]`);
 								const sw = label && label.querySelector(".toggle-switch");
@@ -469,7 +494,7 @@ function widgetReport(rep) {
 								}
 							} catch {}
 
-							// Обновляем лампочку (для light_onoff)
+							// Refresh the bulb (for light_onoff)
 							if (role === "light_onoff") {
 								try {
 									const bulb = el.closest(".ac")?.querySelector("[id^='z']");
@@ -491,33 +516,33 @@ function widgetReport(rep) {
 						case "range": {
 							let rangeVal = parseFloat(val) || 0;
 
-						// Масштабируем по кластеру/роли.
-						// 0008→0-100 — только яркость света (role light):
-						// у number/range своя шкала из класса (напр. Volume 0300080000, max 254),
-						// маппинг писал ~100 в ползунок с max=254 и уводил бегунок на середину.
+						// Scale by cluster/role.
+						// 0008→0-100 — light brightness only (role light):
+						// number/range have their own scale from the class (e.g. Volume 0300080000, max 254),
+						// mapping wrote ~100 into a slider with max=254 and dragged the thumb to the middle.
 						if (cluster === "0008" && role !== "number" && role !== "range") {
-								// Яркость ZigBee: 0-255 → 0-100
+								// ZigBee brightness: 0-255 → 0-100
 								rangeVal = map_range(rangeVal, 0, 255, 0, 100);
 							} else if (cluster === "0300" && attrID.endsWith("0007")) {
-								// Цветовая температура (mireds): 153-500 → 0-100
+								// Color temperature (mireds): 153-500 → 0-100
 								rangeVal = map_range(rangeVal, 153, 500, 0, 100);
 							} else if (cluster === "0300" && attrID.endsWith("0000")) {
-								// Цвет hex — rangeVal не обновляем (оставляем NaN)
+								// Hex color — don't update rangeVal (leave NaN)
 								rangeVal = NaN;
 							} else if (role === "cover") {
-								// Позиция шторы уже 0-100
+								// Curtain position is already 0-100
 								rangeVal = Math.min(100, Math.max(0, rangeVal));
 							} else if (role === "climate" || role === "range") {
-								// Температура — значение напрямую
-								// rangeVal = rangeVal (без изменений)
+								// Temperature — value as-is
+								// rangeVal = rangeVal (unchanged)
 							} else if (role === "fan") {
-								// Скорость 0-100
+								// Speed 0-100
 								rangeVal = Math.min(100, Math.max(0, rangeVal));
 							}
-							// Для number — напрямую
+							// For number — as-is
 							if (!isNaN(rangeVal)) el.value = rangeVal;
 
-							// Обновляем соседний span с текущим значением
+							// Refresh the neighbor span with the current value
 							try {
 								const parent = el.parentElement;
 								if (parent) {
@@ -536,7 +561,7 @@ function widgetReport(rep) {
 								}
 							} catch {}
 
-							// Обновляем лампочку brightness
+							// Refresh the bulb brightness
 							if (cluster === "0008" || role === "light_level") {
 								try {
 									const ac = el.closest(".ac");
@@ -544,7 +569,7 @@ function widgetReport(rep) {
 									if (bulb) bulb.style.webkitFilter = `brightness(${rangeVal}%)`;
 								} catch {}
 							}
-							// Обновляем цвет лампочки по репорту цветовой температуры
+							// Refresh the bulb color from the color-temperature report
 							if (cluster === "0300" && role === "light_color_temp") {
 								try {
 									const ac = el.closest(".ac");
@@ -564,7 +589,7 @@ function widgetReport(rep) {
 					}
 					break;
 			}
-			// Обновляем цвет лампочки по репорту hex цвета (вне зависимости от типа элемента)
+			// Refresh the bulb color from the hex-color report (regardless of element type)
 			if (cluster === "0300" && attrID.endsWith("0000") && role === "light_color") {
 				console.log('[color] hex bulb update val=', val);
 				try {
@@ -581,7 +606,7 @@ function widgetReport(rep) {
 			}
 		}
 
-		// --- обновляем climate target temp span (id="clt_...") отдельно ---
+		// --- refresh the climate target-temp span (id="clt_...") separately ---
 		if (role === "climate") {
 			try {
 				const tempInput = document.getElementById(`climate_temp|${cls}`);
@@ -599,7 +624,7 @@ function widgetReport(rep) {
 			} catch {}
 		}
 
-		// --- обновляем range слайдер (id="level|...") ---
+		// --- refresh the range slider (id="level|...") ---
 		if (role === "range") {
 			try {
 				const rngInput = document.getElementById(`level|${cls}`);
@@ -611,7 +636,7 @@ function widgetReport(rep) {
 			} catch {}
 		}
 
-		// --- обновляем lock иконку ---
+		// --- refresh the lock icon ---
 		if (role === "lock") {
 			try {
 				document.querySelectorAll(`span.${CSS.escape(cls)}[style*="cursor:pointer"]`).forEach(el => {
@@ -622,7 +647,7 @@ function widgetReport(rep) {
 			} catch {}
 		}
 
-		// --- обновляем climate mode кнопки ---
+		// --- refresh the climate-mode buttons ---
 		if (role === "climate" && report && typeof val === "string") {
 			try {
 				const sysKey = Object.keys(dev.Report || {}).find(k => /^01\d{4}001C$/.test(k));

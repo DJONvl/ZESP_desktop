@@ -1,25 +1,25 @@
 /**
- * NotificationCenter — панель уведомлений для ZESP desktop
- * Подключать ПОСЛЕ socket.js и KWS.js
+ * NotificationCenter — notification panel for ZESP desktop
+ * Include AFTER socket.js and KWS.js
  *
- * Что делает:
- *  - NC.add(title, text, type) — добавляет уведомление в панель
- *  - Автоудаление через 12 часов
- *  - Хранение в localStorage (выживает перезагрузку)
- *  - Показывает бейдж с числом непрочитанных на кнопке колокола
- *  - Проверяет новую версию прошивки через WSsend('cmdUpdatefw|false')
- *    Ответ приходит через notify в socket.js → NC.add(...)
+ * What it does:
+ *  - NC.add(title, text, type) — adds a notification to the panel
+ *  - Auto-removal after 12 hours
+ *  - Stored in localStorage (survives reload)
+ *  - Shows an unread-count badge on the bell button
+ *  - Checks for a new firmware version via WSsend('cmdUpdatefw|false')
+ *    The reply arrives via notify in socket.js → NC.add(...)
  */
 
 (function () {
     'use strict';
 
-    // ───────────────────────── константы ─────────────────────────
+    // ───────────────────────── constants ─────────────────────────
     const STORAGE_KEY   = 'zesp_notifications';
-    const MAX_AGE_MS    = 12 * 60 * 60 * 1000;   // 12 часов
-    const CHECK_VER_INT = 60 * 60 * 1000;          // проверять версию раз в час
+    const MAX_AGE_MS    = 12 * 60 * 60 * 1000;   // 12 hours
+    const CHECK_VER_INT = 60 * 60 * 1000;          // check version once an hour
 
-    // ───────────────────────── хранилище ─────────────────────────
+    // ───────────────────────── storage ─────────────────────────
     function loadNotifications() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
@@ -36,8 +36,8 @@
         return list.filter(n => n.ts > cutoff);
     }
 
-    // ───────────────────────── добавление ────────────────────────
-    const DEDUP_AGE_MS = 60 * 60 * 1000; // дубль если то же сообщение < 1 часа назад
+    // ───────────────────────── adding ────────────────────────
+    const DEDUP_AGE_MS = 60 * 60 * 1000; // duplicate if the same message < 1 hour ago
 
     function addNotification(title, text, type) {
         let list = pruneOld(loadNotifications());
@@ -46,7 +46,7 @@
         const normText    = (text  || '').trim();
         const dedupCutoff = Date.now() - DEDUP_AGE_MS;
 
-        // Ищем дубль: тот же title+text, не старше DEDUP_AGE_MS
+        // Look for a duplicate: same title+text, not older than DEDUP_AGE_MS
         const dupIdx = list.findIndex(n =>
             n.title.trim() === normTitle &&
             n.text.trim()  === normText  &&
@@ -54,7 +54,7 @@
         );
 
         if (dupIdx !== -1) {
-            // Поднимаем наверх, обновляем время, помечаем непрочитанным
+            // Move to top, refresh time, mark as unread
             const existing = { ...list[dupIdx], ts: Date.now(), read: false };
             list.splice(dupIdx, 1);
             list.unshift(existing);
@@ -78,7 +78,7 @@
         updateBadge();
     }
 
-    // ───────────────────────── удаление ──────────────────────────
+    // ───────────────────────── removal ──────────────────────────
     function removeNotification(id) {
         let list = loadNotifications().filter(n => n.id !== id);
         saveNotifications(list);
@@ -98,7 +98,7 @@
         updateBadge();
     }
 
-    // ───────────────────────── бейдж ─────────────────────────────
+    // ───────────────────────── badge ─────────────────────────────
     function updateBadge() {
         const list   = pruneOld(loadNotifications());
         const unread = list.filter(n => !n.read).length;
@@ -108,7 +108,7 @@
         badge.style.display = unread > 0 ? 'flex' : 'none';
     }
 
-    // ───────────────────────── рендер панели ─────────────────────
+    // ───────────────────────── panel rendering ─────────────────────
     function formatTime(ts) {
         const d = new Date(ts);
         const pad = n => String(n).padStart(2, '0');
@@ -123,7 +123,7 @@
         if (!container) return;
 
         let list = pruneOld(loadNotifications());
-        saveNotifications(list);   // заодно чистим старые
+        saveNotifications(list);   // clean up old ones along the way
 
         if (list.length === 0) {
             container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--faint);font-size:13px;">Нет уведомлений</div>';
@@ -155,7 +155,7 @@
             .replace(/"/g,'&quot;');
     }
 
-    // ───────────────────────── создание DOM панели ────────────────
+    // ───────────────────────── panel DOM creation ────────────────
     function buildPanel() {
         let panel = document.getElementById('notifi_cntr');
         if (!panel) {
@@ -180,9 +180,9 @@
         renderPanel();
     }
 
-    // ───────────────────────── проверка версии через WS ──────────
-    // Отправляем команду на ZESP — он сам проверяет версию и шлёт notify|...
-    // Обработчик notify в socket.js вызовет NC.add() с результатом
+    // ───────────────────────── version check via WS ──────────
+    // Send the command to ZESP — it checks the version itself and sends notify|...
+    // The notify handler in socket.js will call NC.add() with the result
     function checkNewVersion() {
         if (typeof WSsend === 'function') {
             WSsend('cmdUpdatefw|false');
@@ -192,8 +192,8 @@
     }
 
     // ───────────────────────── Toast ─────────────────────────────
-    // Настоящий класс (порт из KWS.js). Определяем только если его ещё нет
-    // (в старой версии Toast подключает KWS.js — там не мешаем).
+    // The real class (port from KWS.js). Define only if it does not exist yet
+    // (in the old version Toast includes KWS.js — don't interfere there).
     if (typeof window.Toast === 'undefined') {
         class Toast {
             constructor(t) {
@@ -219,7 +219,7 @@
                 el.style.overflow = 'hidden';
                 el.style.height = el.offsetHeight + 'px';
                 el.style.marginBottom = '0';
-                // свернуть элемент, освобождая место в контейнере, затем удалить
+                // collapse the element, freeing space in the container, then remove
                 requestAnimationFrame(() => {
                     el.style.height = '0';
                     el.style.borderWidth = '0';
@@ -254,21 +254,21 @@
         window.Toast = Toast;
     }
 
-    // ───────────────────────── публичное API ─────────────────────
+    // ───────────────────────── public API ─────────────────────
     window.NC = {
         add:           addNotification,
         remove:        removeNotification,
         clearAll:      clearAll,
         render:        renderPanel,
         badge:         updateBadge,
-        checkVersion:  checkNewVersion   // можно вызвать вручную из консоли
+        checkVersion:  checkNewVersion   // can be called manually from the console
     };
 
-    // ───────────────────────── инициализация ─────────────────────
+    // ───────────────────────── initialization ─────────────────────
     function init() {
         buildPanel();
 
-        // Автоудаление: чистим раз в минуту
+        // Auto-removal: clean once a minute
         setInterval(() => {
             const list = pruneOld(loadNotifications());
             saveNotifications(list);
@@ -276,13 +276,13 @@
             updateBadge();
         }, 60 * 1000);
 
-        // Проверка версии: через 5 сек после старта, потом каждый час
+        // Version check: 5 sec after start, then every hour
         setTimeout(() => {
             checkNewVersion();
             setInterval(checkNewVersion, CHECK_VER_INT);
         }, 5000);
 
-        // Открытие панели — помечаем всё прочитанным
+        // Opening the panel — mark everything as read
         const btnOpen = document.getElementById('notifi_btn');
         if (btnOpen) {
             btnOpen.addEventListener('click', () => {
@@ -291,8 +291,8 @@
             });
         }
 
-        // Закрытие по клику вне панели (крестик остаётся).
-        // Клик по кнопке-колоколу игнорируем — иначе открытие тут же закроется.
+        // Close on click outside the panel (the cross stays).
+        // Ignore clicks on the bell button — otherwise opening would close right away.
         document.addEventListener('click', (e) => {
             const panel = document.getElementById('notifi_cntr');
             if (!panel || !panel.classList.contains('nc_open')) return;
@@ -304,7 +304,7 @@
         updateBadge();
     }
 
-    // ───────────────────────── запуск ────────────────────────────
+    // ───────────────────────── startup ────────────────────────────
     function tryInit() {
         if (!document.body) {
             console.warn('NC: body ещё не готов, повторяем через 100ms...');

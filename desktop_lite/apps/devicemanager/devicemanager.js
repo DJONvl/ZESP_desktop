@@ -1,6 +1,6 @@
-// devicemanager.js — виджет «Менеджер устройств» (порт static/apps/deviceManager.app на WinEngine).
-// Зависит: socket.js (deviceList/eventE/WSsend), widgets.js (getIconSvg/getDeviceClass/widgetEvnt),
-// zesp-globals.js (groups). M2PC-окна wJoin/wGroup/wBind/wAbout → модальные панели внутри окна.
+// devicemanager.js — "Device Manager" widget (port of static/apps/deviceManager.app to WinEngine).
+// Depends on: socket.js (deviceList/eventE/WSsend), widgets.js (getIconSvg/getDeviceClass/widgetEvnt),
+// zesp-globals.js (groups). M2PC windows wJoin/wGroup/wBind/wAbout → modal panels inside the window.
 
 (function () {
   var CSS = `
@@ -100,7 +100,7 @@
     });
   }
 
-  // t(key, fb, vars) — перевод из словаря devicemgr (папка devicemanager), fallback на русский.
+  // t(key, fb, vars) — translation from the devicemgr dictionary (devicemanager folder), fallback to Russian.
   function t(key, fb, vars) {
     if (window.L) {
       var d = L.dicts.devicemgr || {};
@@ -113,7 +113,7 @@
     return fb;
   }
 
-  // сервер шлёт UnixMilli, приводим к секундам
+  // the server sends UnixMilli, convert to seconds
   function tsSec(ts) {
     ts = Number(ts) || 0;
     if (ts > 1e11) ts = Math.floor(ts / 1000);
@@ -131,7 +131,7 @@
     return Math.floor(h / 24) + ' ' + t('ago.d', 'дн');
   }
 
-  // статус родительской строки: онлайн/офлайн/покинуло сеть + число датчиков + last-seen
+  // parent row status: online/offline/left the network + sensor count + last-seen
   function statusHtml(d) {
     var cnt = d.Report ? Object.keys(d.Report).length : 0;
     var cls = 'offline', lbl = t('st.offline', 'Офлайн');
@@ -156,20 +156,20 @@
     return { roleBase: raw.trim(), classObj: rep.class || {} };
   }
 
-  // ── виджет устройства (перенос deviceManager._vidget) ────────────────
+  // ── device widget (port of deviceManager._vidget) ────────────────
   function widgetHtml(device, key, value) {
     try {
-      // Группы без репортов: оптимистичное состояние из grpState (ставит widgetEvnt),
-      // иначе каждый ререндер таблицы роняет контролы в дефолт. Копия — deviceList не трогаем.
+      // Groups without reports: optimistic state from grpState (set by widgetEvnt),
+      // otherwise every table rerender drops controls to default. Copy — leave deviceList alone.
       if (device.DevType === 'GRP' && window.grpState) {
         var sv = window.grpState[device.IEEE + '#' + key];
         if (sv !== undefined) value = Object.assign({}, value, { parsed: sv, val: sv });
       }
       var ri = getRoleInfo(value);
       var role = ri.roleBase, attr = ri.classObj;
-      // Роли ламп разделились (light_onoff/light_level/light_color/light_color_temp),
-      // а ветка ниже одна — case 'light'. Нормализуем, как в widgets.js,
-      // исходную роль помним для выбора юнита.
+      // Lamp roles have split (light_onoff/light_level/light_color/light_color_temp),
+      // but the branch below is one — case 'light'. Normalize as in widgets.js,
+      // remembering the original role for unit selection.
       var lightKind = role;
       if (role === 'light_onoff' || role === 'light_level' || role === 'light_color' || role === 'light_color_temp') role = 'light';
       var device_class = '';
@@ -185,7 +185,7 @@
 
       switch (role) {
         case 'light': {
-          // Юнит выбираем по исходной роли (label ненадёжен: бывает русская «яркость»).
+          // Pick the unit by the original role (label is unreliable: sometimes Russian "яркость").
           var isOnOff = (lightKind === 'light_onoff') || (lightKind === 'light' && (value.label === 'On_Off' || value.label === 'on_off'));
           var isLevel = (lightKind === 'light_level') || (lightKind === 'light' && (value.label === 'Level' || value.label === 'яркость' || value.label === 'brightness'));
           var isCt = (lightKind === 'light_color_temp') || (lightKind === 'light' && (value.label === 'ColorT' || value.label === 'Color_temp'));
@@ -198,19 +198,19 @@
               '<label for="lt_' + idw + '"><div class="toggle-switch ' + id + '"><span></span></div></label>' +
               '<span class="' + id + '" style="font-size:11px;color:var(--faint)">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
           } else if (isLevel) {
-            // parsed 0-255 → показываем проценты, шлём проценты (как виджеты).
+            // parsed 0-255 → show percent, send percent (as widgets do).
             var lvlPct = Math.round((parseFloat(value.parsed) || 0) * 100 / 255);
             html += '<div style="display:flex;align-items:center;gap:4px;">' + window.getIconSvg('brightness', 16, '#ffd54f') +
               '<input class="' + id + ' level" type="range" id="level|' + id + '" style="width:80px" min="0" max="100" step="2" value="' + lvlPct + '" onchange="evm(\'level|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
               '<span class="' + id + '" style="font-size:11px;color:var(--faint);min-width:26px">' + lvlPct + '%</span></div>';
           } else if (isCt) {
-            // миреды 153-500 → проценты, шлём проценты (как виджеты).
+            // mireds 153-500 → percent, send percent (as widgets do).
             var ctPct = Math.round(((parseFloat(value.parsed) || 153) - 153) * 100 / 347);
             html += '<div style="display:flex;align-items:center;gap:4px;">' + window.getIconSvg('sun_temp', 16, '#ff9800') +
               '<input class="' + id + ' color-temp" type="range" id="colorT|' + id + '" style="width:80px" min="0" max="100" step="2" value="' + ctPct + '" onchange="evm(\'colorT|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
               '<span class="' + id + '" style="font-size:11px;color:var(--faint);min-width:26px">' + ctPct + '%</span></div>';
           } else if (isColor) {
-            // оттенок hue 0-100 → шлём hex (как виджеты, hsl2Hex глобальный).
+            // hue 0-100 → send hex (as widgets do, hsl2Hex is global).
             html += '<div style="display:flex;align-items:center;gap:4px;">' + window.getIconSvg('palette', 16, '#ff9800') +
               '<input class="' + id + ' color-range" type="range" id="color|' + id + '" style="width:80px" min="0" max="100" step="2" value="75" onchange="var hue=((this.value/100)*360).toFixed(0);evm(\'color|' + id + '\',hsl2Hex(hue,100,50))" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
               '<span class="' + id + '" style="font-size:11px;color:var(--faint);min-width:26px">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
@@ -388,7 +388,7 @@
     } catch (e) { console.log(e); return '?'; }
   }
 
-  // ── состояние ──
+  // ── state ──
   var st = { filter: '', expanded: {}, editing: null, secTimer: null, scanSec: 0, sort: null };
 
   function thSort(cls, key, label) {
@@ -399,7 +399,7 @@
   function evm(id, val) { if (window.widgetEvnt) widgetEvnt(id, val); }
   window.evm = evm;
 
-  // ── таблица ──
+  // ── table ──
   function genTable() {
     var html = '<table class="dm-table"><thead><tr>' +
       thSort('col-dt', 'DevType', t('th.dt', 'DT')) +
@@ -486,7 +486,7 @@
     renderTable();
   }
 
-  // ── редактирование ячеек ──
+  // ── cell editing ──
   function startEdit(e) {
     if (st.editing) cancelEdit();
     var cell = e.currentTarget;
@@ -560,7 +560,7 @@
     st.editing = null;
   }
 
-  // ── контекст-меню ──
+  // ── context menu ──
   var dm = {};
   window.dm = dm;
 
@@ -585,8 +585,8 @@
     addEl('./static/icons/blockly.svg', t('cm.scenes', 'Сценарии'), 'scenes&' + ieee);
     addEl('./static/icons/trash.svg', t('cm.del', 'Del'), 'del&' + ieee);
     addEl('./static/icons/user-trash.png', t('cm.clean', 'Clean'), 'clean&' + ieee);
-    // Центрируем меню относительно окна «Менеджер устройств», а не курсора.
-    // Сначала показываем, иначе getBoundingClientRect вернёт нули.
+    // Center the menu relative to the "Device Manager" window, not the cursor.
+    // Show first, otherwise getBoundingClientRect returns zeros.
     mnu.style.display = 'block';
     var win = mnu.closest('.window');
     if (win) {
@@ -616,13 +616,13 @@
     }
   };
 
-  // ── модалки ──
+  // ── modals ──
   function openModal(name) { var m = document.getElementById('dm_modal_' + name); if (m) m.classList.add('show'); }
   function closeModal(name) {
     var m = document.getElementById('dm_modal_' + name); if (m) m.classList.remove('show');
     if (name === 'join') {
-      // Гасим join на координаторе и BLE-скан: иначе после закрытия окна
-      // сеть остаётся открытой, а скан жрёт эфир/батарею.
+      // Kill join on the coordinator and the BLE scan: otherwise after closing the window
+      // the network stays open, and the scan eats airtime/battery.
       try { if (typeof WSsend === 'function') { WSsend('addDeviceDone'); WSsend('BLEscan|"false"'); } } catch (e) {}
       if (window.eventE) eventE.off('haddisc', dm.onHadDisc);
       stopAddTimer();
@@ -732,7 +732,7 @@ dm.setBleTpl = function (dev, adr, name) {
       var b = document.getElementById(t); if (b) b.classList.toggle('active', t === id);
     });
   }
-  // Видимость вкладки Импорт — только при активном discovery-импорте в конфиге.
+  // Import tab visibility — only when discovery import is enabled in config.
   dm.updateHadTab = function () {
     var tab = document.getElementById('dm_tab_had'); if (!tab) return;
     var on = !!(window.jsconfig && window.jsconfig.MQTT && window.jsconfig.MQTT.mqttDiscowery === '1');
@@ -779,7 +779,7 @@ dm.setBleTpl = function (dev, adr, name) {
   dm.hadAllowAll = function () {
     (st.hadLast || []).forEach(function (d) { WSsend('had_allow|' + d.ieee); });
   };
-  // Секция «в базе»: HAD из deviceList, удаление — force (из базы + файл).
+  // "in base" section: HAD from deviceList, deletion — force (from base + file).
   dm.renderHadBase = function () {
     var box = document.getElementById('had_base'); if (!box) return;
     var list = (typeof deviceList !== 'undefined' ? deviceList : []).filter(function (d) { return d && d.DevType === 'HAD'; });
@@ -818,17 +818,17 @@ dm.setBleTpl = function (dev, adr, name) {
     }
   };
 
-  // ── группы: администрирование переехало в приложение groups ──
-  // Тулбар и контекст открывают его; вся логика — в apps/groups/groups.js.
+  // ── groups: administration moved to the groups app ──
+  // The toolbar and context open it; all logic lives in apps/groups/groups.js.
   dm.groupUI = function () {
     if (window.WinEngine) WinEngine.open('groups');
   };
   dm.addToGroupUI = function (ieee) {
     if (window.WinEngine) WinEngine.open('groups', { params: ieee });
-    // single-окно: повторный open может не вызвать setup — дёргаем предвыбор напрямую
+    // single window: a repeated open may not trigger setup — poke the preselect directly
     setTimeout(function () { try { if (window.grpAddToUI) grpAddToUI(ieee); } catch (e) {} }, 350);
   };
-  // Нет шаблона под модель — кнопка генерации через сервер шаблонов (этап 1).
+  // No template for the model — generation button via the template server (stage 1).
   dm.onJoinNoTemplate = function (d) {
     try {
       var box = document.getElementById('joinstatus');
@@ -851,10 +851,10 @@ dm.setBleTpl = function (dev, adr, name) {
   dm.genTemplate2 = function (ieee, model, vendor) {
     WSsend('genTemplate|' + ieee + '|' + model + '|' + vendor);
   };
-  // Полный ЖСОН с сервера: доливаем IEEE/адрес из интервью, сохраняем
-  // в Devices/IEEE (непроверенное чистится через Clean, в Devtemplates
-  // попадает только явной кнопкой Tpl) и показываем кнопку перехода.
-  // По кнопке: джоин завершается, модалка закрывается, открывается редактор.
+  // Full JSON from the server: pour IEEE/address from the interview, save
+  // to Devices/IEEE (unverified is cleaned via Clean, lands in Devtemplates
+  // only via the explicit Tpl button) and show the go-to button.
+  // On the button: join finishes, the modal closes, the editor opens.
   dm.onGenTemplateResult = function (d) {
     try {
       var obj = d.json || {};
@@ -890,7 +890,7 @@ dm.setBleTpl = function (dev, adr, name) {
       });
     } catch (e) {}
   };
-  // Несколько кандидатов — кнопки выбора в окно джойна.
+  // Several candidates — selection buttons into the join window.
   dm.onGenTemplateCandidates = function (d) {
     try {
       var box = document.getElementById('joinstatus');
@@ -907,7 +907,7 @@ dm.setBleTpl = function (dev, adr, name) {
     } catch (e) {}
   };
   // ── Bind ──
-  // ponytail: координатор (ZC) первым, без дублей
+  // ponytail: coordinator (ZC) first, no duplicates
   function dstAllOpts() {
     var li = '';
     deviceList.forEach(function (z) { if (z.DevType == 'ZC') li += '<option value="' + z.IEEE + '">' + (z.Name || 'Coordinator') + '</option>'; });
@@ -936,7 +936,7 @@ dm.setBleTpl = function (dev, adr, name) {
     c.innerHTML = li;
     dm.bindBusy(!!st.bindBusy);
   };
-  // крестик чистит своё поле и всё ниже по цепочке src→ep→cluster→dst→dstep
+  // the cross clears its own field and everything below along src→ep→cluster→dst→dstep
   dm.clearBind = function (id) {
     var order = ['src_Adr', 'src_ep', 'cluster_id', 'dst_Adr', 'dst_ep'];
     var lists = { src_Adr: 'src_ep_list', src_ep: 'cluster_id_list', cluster_id: 'dst_Adr_list', dst_Adr: 'dst_ep_list' };
@@ -991,7 +991,7 @@ dm.setBleTpl = function (dev, adr, name) {
   }
   dm.bind = function () { dm.bindBusy(true); bindReq('BIND_REQUEST'); };
   dm.unbind = function () { dm.bindBusy(true); bindReq('UNBIND_REQUEST'); };
-  // прячем кнопки на время запроса, пока не придёт status| (результат или таймаут)
+  // hide the buttons for the request duration, until status| arrives (result or timeout)
   dm.bindBusy = function (on) {
     st.bindBusy = !!on;
     var b1 = document.getElementById('dm_bind_btn'), b2 = document.getElementById('dm_unbind_btn'), w = document.getElementById('dm_bind_wait');
@@ -1006,7 +1006,7 @@ dm.setBleTpl = function (dev, adr, name) {
   dm.confirmYes = function () { closeModal('confirm'); WSsend('Init_Zigbee'); };
   dm.confirmNo = function () { closeModal('confirm'); };
 
-  // ── поиск ──
+  // ── search ──
   dm.search = function (v) {
     st.filter = v || '';
     var x = document.getElementById('dm_search_clear');
@@ -1015,14 +1015,14 @@ dm.setBleTpl = function (dev, adr, name) {
   };
   dm.clearSearch = function () { var i = document.getElementById('dm_search'); if (i) i.value = ''; dm.search(''); };
 
-  // ── сортировка ──
+  // ── sorting ──
   dm.sortBy = function (key) {
     if (!st.sort || st.sort.key !== key) st.sort = { key: key, dir: 1 };
     else st.sort.dir *= -1;
     renderTable();
   };
 
-  // ── развернуть/свернуть все ──
+  // ── expand/collapse all ──
   dm.toggleAll = function () {
     var anyCollapsed = false;
     for (var i = 0; i < deviceList.length; i++) {
@@ -1033,7 +1033,7 @@ dm.setBleTpl = function (dev, adr, name) {
     renderTable();
   };
 
-  // ── регистрация виджета ──
+  // ── widget registration ──
   window.WinEngine.register({
     id: 'devicemgr',
     title: 'Менеджер устройств',
@@ -1094,7 +1094,7 @@ dm.setBleTpl = function (dev, adr, name) {
       if (window.eventE) eventE.on('updateDeviceList', st.onDev);
       if (window.eventE) eventE.on('jsconfig', dm.updateHadTab);
       dm.updateHadTab();
-      // живой пересчёт «назад» (с/мин/ч/дн), пропуск пока редактируется ячейка
+      // live "ago" recount (s/min/h/d), skip while a cell is being edited
       if (st.agoTimer) clearInterval(st.agoTimer);
       st.agoTimer = setInterval(function () { if (!st.editing) renderTable(); }, 5000);
       if (window.eventE) eventE.on('bindStatus', dm.onBindStatus);

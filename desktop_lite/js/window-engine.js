@@ -1,10 +1,10 @@
-// window-engine.js — свободный движок окон. Ничего не знает о конкретных виджетах.
-// Виджеты регистрируются через WinEngine.register({ id, title, icon, label, single, template,
+// window-engine.js — free-floating window engine. Knows nothing about specific widgets.
+// Widgets register via WinEngine.register({ id, title, icon, label, single, template,
 //   setup(node, opts), destroy(node), onFocus(node), activate(node, opts) })
-// и открываются через WinEngine.open(id, opts).
-// Движок отвечает: создание/закрытие/фокус окон, drag/resize (свой, с учётом zoom), мобильная адаптация,
-// сохранение/восстановление раскладки (localStorage 'windowLayout'), ярлыки рабочего стола,
-// старт-меню, событие 'layout' (для перерисовки виджетов после изменений).
+// and are opened via WinEngine.open(id, opts).
+// The engine handles: window creation/close/focus, drag/resize (custom, zoom-aware), mobile adaptation,
+// layout save/restore (localStorage 'windowLayout'), desktop shortcuts,
+// start menu, 'layout' event (for widgets to repaint after changes).
 window.WinEngine = (function () {
   const registry = new Map();       // id -> def
   const layoutListeners = new Set();
@@ -56,7 +56,7 @@ window.WinEngine = (function () {
     positionNode(node, def, opts);
     desktop().appendChild(node);
     wireWindow(node, def);
-    // переводим заголовок окна (для шаблонов без data-i18n у wtitle)
+    // translate the window title (for templates without data-i18n on wtitle)
     const wtitle = node.querySelector('.wtitle');
     if (wtitle && !wtitle.hasAttribute('data-i18n')) {
       wtitle.textContent = wt(def, 'ui.title', def.title || def.label || id);
@@ -130,18 +130,18 @@ window.WinEngine = (function () {
   // ---------- window chrome (min / max / close / focus) ----------
   function wireWindow(win, def) {
     win.style.zIndex = ++winZ;
-    // Клик в любом месте окна (не только в шапку) поднимает его наверх,
-    // иначе перекрытое окно нельзя взять за край для ресайза.
+    // A click anywhere in the window (not just the header) brings it to front,
+    // otherwise an overlapped window cannot be grabbed by its edge for resize.
     win.addEventListener('pointerdown', (e) => {
       if (e.target.closest('.wbtn')) return;
       focus(win);
     });
     const head = win.querySelector('.window-head');
     if (head) head.addEventListener('pointerdown', () => focus(win));
-    // На тач-устройствах браузер перехватывает жест (скролл/зум) и ресайз «срывается»,
-    // если у .window стоит touch-action:manipulation. Но ставить touch-action:none на всё
-    // окно нельзя — сломается прокрутка внутри (.window-body с pan-y). Поэтому отключаем
-    // обработку браузером только на время жеста, начавшегося у краёв или в шапке.
+    // On touch devices the browser hijacks the gesture (scroll/zoom) and resize "breaks off"
+    // if .window has touch-action:manipulation. But touch-action:none cannot be set on the whole
+    // window — it would break scrolling inside (.window-body with pan-y). So we disable
+    // browser handling only for the duration of a gesture that started at the edges or in the header.
     const edgeZone = 12;
     win.addEventListener('pointerdown', (e) => {
       const r = win.getBoundingClientRect();
@@ -205,10 +205,10 @@ window.WinEngine = (function () {
   }
 
   // ---------- collapsible window-head toolbar ----------
-  // Автоматически применяется к .c-tools / .chart-tools / .ops-tools в шапке окна.
-  // Элементы, не влезающие по ширине, помечаются .tb-hidden и переносятся в меню
-  // (кнопка «▾»): в меню лежат РЕАЛЬНЫЕ элементы, поэтому <select> и обработчики
-  // работают нативно. Пересчёт при каждом изменении размера окна.
+  // Automatically applied to .c-tools / .chart-tools / .ops-tools in the window header.
+  // Items that do not fit the width are marked .tb-hidden and moved into the menu
+  // ("▾" button): the menu holds the REAL elements, so <select> and handlers
+  // keep working natively. Recalculated on every window resize.
   function wireCollapsibleToolbar(win) {
     const toolbar = win.querySelector('.c-tools, .chart-tools, .ops-tools');
     if (!toolbar || toolbar.__collapsed) return;
@@ -233,17 +233,17 @@ window.WinEngine = (function () {
     }
 
     function relayout() {
-      // вернуть все элементы на место и сбросить состояния
+      // put every element back in place and reset states
       children.forEach(el => toolbar.appendChild(el));
       children.forEach(el => { el.classList.remove('tb-hidden'); el.style.display = '' });
-      toolbar.appendChild(moreBtn); // ▾ всегда в конце
+      toolbar.appendChild(moreBtn); // ▾ always at the end
       closeMenu();
 
       moreBtn.style.display = '';
-      // доступное место для тулбара считаем от ширины шапки, а не от clientWidth тулбара.
-      // Заголовку резервируем его естественную ширину (scrollWidth), НО не больше ~50%
-      // шапки — чтобы длинный заголовок не вытеснил панель полностью (он обрезается
-      // ellipsis'ом, flex-shrink:1, min-width:0).
+      // available toolbar space is measured from the header width, not the toolbar clientWidth.
+      // We reserve the title's natural width (scrollWidth), BUT no more than ~50% of
+      // the header — so a long title does not push the panel out completely (it gets clipped
+      // with ellipsis, flex-shrink:1, min-width:0).
       const head = win.querySelector('.window-head');
       const title = head.querySelector('.wtitle');
       const wbtns = head.querySelector('.wbtns');
@@ -253,7 +253,7 @@ window.WinEngine = (function () {
       const wbtnsW = wbtns ? wbtns.offsetWidth : 0;
       const available = head.clientWidth - headPad - titleW - wbtnsW - moreBtn.offsetWidth - 6;
       let used = 0;
-      let cutoff = children.length; // первый скрываемый индекс
+      let cutoff = children.length; // first hidden index
       for (let i = 0; i < children.length; i++) {
         const el = children[i];
         if (el.classList.contains('tb-sep')) continue;
@@ -265,17 +265,17 @@ window.WinEngine = (function () {
           break;
         }
       }
-      // помечаем «хвост» вместе с разделителями, попавшими в него
+      // mark the "tail" together with the separators that fell into it
       children.forEach((el, i) => {
         if (i >= cutoff) { el.classList.add('tb-hidden'); el.style.display = 'none' }
       });
-      // если разделитель остался последним видимым — прячем его
+      // if a separator ended up the last visible one — hide it too
       for (let i = cutoff - 1; i >= 0; i--) {
         if (children[i].classList.contains('tb-sep')) { children[i].classList.add('tb-hidden'); children[i].style.display = 'none' }
         else break;
       }
       moreBtn.style.display = (cutoff > 0 && cutoff < children.length) ? '' : 'none';
-      // ограничиваем заголовок, чтобы он не расширился обратно и не вытеснил панель
+      // constrain the title so it does not expand back and push the panel out
       if (title) {
         const tbW = toolbar.getBoundingClientRect().width / getZoom();
         const rest = head.clientWidth - headPad - wbtnsW - tbW - 6;
@@ -286,8 +286,8 @@ window.WinEngine = (function () {
     moreBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (menu.classList.contains('open')) { closeMenu(); return }
-      // в меню кладём КЛОНЫ скрытых элементов; клики/изменения делегируются оригиналам.
-      // Оригиналы остаются в тулбаре, чтобы селекторы виджетов ('.ops-tools .cbtn') работали.
+      // the menu gets CLONES of the hidden elements; clicks/changes are delegated to the originals.
+      // The originals stay in the toolbar so widget selectors ('.ops-tools .cbtn') keep working.
       children.forEach(el => {
         if (!el.classList.contains('tb-hidden') || el.classList.contains('tb-sep')) return;
         const clone = el.cloneNode(true);
@@ -324,7 +324,7 @@ window.WinEngine = (function () {
       if (menu.classList.contains('open') && !menu.contains(e.target) && e.target !== moreBtn) closeMenu();
     });
 
-    // пересчёт при ресайзе окна
+    // recalculation on window resize
     let roTimer;
     const ro = new ResizeObserver(() => {
       clearTimeout(roTimer);
@@ -333,7 +333,7 @@ window.WinEngine = (function () {
     ro.observe(win);
     toolbar.__ro = ro;
 
-    // чтобы клики по «▾» не тянули окно
+    // so clicks on "▾" do not drag the window
     moreBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
 
     relayout();
@@ -387,18 +387,18 @@ window.WinEngine = (function () {
   // ---------- drag / resize ----------
   const isTouchDevice = () => ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
-  // Собственный ресайз для МЫШИ. Невидимые кромки-ручки поверх всего окна
-  // (z-index выше скроллбара), поэтому ресайз работает даже когда под курсором
-  // полоса прокрутки. Кромки толще обычных 8px,
-  // чтобы перекрывать вертикальный скроллбар.
+  // Custom resize for MOUSE. Invisible edge handles above everything in the window
+  // (z-index higher than the scrollbar), so resize works even when the cursor is over
+  // the scroll bar. Edges are thicker than the usual 8px,
+  // to overlap the vertical scrollbar.
   const MR_EDGE = 10;
   const MR_MIN_W = 100;
   const MR_MIN_H = 90;
 
   function wireMouseResize(win) {
-    // На тач-устройствах ресайз делает wireTouchDragResize (long-press по шапке).
-    // Не вешаем mouse-кромки на тач: они конфликтуют с видимыми rh-ручками
-    // (z-index выше), перехватывают скролл у краёв и блокируют прокрутку.
+    // On touch devices resize is done by wireTouchDragResize (long-press on the header).
+    // Do not attach mouse edges on touch: they conflict with the visible rh-handles
+    // (higher z-index), steal scroll at the edges and block scrolling.
     if (isTouchDevice()) return;
     if (win.__mr) return;
     win.__mr = true;
@@ -464,12 +464,12 @@ window.WinEngine = (function () {
     });
   }
 
-  // ---------- mouse drag (свой, вместо interact.js) ----------
-  // Перетаскивание окон мышью за заголовок. Всё считается в CSS-пикселях
-  // (дельты clientX делятся на zoom), поэтому корректно работает при любом
-  // масштабе — в отличие от interact.js, который под CSS zoom ломался.
+  // ---------- mouse drag (custom, instead of interact.js) ----------
+  // Dragging windows with the mouse by the header. Everything is computed in CSS pixels
+  // (clientX deltas divided by zoom), so it works correctly at any
+  // scale — unlike interact.js, which broke under CSS zoom.
   function wireMouseDrag(win) {
-    if (isTouchDevice()) return; // на таче — wireTouchDragResize
+    if (isTouchDevice()) return; // on touch — wireTouchDragResize
     if (win.__md) return;
     win.__md = true;
     const head = win.querySelector('.window-head');
@@ -513,8 +513,8 @@ window.WinEngine = (function () {
     const mobile = window.innerWidth <= 820;
     const changed = document.body.classList.toggle('mobile-layout', mobile);
     if (mobile) {
-      // окна не максимизируем — они остаются ресайзабельными; только подгоняем
-      // вылезшие за экран (сохранённую раскладку не трогаем).
+      // windows are not maximized — they stay resizable; only fit
+      // those sticking out of the screen (saved layout untouched).
       windows().forEach(win => {
         if (win.classList.contains('maximized')) return;
         const d = desktop();
@@ -533,19 +533,19 @@ window.WinEngine = (function () {
   }
 
   // ---------- touch drag / long-press rose ----------
-  // Быстрое движение по заголовку перетаскивает окно. Долгий тап (~450мс) по
-  // заголовку открывает РОЗУ РЕСАЙЗА: полупрозрачный круг 300x300 по центру
-  // экрана. Крест делит её на 4 зоны (стороны окна). Тяга из любой точки зоны
-  // двигает соответствующий край окна 1:1. Роза остаётся после отпускания
-  // пальца — можно тянуть несколько раз. Закрытие — тап за пределами розы.
-  const TOUCH_LONG_MS = 450; // задержка долгого тапа
-  const TOUCH_SLOP = 8;      // порог движения до активации, px
-  const ROSE_SIZE = 300;     // диаметр розы, px
+  // A quick move over the header drags the window. A long tap (~450ms) on the
+  // header opens the RESIZE ROSE: a translucent 300x300 circle in the center of
+  // the screen. The cross divides it into 4 zones (window sides). Pulling from any point of a zone
+  // moves the corresponding window edge 1:1. The rose stays after releasing
+  // the finger — it can be pulled several times. Close — tap outside the rose.
+  const TOUCH_LONG_MS = 450; // long-tap delay
+  const TOUCH_SLOP = 8;      // movement threshold before activation, px
+  const ROSE_SIZE = 300;     // rose diameter, px
 
-  // Одна роза на всех: открытая роза и окно, которое её вызвало.
+  // One rose for all: the open rose and the window that summoned it.
   let roseEl = null, roseWin = null, roseCloser = null;
 
-  // край окна по точке касания внутри розы (px,py — CSS-px от центра розы)
+  // window edge from the touch point inside the rose (px,py — CSS-px from the rose center)
   function roseEdge(px, py) {
     if (Math.abs(px) >= Math.abs(py)) return px >= 0 ? 'e' : 'w';
     return py >= 0 ? 's' : 'n';
@@ -561,7 +561,7 @@ window.WinEngine = (function () {
     let longTimer = null;
     let dragMode = false;
     let dragSX = 0, dragSY = 0, dragBX = 0, dragBY = 0;
-    let grab = null; // активный жест на розе {edge, sx, sy, bx, by, bW, bH}
+    let grab = null; // active rose gesture {edge, sx, sy, bx, by, bW, bH}
 
     const closeRose = (silent) => {
       if (!roseEl || roseWin !== win) return;
@@ -600,7 +600,7 @@ window.WinEngine = (function () {
     };
 
     const openRose = () => {
-      if (roseCloser) roseCloser(true); // тихо снести чужую розу
+      if (roseCloser) roseCloser(true); // silently dismiss someone else's rose
       const z = getZoom();
       const el = document.createElement('div');
       el.className = 'rose';
@@ -614,14 +614,14 @@ window.WinEngine = (function () {
       win.style.zIndex = ++winZ;
       win.classList.add('resize-mode');
       el.addEventListener('pointerdown', roseDown);
-      el.addEventListener('contextmenu', (e) => { e.preventDefault() }); // давим меню long-press на таче
+      el.addEventListener('contextmenu', (e) => { e.preventDefault() }); // suppress the long-press menu on touch
       document.addEventListener('pointerdown', roseOutsideDown, true);
     };
     const roseDown = (e) => {
       if (!roseEl || roseWin !== win) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       e.stopPropagation();
-      e.preventDefault(); // давим нативное long-press меню на таче
+      e.preventDefault(); // suppress the native long-press menu on touch
       const z = getZoom();
       const rr = roseEl.getBoundingClientRect();
       const px = (e.clientX - (rr.left + rr.width / 2)) / z;
@@ -646,7 +646,7 @@ window.WinEngine = (function () {
       document.removeEventListener('pointerup', roseUp);
       document.removeEventListener('pointercancel', roseUp);
       if (grab) { grab = null; saveLayout(); emitLayout(); }
-      // роза остаётся открытой — закрытие тапом вне её
+      // the rose stays open — close it by tapping outside it
     };
 
     head.addEventListener('pointerdown', (e) => {
@@ -694,11 +694,11 @@ window.WinEngine = (function () {
       if (longTimer) { clearTimeout(longTimer); longTimer = null }
       dragMode = false;
     });
-    head.addEventListener('contextmenu', (e) => { e.preventDefault() }); // давим меню long-press на таче
+    head.addEventListener('contextmenu', (e) => { e.preventDefault() }); // suppress the long-press menu on touch
   }
 
   // ---------- desktop shortcuts ----------
-  // tl(key, fallback, vars) — строка из словаря каркаса 'desktop'; если ключа нет — fallback.
+  // tl(key, fallback, vars) — string from the 'desktop' shell dictionary; if the key is missing — fallback.
   function tl(key, fb, vars) {
     if (window.L) {
       const v = L.t('desktop', key, vars);
@@ -706,8 +706,8 @@ window.WinEngine = (function () {
     }
     return fb;
   }
-// wt(def, key, fb) — перевод имени виджета из ЕГО словаря (L.dicts[def.id].ui.title/.ui.label);
-// нет словаря/ключа — fallback на русское имя из def. Удалил виджет — удалил и перевод.
+// wt(def, key, fb) — widget name translation from ITS dictionary (L.dicts[def.id].ui.title/.ui.label);
+// no dictionary/key — fallback to the Russian name from def. Removed the widget — removed its translation too.
   function wt(def, key, fb) {
     if (!window.L) return fb;
     const d = L.dicts[def.id] || {};
@@ -757,8 +757,8 @@ window.WinEngine = (function () {
     let deleted = [];
     try { deleted = JSON.parse(localStorage.getItem('deletedShortcuts') || '[]') } catch {}
     const deletedSet = new Set(deleted);
-    // колонки/строки считаем по доступной площади рабочего стола, чтобы ярлыки
-    // не уходили за экран (особенно на мобильном)
+    // we compute columns/rows from the available desktop area so shortcuts
+    // do not run off-screen (especially on mobile)
     const d = desktop();
     const cols = Math.max(1, Math.floor((d.clientWidth - 8) / SC_STEP));
     shortcutWidgets().forEach((s, i) => {
@@ -788,12 +788,12 @@ window.WinEngine = (function () {
 
   function initShortcutDrag() {
     shortcutEls().forEach(el => {
-      // Глушим нативный HTML5-drag картинок/текста: иначе браузер тащит
-      // «призрак» глифа, а pointermove ярлыку не приходит.
+      // Suppress the native HTML5 drag of images/text: otherwise the browser drags
+      // the glyph "ghost" and the shortcut never gets pointermove.
       el.addEventListener('dragstart', (e) => e.preventDefault());
       let dragging = false, moved = false, sx = 0, sy = 0, bx = 0, by = 0;
       let lpTimer = null, lpFired = false;
-      let dragGroup = null;   // набор перетаскиваемых ярлыков (включая захваченный)
+      let dragGroup = null;   // set of dragged shortcuts (including the grabbed one)
       const isTouch = (e) => e.pointerType === 'touch' || e.pointerType === 'pen';
       const clearLp = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null } };
       el.addEventListener('pointerdown', (e) => {
@@ -802,7 +802,7 @@ window.WinEngine = (function () {
         dragging = true; moved = false; lpFired = false;
         sx = e.clientX; sy = e.clientY;
         bx = parseFloat(el.style.left); by = parseFloat(el.style.top);
-        // Если захваченный ярлык выделен — двигаем всю группу выделенных.
+        // If the grabbed shortcut is selected — move the whole selected group.
         dragGroup = new Map();
         if (selectedShortcuts.has(el.dataset.shortcut)) {
           shortcutEls().forEach(s => {
@@ -1164,13 +1164,13 @@ window.WinEngine = (function () {
     });
     if (entries.length === 0) return;
 
-    // сначала рендерим отдельные кнопки и проверяем, помещаются ли
+    // first render separate buttons and check whether they fit
     const buttons = entries.map(({ win, def }) => makeWinBtn(win, def, topWin));
     buttons.forEach(b => host.appendChild(b));
     const overflows = host.scrollWidth > host.clientWidth + 1;
     if (!overflows) return;
 
-    // не помещаются — сворачиваем в одну групповую кнопку с выпадашкой
+    // they do not fit — collapse into a single group button with a dropdown
     buttons.forEach(b => b.remove());
     const group = document.createElement('div');
     group.className = 'tb-win-group';
@@ -1208,7 +1208,7 @@ window.WinEngine = (function () {
     host.appendChild(group);
   }
 
-  // applyLang() — перерисовка каркаса интерфейса при смене языка.
+  // applyLang() — repaint of the shell UI on language change.
   function applyLang() {
     windows().forEach(win => {
       const def = registry.get(win.dataset.wid);

@@ -9,3 +9,6 @@ scenes.json
 groups.json
 location.json
 workspace.xml
+# бэкапы и временные копии — никогда в репо
+*.bak
+*.tmp

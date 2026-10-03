@@ -1,4 +1,4 @@
-// templateedit.js — редактор устройства (порт static/apps/templateEdit.app).
+// templateedit.js — device editor (port of static/apps/templateEdit.app).
 var te_node=null;
 var te_bodyEl=null;
 function teCloseWindow(){ if(window.WinEngine&&te_node){ try{WinEngine.close(te_node);}catch(e){} } }
@@ -20,7 +20,7 @@ te_filePath='';
 te_docChanged=false;
 te_exiting=false;
 
-// Глобальные переменные для перетаскивания
+// Globals for drag-and-drop
 te_dragItem = null;
 te_dragStartIndex = 0;
 te_dragStartY = 0;
@@ -80,11 +80,11 @@ te_parseFile=function(file)
 	if (window.te_retryHdl && window.eventE) { eventE.off("updateDeviceList", window.te_retryHdl); window.te_retryHdl = null; }
 	te_file={ ...src };
 
-	// JoinSetup живёт в файле, в deviceList его нет — нормализуем и догружаем полным LoadJson
+	// JoinSetup lives in the file, deviceList lacks it — normalize and fetch the full LoadJson
 	te_normJoinSetup(te_file);
 	te_fetchJoinSetup(file);
 
-	// Приводим все объекты Report к новому формату сразу после загрузки
+	// Migrate all Report objects to the new format right after loading
 	te_migrateRoleFormat(te_file);
 
 	console.log(te_file)
@@ -103,7 +103,7 @@ te_parseFile=function(file)
 	const arrc = Array.from(arr);
 	//debugger
 
-	// ИСПРАВЛЕНИЕ: используем глобальный объект clasters вместо запроса к серверу
+	// FIX: use the global clasters object instead of a server request
 	te_ClassterAttr = {};
 	for (const clusterId of arrc) {
 		let cl=parseInt(clusterId, 16)
@@ -177,7 +177,7 @@ WSsend(`writeAtribute|${attrR}`)
 }
 te_setObjAttr=function(ep,id,atr) {
 	te_newObj.innerText=`${ep}${id}${atr}`
-	// className не затираем (там стилевой класс obj-mnu-prev) — ключ кладём в title, превью в текст
+	// do not overwrite className (it holds the obj-mnu-prev style class) — put the key into title, the preview into text
 	const pv=document.getElementById("te_prevDR");
 	if (pv) { pv.innerText=`${ep}|${id}|${atr}`; pv.title=`${te_file.IEEE}#${ep}${id}${atr}`; }
 	try {
@@ -255,14 +255,14 @@ te_drawJsonEp = function() {
 
 /*
   <div class="icon-menu-bar">
-    <button class="icon-btn" title="Обновить" onclick="te_mkReport()">🔄</button>
+    <button class="icon-btn" title="Refresh" onclick="te_mkReport()">🔄</button>
   </div>
 
-        <button class="icon-btn" title="Настройки">⚙️</button>
-        <button class="icon-btn" title="Графики">📊</button>
-        <button class="icon-btn" title="Журнал">📝</button>
-        <button class="icon-btn" title="Экспорт">⏬</button>
-        <button class="icon-btn" title="Назад">❓</button>
+        <button class="icon-btn" title="Settings">⚙️</button>
+        <button class="icon-btn" title="Charts">📊</button>
+        <button class="icon-btn" title="Log">📝</button>
+        <button class="icon-btn" title="Export">⏬</button>
+        <button class="icon-btn" title="Back">❓</button>
 
 */	
 	
@@ -324,7 +324,7 @@ te_drawJson = function(js, obj) {
     deviceDiv.id = "Device_objects";
     const btnAdd = (!obj) ? "<tr><td><button onclick='te_drawJsonEp()'> + object</button></td><td></td><td></td></tr>" : "";
     
-    // Создаем таблицу с deviceDiv
+    // Build the table with deviceDiv
     deviceDiv.innerHTML = `
         <table>
             <tr><td>Type:</td><td colspan="2" id="te_typePickerCell"></td></tr>
@@ -498,7 +498,7 @@ te_drawJson = function(js, obj) {
         `;
         container.appendChild(objectTable);
     } else {
-        // Создаем контейнер для перетаскиваемых элементов
+        // Create the container for draggable items
         const dragContainer = document.createElement("div");
         dragContainer.id = "te_dragContainer";
         dragContainer.style.position = "relative";
@@ -518,8 +518,8 @@ te_drawJson = function(js, obj) {
             dragContainer.appendChild(object);
         }
         container.appendChild(dragContainer);
-        // Секция JoinSetup («Настройка подключения») — под списком объектов.
-        // innerHTML ставим здесь же (контейнер ещё не в DOM), refresh — после вставки ниже.
+        // JoinSetup section ("Connection setup") — below the object list.
+        // innerHTML is set right here (container not in DOM yet), refresh — after insertion below.
         try {
             const jsBlock = document.createElement("div");
             jsBlock.id = "te_JoinSetup";
@@ -528,31 +528,31 @@ te_drawJson = function(js, obj) {
         } catch(e) { console.warn("te JoinSetup render", e); }
     }
     
-    // Очищаем и заполняем DeviceJson
+    // Clear and fill DeviceJson
     const deviceJson = document.getElementById("te_DeviceJson");
     deviceJson.innerHTML = '';
     deviceJson.appendChild(container);
     try { te_refreshJoinSetup(); } catch(e) {}
 
-    // ========== ИСПРАВЛЕНИЕ: СОЗДАЕМ ПИКЕР ПОСЛЕ ДОБАВЛЕНИЯ В DOM ==========
-    // Небольшая задержка для гарантии, что DOM обновился
+    // ========== FIX: CREATE THE PICKER AFTER ADDING TO DOM ==========
+    // Small delay to guarantee the DOM has updated
     setTimeout(function() {
         const typePickerCell = document.getElementById('te_typePickerCell');
         
         if (typePickerCell) {
             console.log('typePickerCell найден, создаем пикер');
             
-            // Очищаем ячейку
+            // Clear the cell
             typePickerCell.innerHTML = '';
             
             if (window.DeviceTypePicker) {
                 try {
-                    // Уничтожаем старый пикер если есть
+                    // Destroy the old picker if any
                     if (window.te_typePicker) {
                         try { window.te_typePicker.destroy(); } catch(e) {}
                     }
                     
-                    // Создаем новый пикер
+                    // Create a new picker
                     window.te_typePicker = new DeviceTypePicker({
                         value: js.type || '',
                         onChange: function(val) {
@@ -560,7 +560,7 @@ te_drawJson = function(js, obj) {
                         }
                     });
                     
-                    // Добавляем в DOM
+                    // Add to DOM
                     if (window.te_typePicker && window.te_typePicker.el) {
                         typePickerCell.appendChild(window.te_typePicker.el);
                         console.log('Пикер успешно добавлен');
@@ -579,13 +579,13 @@ te_drawJson = function(js, obj) {
         } else {
             console.error('typePickerCell не найден в DOM');
         }
-    }, 50); // Небольшая задержка для гарантии
+    }, 50); // Small delay to guarantee
 }
-// Функции для обработки перетаскивания
+// Drag handling functions
 te_startDrag = function(e) {
-    // Не вызываем preventDefault здесь — иначе click не сработает никогда
+    // Do not call preventDefault here — otherwise click will never fire
     te_dragItem = this;
-    te_isDragging = false; // Пока не началось реальное движение — не драг
+    te_isDragging = false; // No real movement yet — not a drag
 
     te_dragStartY = e.clientY || (e.touches && e.touches[0].clientY);
     te_dragStartX = e.clientX || (e.touches && e.touches[0].clientX);
@@ -605,13 +605,13 @@ te_onDrag = function(e) {
     const x = e.clientX || (e.touches && e.touches[0].clientX);
     if (!y) return;
 
-    // Активируем drag только после реального движения (порог 5px)
+    // Activate drag only after real movement (5px threshold)
     if (!te_isDragging) {
         const dy = Math.abs(y - te_dragStartY);
         const dx = Math.abs(x - te_dragStartX);
         if (dy < 5 && dx < 5) return;
 
-        // Теперь реально начинаем drag
+        // Now actually start the drag
         te_isDragging = true;
 
         te_placeholder = document.createElement("div");
@@ -635,10 +635,10 @@ te_onDrag = function(e) {
 
     e.preventDefault();
 
-    // Перемещаем элемент
+    // Move the element
     te_dragItem.style.top = (y - te_dragOffsetY) + 'px';
     
-    // Определяем новый индекс для элемента
+    // Determine the new index for the element
     const items = Array.from(te_dragContainer.children);
     const dragRect = te_dragItem.getBoundingClientRect();
     const dragCenterY = dragRect.top + dragRect.height / 2;
@@ -657,12 +657,12 @@ te_onDrag = function(e) {
         }
     }
     
-    // Если элемент переместили в конец
+    // If the element was moved to the end
     if (newIndex === -1) {
         newIndex = items.length;
     }
     
-    // Перемещаем плейсхолдер в новую позицию
+    // Move the placeholder to the new position
     const currentIndex = Array.from(te_dragContainer.children).indexOf(te_placeholder);
     if (newIndex !== currentIndex) {
         if (newIndex === te_dragContainer.children.length) {
@@ -679,27 +679,27 @@ te_onDrag = function(e) {
 te_stopDrag = function(e) {
     if (!te_dragItem) return;
 
-    // Убираем обработчики в любом случае
+    // Remove handlers in any case
     document.removeEventListener('mousemove', te_onDrag);
     document.removeEventListener('touchmove', te_onDrag);
     document.removeEventListener('mouseup', te_stopDrag);
     document.removeEventListener('touchend', te_stopDrag);
 
     if (!te_isDragging) {
-        // Движения не было — это был обычный клик, не мешаем
+        // No movement — it was a plain click, do not interfere
         te_dragItem = null;
         return;
     }
 
-    // Был реальный drag — завершаем его
+    // It was a real drag — finish it
     te_isDragging = false;
 
-    // Возвращаем элемент на место плейсхолдера
+    // Return the element to the placeholder's place
     te_placeholder.parentNode.insertBefore(te_dragItem, te_placeholder);
     te_placeholder.parentNode.removeChild(te_placeholder);
     te_placeholder = null;
 
-    // Восстанавливаем стили
+    // Restore styles
     te_dragItem.style.position = '';
     te_dragItem.style.top = '';
     te_dragItem.style.left = '';
@@ -709,7 +709,7 @@ te_stopDrag = function(e) {
     te_dragItem.style.cursor = '';
     te_dragItem.style.width = '';
 
-    // Обновляем порядок в данных
+    // Update the order in data
     te_updateReportOrder();
 
     te_dragItem = null;
@@ -717,10 +717,10 @@ te_stopDrag = function(e) {
 };
 
 te_updateReportOrder = function() {
-    // Получаем новый порядок элементов
+    // Get the new element order
     const newOrder = Array.from(te_dragContainer.children).map(item => item.id);
     
-    // Создаем новый объект Report с обновленным порядком
+    // Create a new Report object with the updated order
     const newReport = {};
     for (const key of newOrder) {
         if (te_file.Report[key]) {
@@ -728,8 +728,12 @@ te_updateReportOrder = function() {
         }
     }
     
-    // Обновляем файл
+    // Update the file
     te_file.Report = newReport;
+    // Order lives separately in ReportOrder (the Go map does not store it):
+    // without this Tpl will save keys in the new order but the array — in the old one,
+    // and rejoin after force will return sorting instead of the editor order.
+    te_file.ReportOrder = newOrder.filter(function(k){ return !!newReport[k]; });
     te_docChanged = true;
 	var widget=getWidget(te_file)
 	document.getElementById("te_DeviceWidget" ).innerHTML=widget
@@ -741,7 +745,7 @@ te_updateReportOrder = function() {
 };
 
 te_liveTmr = null;
-// ponytail: один синк вместо копипасты в каждом редакторе; десктоп-пуш с дебаунсом чтобы oninput не дёргал грид на каждую букву
+// ponytail: one sync instead of copy-paste in every editor; desktop push with debounce so oninput does not yank the grid on every letter
 te_syncLive = function(immediate) {
     try {
         var w = document.getElementById("te_DeviceWidget");
@@ -765,25 +769,25 @@ te_syncLive = function(immediate) {
 
 te_devObjEd=function(id,value){
 	console.log(id,value)
-	// id формата "<obj>_te_<key>", obj сам может содержать "_" (s_illuminance):
-	// key — последний кусок, перед ним "te", остальное — obj.
+	// id format "<obj>_te_<key>", obj itself may contain "_" (s_illuminance):
+	// key — the last chunk, "te" before it, the rest — obj.
 	let parts=id.split("_");
 	let key=parts.pop();
 	parts.pop();
 	let obj=parts.join("_");
-	// ya_rep и cfg_report хранятся как объекты — парсим если пришла JSON-строка
+	// ya_rep and cfg_report are stored as objects — parse if a JSON string came in
 	if((key==='ya_rep'||key==='cfg_report') && typeof value==='string'
 	   && value!=='none' && value!==''){
 		try{ value=JSON.parse(value); }catch(e){}
 	}
-	// Числовые поля — конвертируем в int
+	// Numeric fields — convert to int
 	if(key==='polling'||key==='debounce'){
 		value=parseInt(value)||0;
 	}
 	if(key==='retain'){
 		value=String(parseInt(value))||"0";
 	}
-	// location пустое — удаляем чтобы наследовать от устройства
+	// empty location — delete to inherit from the device
 	if(key==='location'){
 		if(!value || value.trim()===''){
 			delete te_file.Report[obj][key];
@@ -792,7 +796,7 @@ te_devObjEd=function(id,value){
 		}
 		value = value.trim();
 	}
-	// DataType объекта — чистим до hex ("21: UINT16" → "21")
+	// Object DataType — clean down to hex ("21: UINT16" → "21")
 	if(key==='dataType'){
 		value=String(value).split(":")[0].trim().toUpperCase();
 	}
@@ -815,7 +819,7 @@ te_objEd=function(obj,value){
 
 
 
-// Функция для установки класса на основе выбранной роли
+// Function for setting the class based on the selected role
 te_setClassOptions = function(role) {
 		const roleInput = document.getElementById("te_role");
 		const classInput = document.getElementById("te_class");
@@ -876,15 +880,15 @@ te_cbSaveAs=function(file)
 	te_docChanged=true;
 	te_cmSave_click();
 }
-// Приводит все объекты Report к новому формату:
-// - role: только базовая строка (без &json), class — отдельный объект
-// - cfg_report: объект, не строка
+// Brings all Report objects to the new format:
+// - role: only the base string (no &json), class — a separate object
+// - cfg_report: object, not string
 function te_migrateRoleFormat(file) {
 	if (!file || !file.Report) return;
 	for (const key of Object.keys(file.Report)) {
 		const ro = file.Report[key];
 		if (!ro) continue;
-		// role: убираем &json
+		// role: strip &json
 		if (typeof ro.role === 'string') {
 			const ampIdx = ro.role.indexOf('&');
 			if (ampIdx !== -1) {
@@ -896,11 +900,11 @@ function te_migrateRoleFormat(file) {
 			}
 			if (!ro.class) ro.class = {};
 		}
-		// cfg_report: строку → объект
+		// cfg_report: string → object
 		if (typeof ro.cfg_report === 'string' && ro.cfg_report !== '') {
 			try { ro.cfg_report = JSON.parse(ro.cfg_report); } catch {}
 		}
-		// Числовые поля — добавляем если нет, конвертируем строки в int
+		// Numeric fields — add if missing, convert strings to int
 		if (ro.polling === undefined || ro.polling === null) ro.polling = 0;
 		else ro.polling = parseInt(ro.polling) || 0;
 
@@ -920,13 +924,16 @@ te_cmSave_click=function()
 
 	te_migrateRoleFormat(te_file);
 	te_normJoinSetup(te_file);
+	// Pin the object order as data: the Go map does not store it,
+	// the backend writes Report in this array's order (MarshalJSON).
+	if (te_file.Report) te_file.ReportOrder = Object.keys(te_file.Report);
 	//SaveJson(`/Devices/${te_fileName}`, JSON.stringify(te_file))
 	WSsend(`SaveJson|/Devices/${te_fileName}|` + JSON.stringify(te_file));
 	te_markSave(1);	
 	let ind=deviceList.findIndex(d => d.IEEE === te_file.IEEE)
 	if(ind>=0){deviceList[ind]=te_strippedLive(te_file)}
-	// Живое обновление десктопа: плитки подтянутся по alldev-бродкасту с бэка,
-	// открытый попап устройства перерисовываем сразу
+	// Live desktop update: tiles will catch up via the alldev broadcast from the backend,
+	// repaint the open device popup immediately
 	try{ if(typeof redrawDevice==="function") redrawDevice(te_file.IEEE); }catch(e){}
 	try{ if(window.eventE) eventE.emit("updateDeviceList", deviceList); }catch(e){}
 	try{
@@ -953,6 +960,9 @@ te_cmSaveTmpl_click=async function()
 	if(!confirmed) return;
 const templateData = JSON.parse(JSON.stringify(te_file));
 te_migrateRoleFormat(templateData);
+// Object order — as data: without the current array a rejoin after
+// force will return sorted keys, not the editor order.
+if (templateData.Report) templateData.ReportOrder = Object.keys(templateData.Report);
 templateData.IEEE = "";
 templateData.Device = "";
 templateData.Location = "Дом";
@@ -971,11 +981,11 @@ te_docChange=function()
 		teSetTitle(['*'+te_fileName+" ("+te_filePath.substring(0,te_filePath.length-1)+") - Text editor"]);
 }
 te_wMain_destroy = function() {
-    // Очищаем все таймеры
+    // Clear all timers
     const timers = te_timers || [];
     timers.forEach(timer => clearTimeout(timer));
     
-    // Удаляем обработчики событий
+    // Remove event handlers
     const cleanUpElement = (id, event, handler) => {
         const el = document.getElementById(id);
         if (el) el.removeEventListener(event, handler);
@@ -984,7 +994,7 @@ te_wMain_destroy = function() {
     cleanUpElement("te_DeviceWidget", "click", te_DeviceWidgetHandler);
     cleanUpElement("te_DeviceWidget", "touchend", te_DeviceWidgetHandler);
     
-    // Очищаем контейнеры
+    // Clear containers
     const cleanContainer = (id) => {
         const container = document.getElementById(id);
         if (container) container.innerHTML = '';
@@ -993,16 +1003,16 @@ te_wMain_destroy = function() {
     cleanContainer("te_DeviceJson");
     cleanContainer("te_DeviceWidget");
     
-    // Закрываем дочерние окна
+    // Close child windows
     [te_wConfirmExit, te_wAbout].forEach(w => {
         if (w && typeof w.destroy === 'function') w.destroy();
     });
     
-    // Очищаем глобальные переменные
+    // Clear globals
     const vars = ['file', 'fileName', 'filePath', 'docChanged', 'ClassterAttr', 'tmpFile'];
     vars.forEach(function(v){ try{ window["te_"+v]=null; }catch(e){} });
     
-    // Выгружаем приложение
+    // Unload the app
     ;
     return true;
 };	
@@ -1055,7 +1065,7 @@ te_wMain_about=function()
 	te_cmAbout_click();
 }
 
-    // Маппинг кластеров на их роли и метки
+    // Cluster → role/label mapping
     const te_clusterMappings = {
         '0000': { label: 'Basic', role: 'system' },
         '0003': { label: 'Identify', role: 'system' },
@@ -1075,13 +1085,13 @@ te_wMain_about=function()
         'E001': { label: 'Custom2', role: 'sensor' }
     };
 
-    // ZCL-атрибуты ламп (гл.3 General: 0006/0008; гл.5 Lighting: 0300/0301)
-    // → каноничные лейблы. Ключ: "CCCCAAAA" (кластер+атрибут).
-    // Канон виджетов (widgets.js getWidget + socket.js): On_Off / Level / Color / Color_Control
-    // (ColorT — legacy-синоним, виджеты его понимают). Переименования управляющих
-    // лейблов нет — иначе отвалятся виджеты. Служебным атрибутам сразу даём role sensor
-    // (данные, не управление): текстовый сенсор вместо невидимки в ветке light.
-    // Используется в te_Add_obj: перекрывает кластерный лейбл/роль из te_clusterMappings.
+    // ZCL lamp attributes (ch.3 General: 0006/0008; ch.5 Lighting: 0300/0301)
+    // → canonical labels. Key: "CCCCAAAA" (cluster+attribute).
+    // Widget canon (widgets.js getWidget + socket.js): On_Off / Level / Color / Color_Control
+    // (ColorT — legacy synonym, widgets understand it). No renames of control
+    // labels — otherwise widgets break. Service attributes immediately get role sensor
+    // (data, not control): a text sensor instead of an invisible in the light branch.
+    // Used in te_Add_obj: overrides the cluster label/role from te_clusterMappings.
     const te_lampAttrLabels = {
         '00060000': { label: 'On_Off' },
         '00080000': { label: 'Level', role: 'light_level' },
@@ -1103,27 +1113,27 @@ function generateReportsFromEP(epData) {
     
 
 
-    // Маппинг типов данных для конфигурации репортинга
+    // Data type mapping for reporting configuration
     const dataTypeMappings = {
         'switch': '10',    // Boolean
         'light_onoff': '10',      // Boolean (On_Off)
         'light_level': '20',      // 8-bit unsigned (Level)
         'light_color': '20',      // 8-bit unsigned (Color)
         'light_color_temp': '21', // 16-bit unsigned (mireds)
-        'color': '19',     // Структура для Color
+        'color': '19',     // Structure for Color
         'temperature': '29', // 16-bit signed
         'humidity': '21',  // 16-bit unsigned
-        'default': '20'    // По умолчанию
+        'default': '20'    // Default
     };
 
-    // Перебираем все EndPoints
+    // Iterate all EndPoints
     for (const [endpoint, epConfig] of Object.entries(epData.EP)) {
-        // Перебираем все входные кластеры (ClI)
+        // Iterate all input clusters (ClI)
         for (const cluster of epConfig.ClI) {
             const mapping = te_clusterMappings[cluster] || { label: `Cluster_${cluster}`, role: 'sensor' };
             const reportKey = `${endpoint}${cluster}0000`;
             
-            // Определяем тип данных для cfg_report
+            // Determine the data type for cfg_report
             let dataType = dataTypeMappings[mapping.role] || dataTypeMappings['default'];
             if (cluster === '0300') dataType = dataTypeMappings['color'];
             if (cluster === '0402') dataType = dataTypeMappings['temperature'];
@@ -1160,7 +1170,7 @@ if (te_file.Report[id]) {alert("Уже существует");return}//objEnbl
     const cluster=id.substring(2, 6);
 	const attr=id.substring(6, 10);
 	const mapping = te_clusterMappings[cluster] || { label: `Cluster_${cluster}`, role: 'sensor' };
-	// ZCL-лейбл/роль атрибута лампы (te_lampAttrLabels) важнее кластерных
+	// The lamp attribute ZCL label/role (te_lampAttrLabels) wins over cluster ones
 	const lampAttr = (typeof te_lampAttrLabels !== 'undefined') ? te_lampAttrLabels[cluster + attr] : null;
 	const lampAttrLbl = lampAttr ? lampAttr.label : null;
 	const lampAttrRole = lampAttr ? lampAttr.role : null;
@@ -1170,20 +1180,20 @@ if (te_file.Report[id]) {alert("Уже существует");return}//objEnbl
         'light_level': '20',      // 8-bit unsigned (Level)
         'light_color': '20',      // 8-bit unsigned (Color)
         'light_color_temp': '21', // 16-bit unsigned (mireds)
-        'color': '19',     // Структура для Color
+        'color': '19',     // Structure for Color
         'temperature': '29', // 16-bit signed
         'humidity': '21',  // 16-bit unsigned
-        'default': '20'    // По умолчанию
+        'default': '20'    // Default
     };	
-            // Определяем тип данных для cfg_report
+            // Determine the data type for cfg_report
             let dataType = dataTypeMappings[mapping.role] || dataTypeMappings['default'];
             if (cluster === '0300') dataType = dataTypeMappings['color'];
             if (cluster === '0402') dataType = dataTypeMappings['temperature'];
             if (cluster === '0405') dataType = dataTypeMappings['humidity'];
 
-	// Реальный ZCL-тип атрибута из описателя кластеров (cl.js), hex-строка ("21").
-	// Кладём в объект, чтобы запись/виджеты брали тип отсюда, а не гадали.
-	// Не путать с cfg_report.DataType — тот для подписки репортинга.
+	// Real ZCL attribute type from the cluster descriptor (cl.js), hex string ("21").
+	// Stored on the object so writes/widgets take the type from here instead of guessing.
+	// Do not confuse with cfg_report.DataType — that one is for the reporting subscription.
 	let attrDataType = "";
 	try {
 		const clEntry = (typeof clusters !== "undefined" && clusters) ? clusters[parseInt(cluster, 16)] : null;
@@ -1239,12 +1249,12 @@ rows.forEach(row => {
 
 
 // ============================================================
-// SNIFF / LISTEN — сбор неизвестных репортов
+// SNIFF / LISTEN — collecting unknown reports
 // ============================================================
 
-te_sniffActive  = false;   // флаг активности
-te_sniffBuf     = {};      // { objKey: [rep, rep, ...] } max 8 на ключ
-te_sniffHandler = null;    // ссылка на обработчик eventE
+te_sniffActive  = false;   // activity flag
+te_sniffBuf     = {};      // { objKey: [rep, rep, ...] } max 8 per key
+te_sniffHandler = null;    // eventE handler reference
 
 te_toggleSniff = function() {
     if (te_sniffActive) {
@@ -1258,7 +1268,7 @@ te_startSniff = function() {
     te_sniffActive = true;
     te_sniffBuf    = {};
 
-    // Меняем кнопку
+    // Change the button
     var btn = document.getElementById('te_sniffBtn');
     if (btn) {
         btn.textContent  = '⏹ Stop';
@@ -1267,26 +1277,26 @@ te_startSniff = function() {
         btn.style.color      = '#fff';
     }
 
-    // Показываем панель
+    // Show the panel
     var panel = document.getElementById('te_sniffPanel');
     if (panel) panel.style.display = 'block';
 
-    // Подписываемся на все репорты через eventE
+    // Subscribe to all reports via eventE
     te_sniffHandler = function(args) {
         var rep  = args[0];
         var ieee = args[1];
 
-        // Только наше устройство
+        // Only our device
         if (ieee !== te_file.IEEE) return;
 
-        // Ключ объекта
+        // Object key
         var objKey = rep.Obj || (rep.EndPoint + rep.ClusterId + rep.AttribId);
         if (!objKey || objKey === 'undefinedundefinedundefined') return;
 
-        // Пропускаем уже прописанные объекты
+        // Skip already defined objects
         if (te_file.Report && te_file.Report[objKey]) return;
 
-        // Накапливаем, не более 8 на объект
+        // Accumulate, no more than 8 per object
         if (!te_sniffBuf[objKey]) te_sniffBuf[objKey] = [];
         var buf = te_sniffBuf[objKey];
         buf.push({
@@ -1313,7 +1323,7 @@ te_stopSniff = function() {
         te_sniffHandler = null;
     }
 
-    // Возвращаем кнопку
+    // Restore the button
     var btn = document.getElementById('te_sniffBtn');
     if (btn) {
         btn.textContent  = '🎧 Sniff';
@@ -1328,7 +1338,7 @@ te_clearSniff = function() {
     te_renderSniffList();
 };
 
-// Текущий выделенный объект в sniff-панели
+// Currently selected object in the sniff panel
 te_sniffSelected = null;
 
 te_renderSniffList = function() {
@@ -1379,19 +1389,19 @@ te_renderSniffList = function() {
     list.innerHTML = html;
 };
 
-// Клик по объекту — выделяем и вставляем в поле newObj
+// Click on an object — select it and insert into the newObj field
 te_sniffSelect = function(objKey) {
     te_sniffSelected = objKey;
 
-    // Вставляем в поле ввода объекта если оно есть
+    // Insert into the object input if present
     var newObj = document.getElementById('te_newObj');
     if (newObj) newObj.innerText = objKey;
 
-    // Обновляем визуальное выделение без перерисовки всего списка
+    // Update the visual selection without repainting the whole list
     var items = document.querySelectorAll('#te_sniffList .sniff-item');
     items.forEach(function(el) { el.classList.remove('sniff-item-selected'); });
     var all = document.querySelectorAll('#te_sniffList .sniff-item');
-    // Находим нужный по содержимому onclick
+    // Find the right one by onclick contents
     all.forEach(function(el) {
         if (el.getAttribute('onclick') && el.getAttribute('onclick').indexOf(objKey) !== -1) {
             el.classList.add('sniff-item-selected');
@@ -1399,7 +1409,7 @@ te_sniffSelect = function(objKey) {
     });
 };
 
-// Добавить конкретный объект — вызывается кнопкой + у каждого объекта
+// Add a specific object — called by the + button on each object
 te_sniffAddObj = function(objKey) {
     if (te_file.Report && te_file.Report[objKey]) {
         new Toast({ title: 'Sniff', text: objKey + ' уже существует', theme: 'light', autohide: true, interval: 2000 });
@@ -1434,14 +1444,14 @@ te_sniffAddObj = function(objKey) {
         ya_rep: 'none'
     };
 
-    // Объект добавлен — убираем из буфера, он больше не "неизвестный"
+    // Object added — remove from the buffer, it is no longer "unknown"
     delete te_sniffBuf[objKey];
     if (te_sniffSelected === objKey) te_sniffSelected = null;
 
-    // Обновляем виджет + десктоп — панель sniff НЕ трогаем
+    // Refresh the widget + desktop — leave the sniff panel alone
     te_syncLive(true);
 
-    // Если правая панель показывает список объектов — обновляем её тоже
+    // If the right panel shows the object list — refresh it too
     if (document.getElementById('obj_mnu')) {
         te_drawJsonEp();
     }
@@ -1450,7 +1460,7 @@ te_sniffAddObj = function(objKey) {
     new Toast({ title: 'Sniff', text: '+ ' + objKey, theme: 'light', autohide: true, interval: 2000 });
 };
 
-// Добавить все перехваченные объекты сразу
+// Add all intercepted objects at once
 te_sniffAddAll = function() {
     var keys = Object.keys(te_sniffBuf);
     if (keys.length === 0) return;
@@ -1458,7 +1468,7 @@ te_sniffAddAll = function() {
     new Toast({ title: 'Sniff', text: 'Добавлено: ' + keys.length + ' объектов', theme: 'light', autohide: true, interval: 3000 });
 };
 
-// Останавливаем sniff при закрытии редактора
+// Stop sniff when the editor closes
 var _origCloseApp = (typeof te_closeApp !== 'undefined') ? te_closeApp : function(){};
 te_closeApp = function() {
     te_stopSniff();
@@ -1466,24 +1476,24 @@ te_closeApp = function() {
 };
 
 // ============================================================
-// JOINSETUP — «Настройка подключения» (writes/binds/reports/groups)
-// Хранится в файле устройства/шаблона, в deviceList/broadcast не попадает.
+// JOINSETUP — "Connection setup" (writes/binds/reports/groups)
+// Stored in the device/template file, never lands in deviceList/broadcast.
 // ============================================================
 
-// Копия te_file без JoinSetup — для deviceList/десктопа (память чистая)
+// A te_file copy without JoinSetup — for deviceList/desktop (memory stays clean)
 te_strippedLive = function(src) {
     if (!src) return src;
     var c = Object.assign({}, src);
     try { delete c.JoinSetup; } catch(e) {}
-    // Флаг виджету: есть юниты — карточка подтянет проекцию из общего jsCache
+    // Widget flag: units exist — the card will pull the projection from the shared jsCache
     try {
         if (src.JoinSetup && src.JoinSetup.writes && src.JoinSetup.writes.length) c.hasSetup = true;
     } catch(e) {}
     return c;
 };
 
-// Кладём проекцию юнитов из te_file в общий jsCache — превью и плитки
-// рисуются мгновенно, без ожидания getJoinSetup и сейва
+// Push the unit projection from te_file into the shared jsCache — previews and tiles
+// render instantly, without waiting for getJoinSetup and save
 te_primeJsCache = function() {
     try {
         if (!window.te_file || !te_file.IEEE || !te_file.JoinSetup) return;
@@ -1495,7 +1505,7 @@ te_primeJsCache = function() {
     } catch(e) {}
 };
 
-// Нормализация к {writes:[],binds:[],reports:[],groups:[]} — правит по месту, возвращает ссылку
+// Normalization to {writes:[],binds:[],reports:[],groups:[]} — fixes in place, returns the reference
 te_normJoinSetup = function(dev) {
     if (!dev) return { writes: [], binds: [], reports: [], groups: [] };
     var js = dev.JoinSetup;
@@ -1503,7 +1513,7 @@ te_normJoinSetup = function(dev) {
     ['writes', 'binds', 'reports', 'groups'].forEach(function(k) {
         if (!Array.isArray(js[k])) js[k] = [];
     });
-    // Миграция: options-строки → [{v,l}], unit → unitname, unitname ← label
+    // Migration: options strings → [{v,l}], unit → unitname, unitname ← label
     js.writes.forEach(function(w) {
         if (Array.isArray(w.options)) {
             w.options = w.options.map(function(o) {
@@ -1514,7 +1524,7 @@ te_normJoinSetup = function(dev) {
         if (w.unit && !w.unitname) { w.unitname = w.unit; delete w.unit; }
         if (!w.unitname) w.unitname = w.label || w.id || '';
     });
-    // Чистка: в merged-группе (2+ select на юнит) вложенные options бессмысленны — записи сами варианты
+    // Cleanup: in a merged group (2+ selects per unit) nested options are meaningless — the entries are the variants
     var selCount = {};
     js.writes.forEach(function(w) {
         if ((w.kind || 'select') === 'select') {
@@ -1531,7 +1541,7 @@ te_normJoinSetup = function(dev) {
     return js;
 };
 
-// Догрузка полного файла с диска (в deviceList JoinSetup нет) — мерж только JoinSetup
+// Fetch the full file from disk (deviceList has no JoinSetup) — merge JoinSetup only
 te_fetchJoinSetup = function(ieee) {
     if (!ieee || !window.eventE || typeof WSsend !== 'function') return;
     try {
@@ -1539,7 +1549,7 @@ te_fetchJoinSetup = function(ieee) {
         eventE.once(key, function(data) {
             try {
                 if (!data || data === 'NULL') return;
-                if (!window.te_file || te_file.IEEE !== ieee) return; // окно уже закрыто/сменено
+                if (!window.te_file || te_file.IEEE !== ieee) return; // window already closed/switched
                 var full = JSON.parse(data);
                 if (full && full.JoinSetup) {
                     te_file.JoinSetup = te_normJoinSetup(full);
@@ -1568,11 +1578,11 @@ te_joinSetupHtml = function() {
     h += '<div class="te_edObj" id="te_jsHead"><div class="ep">⚙</div><div class="cl">JoinSetup</div><div>— Настройка подключения (применяется при подключении)</div></div>';
     h += '<div class="te_edAttr show" style="display:block">';
 
-    // --- WRITES: всё правится прямо на месте, без режимов правки ---
+    // --- WRITES: everything is edited in place, no edit modes ---
     h += '<div class="obj-mnu-section"><div class="obj-mnu-row"><label class="obj-mnu-label">Записи</label>'
         + '<span style="font-size:11px;color:var(--text-muted)">юниты: запись значения в EP+кластер+атрибут</span></div>';
     if (!js.writes.length) h += '<div style="font-size:11px;color:#bbb;padding:2px 6px">— пусто —</div>';
-    // Группировка по unitname; select-записи одного юнита = варианты одного селекта
+    // Grouping by unitname; select entries of one unit = variants of one select
     var dup = te_jsDupKeys(js);
     var groups = {}, order = [];
     js.writes.forEach(function(w, i) {
@@ -1647,7 +1657,7 @@ te_joinSetupHtml = function() {
     });
     h += '<div class="obj-mnu-row"><button class="obj-mnu-btn obj-mnu-btn-primary" onclick="te_jsAddUnit()" title="Добавить пустой юнит, заполнить прямо тут">+ юнит</button></div></div>';
 
-    // --- BINDS (настраиваются из карточки объекта, строка Bind ✏️) ---
+    // --- BINDS (configured from the object card, Bind row ✏️) ---
     h += '<div class="obj-mnu-divider"></div><div class="obj-mnu-section"><div class="obj-mnu-row"><label class="obj-mnu-label">Бинды</label>'
         + '<span style="font-size:11px;color:var(--text-muted)">настройка — из карточки объекта (строка Bind ✏️)</span></div>';
     if (!js.binds.length) h += '<div style="font-size:11px;color:#bbb;padding:2px 6px">— пусто —</div>';
@@ -1662,7 +1672,7 @@ te_joinSetupHtml = function() {
     });
     h += '</div>';
 
-    // --- REPORTS (настраиваются из карточки объекта, строка cfg_report ✏️) ---
+    // --- REPORTS (configured from the object card, cfg_report row ✏️) ---
     h += '<div class="obj-mnu-divider"></div><div class="obj-mnu-section"><div class="obj-mnu-row"><label class="obj-mnu-label">Репорты</label>'
         + '<span style="font-size:11px;color:var(--text-muted)">настройка — из карточки объекта (строка cfg_report ✏️)</span></div>';
     if (!js.reports.length) h += '<div style="font-size:11px;color:#bbb;padding:2px 6px">— пусто —</div>';
@@ -1679,7 +1689,7 @@ te_joinSetupHtml = function() {
     });
     h += '</div>';
 
-    // --- GROUPS: устройство СЛУШАЕТ группу (нужен 0004). Бинд = устройство ШЛЁТ — он в строке Bind ---
+    // --- GROUPS: the device LISTENS to a group (needs 0004). Bind = the device SENDS — that is in the Bind row ---
     if (te_jsHasGroups()) {
     te_ensureGroups();
     h += '<div class="obj-mnu-divider"></div><div class="obj-mnu-section"><div class="obj-mnu-row"><label class="obj-mnu-label">Группы</label>'
@@ -1720,7 +1730,7 @@ te_joinSetupHtml = function() {
     return h;
 };
 
-// Есть ли у устройства кластер Groups (0004) хоть в одном EP — иначе членство в группах не работает
+// Whether the device has the Groups cluster (0004) in at least one EP — otherwise group membership will not work
 te_jsHasGroups = function() {
     try {
         var eps = (window.te_file && te_file.EP) || {};
@@ -1740,7 +1750,7 @@ te_refreshJoinSetup = function() {
     if (!el) return;
     try { el.innerHTML = te_joinSetupHtml(); } catch(e) { console.warn('te JoinSetup refresh', e); }
     try { te_primeJsCache(); } catch(e) {}
-    // Живое превью слева — перерисовать с юнитами сразу, без сейва
+    // Live preview on the left — repaint with units immediately, no save
     try {
         var w = document.getElementById("te_DeviceWidget");
         if (w && window.te_file) w.innerHTML = getWidget(te_file);
@@ -1752,7 +1762,7 @@ te_jsVal = function(id) {
     return el ? (el.value || '').trim() : '';
 };
 
-// ---------- WRITES: всё правится инлайном, onchange сохраняет (без режимов) ----------
+// ---------- WRITES: everything edited inline, onchange saves (no modes) ----------
 te_jsAddUnit = function() {
     if (!window.te_file) return;
     var js = te_normJoinSetup(te_file);
@@ -1766,7 +1776,7 @@ te_jsAddUnit = function() {
     te_refreshJoinSetup();
 };
 
-// Поле записи (label/cat/hex/value) — hex чистим в верхний регистр
+// Entry field (label/cat/hex/value) — clean hex to upper case
 te_jsSetF = function(i, f, v) {
     if (!window.te_file) return;
     var w = te_normJoinSetup(te_file).writes[i];
@@ -1785,7 +1795,7 @@ te_jsSetF = function(i, f, v) {
     te_refreshJoinSetup();
 };
 
-// Переименование юнита целиком (все записи с этим unitname)
+// Renaming a unit as a whole (all entries with this unitname)
 te_jsSetUnit = function(el) {
     if (!window.te_file || !el) return;
     var old = el.dataset.old || '', nw = (el.value || '').trim() || old;
@@ -1797,7 +1807,7 @@ te_jsSetUnit = function(el) {
     te_refreshJoinSetup();
 };
 
-// Поле варианта (значение, название)
+// Variant field (value, name)
 te_jsSetVar = function(i, j, f, v) {
     if (!window.te_file) return;
     var w = te_normJoinSetup(te_file).writes[i];
@@ -1815,8 +1825,8 @@ te_jsDel = function(list, i) {
     te_refreshJoinSetup();
 };
 
-// Дубли: один EP+кластер+атрибут у нескольких записей.
-// НЕ дубль: select-записи одного юнита на одном атрибуте — они сольются в один селект.
+// Duplicates: one EP+cluster+attribute on several entries.
+// NOT a duplicate: select entries of one unit on one attribute — they merge into one select.
 te_jsDupKeys = function(js) {
     var byKey = {};
     try {
@@ -1839,7 +1849,7 @@ te_jsDupKeys = function(js) {
     return m;
 };
 
-// Смена типа юнита прямо из шапки блока
+// Switching the unit type right from the block header
 te_jsSetKind = function(i, kind) {
     if (!window.te_file) return;
     var w = te_normJoinSetup(te_file).writes[i];
@@ -1859,7 +1869,7 @@ te_jsSetKind = function(i, kind) {
     te_refreshJoinSetup();
 };
 
-// Варианты селекта: добавление строкой, правка — прямо в полях варианта
+// Select variants: adding by row, editing — right in the variant fields
 te_jsAddVariant = function(i) {
     if (!window.te_file) return;
     var w = te_normJoinSetup(te_file).writes[i];
@@ -1875,7 +1885,7 @@ te_jsAddVariant = function(i) {
     te_refreshJoinSetup();
 };
 
-// Проверить вариант: записать его значение в устройство (и запомнить как текущее)
+// Test a variant: write its value to the device (and remember as current)
 te_jsTestVariant = function(i, j) {
     if (!window.te_file) return;
     var w = te_normJoinSetup(te_file).writes[i];
@@ -1901,7 +1911,7 @@ te_jsApplyWrite = function(i) {
     var js = te_normJoinSetup(te_file);
     var w = js.writes[i];
     if (!w) return;
-    // Выбор юнита: снимаем selected с одногруппников (реплей пишет выбранный)
+    // Unit selection: drop selected on same-group peers (replay writes the selected one)
     var u = w.unitname || w.label || '';
     js.writes.forEach(function(o) {
         if ((o.unitname || o.label || '') === u) delete o.selected;
@@ -1933,7 +1943,7 @@ te_jsReadWrite = function(i) {
 };
 
 // ---------- BINDS ----------
-// ---------- человекочитаемые имена для секции ----------
+// ---------- human-readable names for the section ----------
 te_jsClusterName = function(cl) {
     try {
         cl = (cl || '').toUpperCase();
@@ -1991,7 +2001,7 @@ te_jsApplyBind = function(i, bind) {
 };
 
 // ---------- REPORTS ----------
-// Удаление из секции + чистка cfg_report у объекта (синк в обе стороны)
+// Deletion from the section + cfg_report cleanup on the object (two-way sync)
 te_jsDelReport = function(i) {
     if (!window.te_file) return;
     var js = te_normJoinSetup(te_file);
@@ -2025,7 +2035,7 @@ te_jsApplyReport = function(i) {
 };
 
 // ---------- GROUPS ----------
-// EP устройства списком (с 0004 первые), глобальные группы — догрузка для пикера
+// Device EPs as a list (0004 first), global groups — lazy load for the picker
 te_jsEpList = function() {
     var eps = [];
     try {
@@ -2098,7 +2108,7 @@ te_jsAddGroup = function() {
     window.te_jsNewGroup = false;
     te_jsDirty();
     te_refreshJoinSetup();
-    // Поверхность группы: дотянуть кластеры EP + записать слушателя
+    // Group surface: pull EP clusters + register the listener
     try {
         var ecl = [];
         if (te_file.EP && te_file.EP[ep]) ecl = (te_file.EP[ep].ClI || []).concat(te_file.EP[ep].ClO || []);
@@ -2106,7 +2116,7 @@ te_jsAddGroup = function() {
     } catch(e) {}
 };
 
-// Прописать сейчас на живое устройство
+// Write to the live device now
 te_jsApplyGroup = function(i) {
     if (!window.te_file || !te_file.Device) return;
     var g = te_normJoinSetup(te_file).groups[i];
@@ -2114,7 +2124,7 @@ te_jsApplyGroup = function(i) {
     WSsend('groupAdd|' + te_file.Device + '|' + g.ep + '|' + g.addr);
 };
 
-// Убрать везде: из устройства (best-effort) и из файла
+// Remove everywhere: from the device (best-effort) and from the file
 te_jsDelGroup = function(i) {
     if (!window.te_file) return;
     var js = te_normJoinSetup(te_file);
@@ -2133,7 +2143,7 @@ te_jsDelGroup = function(i) {
 // CLASS EDITOR
 // ============================================================
 
-// Полная база классов HA по ролям
+// Full HA class database by role
 te_HA_CLASSES = {
   sensor: {
     device_classes: [
@@ -2307,12 +2317,12 @@ te_renderClassEditor = function(role, currentClass, label) {
   const schema = te_HA_CLASSES[role] || te_HA_CLASSES['sensor'];
   const dc = schema.device_classes;
 
-  // Выбор роли
+  // Role selection
   const roleSelHtml = Object.keys(te_HA_CLASSES).map(r =>
     `<option value="${r}" ${r===role?'selected':''}>${r}</option>`
   ).join('');
 
-  // Выбор device_class
+  // device_class selection
   const dcHtml = dc.length ? `
     <div class="ce-row">
       <label class="ce-label">device_class</label>
@@ -2322,8 +2332,8 @@ te_renderClassEditor = function(role, currentClass, label) {
       </select>
     </div>` : '';
 
-  // Поля props (кроме device_class — он уже отдельно).
-  // only_for: показать поле только для ключей с этими лейблами (контекст ZCL-атрибута).
+  // props fields (except device_class — it is already separate).
+  // only_for: show the field only for keys with these labels (ZCL attribute context).
   let propsHtml = '';
   const props = schema.props || {};
   for (const [key, cfg] of Object.entries(props)) {
@@ -2344,8 +2354,8 @@ te_renderClassEditor = function(role, currentClass, label) {
         <input type="checkbox" class="ce-check" id="ce_${key}" data-key="${key}" ${val?'checked':''}>
       </div>`;
     } else if (cfg.type === 'combo') {
-      // Редактируемый комбобокс: выбор из списка или свой ввод (datalist).
-      // В apply обрабатывается как обычный текст (data-key уже стоит).
+      // Editable combobox: pick from the list or type your own (datalist).
+      // In apply it is handled as plain text (data-key already set).
       const listId = 'ce_list_' + key;
       propsHtml += `<div class="ce-row">
         <label class="ce-label">${key}</label>
@@ -2368,7 +2378,7 @@ te_renderClassEditor = function(role, currentClass, label) {
 };
 
 te_onDcChange = function(val) {
-  // просто обновляем превью
+  // just refresh the preview
 };
 
 te_onCeRoleChange = function(val) {
@@ -2386,17 +2396,17 @@ te_applyClassEditor = function() {
   const roleEl = document.getElementById('ce_role_sel');
   const role = roleEl ? roleEl.value : (ro.role||'sensor').split('&')[0];
 
-  // Собираем новый class объект
+  // Collect the new class object
   const newClass = {};
   const dcEl = document.getElementById('ce_dc');
   if (dcEl && dcEl.value) newClass.device_class = dcEl.value;
 
-  // Остальные props
+  // Other props
   document.querySelectorAll('#ce_props [data-key]').forEach(el => {
     const key = el.dataset.key;
     if (el.type === 'checkbox') {
-      // bool пишем всегда явно (true/false): снятая галка — это false,
-      // а не отсутствие ключа, иначе читатель не отличит "выключено" от "не задано"
+      // Write bool always explicitly (true/false): an unchecked box is false,
+      // not a missing key, otherwise the reader cannot tell "off" from "unset"
       newClass[key] = !!el.checked;
     } else if (el.value !== '') {
       if (key === 'options') {
@@ -2407,13 +2417,13 @@ te_applyClassEditor = function() {
     }
   });
 
-  // Обновляем role (базовая часть до &)
+  // Update role (base part before &)
   const roleBase = role;
   const classJson = Object.keys(newClass).length ? JSON.stringify(newClass) : '';
   ro.role = classJson ? `${roleBase}&${classJson}` : roleBase;
   ro.class = newClass;
 
-  // Обновляем превью в основной панели — как при рендере, через getDeviceClass (фолбэк на role)
+  // Refresh the preview in the main panel — as on render, via getDeviceClass (fallback to role)
   const dcView = document.getElementById(`${obj}_te_classname_view`);
   if (dcView) dcView.textContent = (typeof getDeviceClass === 'function') ? getDeviceClass(ro) : (newClass.device_class || '');
   const roleInput = document.getElementById(`${obj}_te_role`);
@@ -2421,7 +2431,7 @@ te_applyClassEditor = function() {
   const propView = document.getElementById(`${obj}_te_classprop_view`);
   if (propView) propView.textContent = Object.entries(newClass).filter(([k])=>k!=='device_class').map(([k,v])=>`${k}: ${v}`).join(', ');
 
-  // Обновляем виджет + десктоп
+  // Refresh the widget + desktop
   te_syncLive(true);
   te_closeClassEditor();
 };
@@ -2448,20 +2458,20 @@ te_closeClassEditor = function() {
 // ===== CFG REPORT EDITOR =====
 te_currentCfgObj = null;
 
-// dec → hex 4-символа
+// dec → 4-char hex
 te_toHex4 = function(dec) {
   const n = parseInt(dec, 10);
   if (isNaN(n) || n < 0) return '0000';
   return Math.min(n, 65535).toString(16).toUpperCase().padStart(4, '0');
 };
 
-// hex → dec (для отображения при открытии)
+// hex → dec (for display on open)
 te_hexToDec = function(hex) {
   const n = parseInt(hex, 16);
   return isNaN(n) ? 0 : n;
 };
 
-// Синхронизация числового поля → hex-превью
+// Number field → hex preview sync
 te_cre_updatePreviews = function() {
   const fields = ['MinInterval','MaxInterval','TimeOut','Change'];
   fields.forEach(function(f) {
@@ -2471,20 +2481,20 @@ te_cre_updatePreviews = function() {
   });
 };
 
-// Синхронизация select DataType → hex input
+// select DataType → hex input sync
 te_cre_syncType = function() {
   const sel = document.getElementById('te_cre_DataType');
   const hex = document.getElementById('te_cre_DataType_hex');
   if (sel && hex && sel.value) hex.value = sel.value.toUpperCase().padStart(2,'0');
 };
 
-// Синхронизация ручного hex input → select
+// Manual hex input → select sync
 te_cre_syncSel = function() {
   const hex = document.getElementById('te_cre_DataType_hex');
   const sel = document.getElementById('te_cre_DataType');
   if (!hex || !sel) return;
   const v = hex.value.toLowerCase().replace(/^0+/, '') || '0';
-  // Пробуем найти в select
+  // Try to find in select
   let found = false;
   for (let i = 0; i < sel.options.length; i++) {
     if (sel.options[i].value === v || sel.options[i].value === '0x'+v) {
@@ -2504,10 +2514,10 @@ te_openCfgReportEditor = function(obj) {
     }
   } catch(e) {}
 
-  // DataType — hex в select и hex-input.
-  // Тип всегда по атрибуту (ZCL требует тип атрибута и в Configure Reporting):
-  // поле объекта → cl.js; сохранённый cfg.DataType — только фолбэк.
-  // Иначе stale "20" от эвристики по роли перекрывает реальный "21".
+  // DataType — hex in select and hex-input.
+  // The type always follows the attribute (ZCL requires the attribute type in Configure Reporting too):
+  // object field → cl.js; saved cfg.DataType — fallback only.
+  // Otherwise a stale "20" from the role heuristic overrides the real "21".
   let dtHex = '';
   if (ro && ro.dataType) {
     dtHex = String(ro.dataType).toLowerCase();
@@ -2523,7 +2533,7 @@ te_openCfgReportEditor = function(obj) {
   hexIn.value = dtHex ? dtHex.toUpperCase().padStart(2,'0') : '';
   sel.value   = dtHex || '';
 
-  // Интервалы — из hex в decimal для удобного ввода
+  // Intervals — hex to decimal for convenient input
   document.getElementById('te_cre_MinInterval').value = cfg.MinInterval ? te_hexToDec(cfg.MinInterval) : 1;
   document.getElementById('te_cre_MaxInterval').value = cfg.MaxInterval ? te_hexToDec(cfg.MaxInterval) : 300;
   document.getElementById('te_cre_TimeOut').value     = cfg.TimeOut     ? te_hexToDec(cfg.TimeOut)     : 0;
@@ -2531,7 +2541,7 @@ te_openCfgReportEditor = function(obj) {
 
   te_cre_updatePreviews();
 
-  // Навешиваем oninput на числовые поля
+  // Attach oninput to number fields
   ['MinInterval','MaxInterval','TimeOut','Change'].forEach(function(f) {
     const el = document.getElementById('te_cre_' + f);
     if (el) el.oninput = te_cre_updatePreviews;
@@ -2549,7 +2559,7 @@ te_closeCfgReportEditor = function() {
 te_YA_JSON = {"capability": [{"on_off": {"desc": "Включение/выключение", "tpl": {"type": "devices.capabilities.on_off", "retrievable": true, "reportable": false, "state": {"instance": "on", "value": false}}}}, {"color_setting": {"desc": "Цвет (температура K)", "tpl": {"type": "devices.capabilities.color_setting", "retrievable": true, "reportable": false, "parameters": {"temperature_k": {"max": 6500, "min": 1000}}, "state": {"instance": "temperature_k", "value": 4000}}}}, {"range": {"desc": "Диапазон — выбери instance ▼", "tpl": {"type": "devices.capabilities.range", "retrievable": true, "reportable": false, "parameters": {}, "arparameter": [{"instance": "brightness", "random_access": true, "range": {"max": 100, "min": 1, "precision": 1}, "unit": "unit.percent"}, {"instance": "volume", "random_access": true, "range": {"max": 100, "min": 0, "precision": 1}, "unit": "unit.percent"}, {"instance": "open", "random_access": true, "range": {"max": 100, "min": 0, "precision": 10}, "unit": "unit.percent"}, {"instance": "humidity", "random_access": true, "range": {"max": 100, "min": 10, "precision": 10}, "unit": "unit.percent"}, {"instance": "temperature", "random_access": true, "range": {"max": 40, "min": 18, "precision": 1}, "unit": "unit.temperature.celsius"}, {"instance": "channel", "random_access": true, "range": {"min": 0, "max": 999, "precision": 1}}], "state": {"instance": "brightness", "value": 50}}}}, {"toggle": {"desc": "Переключатель — выбери instance ▼", "tpl": {"type": "devices.capabilities.toggle", "retrievable": true, "reportable": false, "parameters": {}, "arparameter": [{"instance": "backlight"}, {"instance": "controls_locked"}, {"instance": "ionization"}, {"instance": "keep_warm"}, {"instance": "mute"}, {"instance": "oscillation"}, {"instance": "pause"}]}}}, {"mode": {"desc": "Режим работы — выбери instance ▼", "tpl": {"type": "devices.capabilities.mode", "retrievable": true, "reportable": false, "parameters": {}, "arparameter": [{"instance": "fan_speed", "modes": [{"value": "auto"}, {"value": "high"}, {"value": "medium"}, {"value": "low"}, {"value": "quiet"}, {"value": "turbo"}]}, {"instance": "thermostat", "modes": [{"value": "auto"}, {"value": "fan_only"}, {"value": "heat"}, {"value": "cool"}, {"value": "dry"}, {"value": "preheat"}]}, {"instance": "work_speed", "modes": [{"value": "auto"}, {"value": "fast"}, {"value": "max"}, {"value": "medium"}, {"value": "min"}, {"value": "slow"}, {"value": "turbo"}]}, {"instance": "swing", "modes": [{"value": "vertical"}, {"value": "horizontal"}, {"value": "stationary"}, {"value": "auto"}]}, {"instance": "program", "modes": [{"value": "auto"}, {"value": "eco"}, {"value": "express"}, {"value": "normal"}, {"value": "quiet"}]}, {"instance": "input_source", "modes": [{"value": "one"}, {"value": "two"}, {"value": "three"}, {"value": "four"}, {"value": "five"}, {"value": "hdmi"}, {"value": "hdmi1"}, {"value": "hdmi2"}]}, {"instance": "cleanup_mode", "modes": [{"value": "auto"}, {"value": "eco"}, {"value": "express"}, {"value": "normal"}, {"value": "quiet"}]}, {"instance": "tea_mode", "modes": [{"value": "black_tea"}, {"value": "green_tea"}, {"value": "oolong_tea"}, {"value": "express"}]}]}}}], "float": [{"amperage": {"desc": "Ток (А)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "amperage", "unit": "unit.ampere"}, "state": {"instance": "amperage", "value": 0}}}}, {"battery_level": {"desc": "Заряд батареи (%)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "battery_level", "unit": "unit.percent"}, "state": {"instance": "battery_level", "value": 0}}}}, {"co2_level": {"desc": "CO₂ (ppm)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "co2_level", "unit": "unit.ppm"}, "state": {"instance": "co2_level", "value": 0}}}}, {"humidity": {"desc": "Влажность (%)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "humidity", "unit": "unit.percent"}, "state": {"instance": "humidity", "value": 0}}}}, {"illumination": {"desc": "Освещённость (лк)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "illumination", "unit": "unit.illumination.lux"}, "state": {"instance": "illumination", "value": 0}}}}, {"pm1_density": {"desc": "PM1 (мкг/м³)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "pm1_density", "unit": "unit.density.mcg_m3"}, "state": {"instance": "pm1_density", "value": 0}}}}, {"pm2_5_density": {"desc": "PM2.5 (мкг/м³)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "pm2.5_density", "unit": "unit.density.mcg_m3"}, "state": {"instance": "pm2.5_density", "value": 0}}}}, {"pm10_density": {"desc": "PM10 (мкг/м³)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "pm10_density", "unit": "unit.density.mcg_m3"}, "state": {"instance": "pm10_density", "value": 0}}}}, {"power": {"desc": "Мощность (Вт)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "power", "unit": "unit.watt"}, "state": {"instance": "power", "value": 0}}}}, {"pressure": {"desc": "Давление (мм рт.ст.)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "pressure", "unit": "unit.pressure.mmhg"}, "state": {"instance": "pressure", "value": 0}}}}, {"temperature": {"desc": "Температура (°C)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "temperature", "unit": "unit.temperature.celsius"}, "state": {"instance": "temperature", "value": 0}}}}, {"tvoc": {"desc": "TVOC органика (мкг/м³)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "tvoc", "unit": "unit.density.mcg_m3"}, "state": {"instance": "tvoc", "value": 0}}}}, {"voltage": {"desc": "Напряжение (В)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "voltage", "unit": "unit.volt"}, "state": {"instance": "voltage", "value": 0}}}}, {"water_level": {"desc": "Уровень воды (%)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "water_level", "unit": "unit.percent"}, "state": {"instance": "water_level", "value": 0}}}}, {"electricity_meter": {"desc": "Счётчик эл.энергии (кВт·ч)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "electricity_meter", "unit": "unit.kilowatt_hour"}, "state": {"instance": "electricity_meter", "value": 0}}}}, {"water_meter": {"desc": "Счётчик воды (м³)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "water_meter", "unit": "unit.cubic_meter"}, "state": {"instance": "water_meter", "value": 0}}}}], "event": [{"vibration": {"desc": "Вибрация / наклон / падение", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "vibration", "events": [{"value": "tilt"}, {"value": "fall"}, {"value": "vibration"}]}, "state": {"instance": "vibration", "value": "vibration"}}}}, {"open": {"desc": "Открытие / закрытие", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "open", "events": [{"value": "opened"}, {"value": "closed"}]}, "state": {"instance": "open", "value": "opened"}}}}, {"button": {"desc": "Кнопка (клик / двойной / удержание)", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "button", "events": [{"value": "click"}, {"value": "double_click"}, {"value": "long_press"}]}, "state": {"instance": "button", "value": "click"}}}}, {"motion": {"desc": "Движение / покой", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "motion", "events": [{"value": "detected"}, {"value": "not_detected"}]}, "state": {"instance": "motion", "value": "not_detected"}}}}, {"smoke": {"desc": "Дым", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "smoke", "events": [{"value": "detected"}, {"value": "not_detected"}]}, "state": {"instance": "smoke", "value": "not_detected"}}}}, {"gas": {"desc": "Газ", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "gas", "events": [{"value": "detected"}, {"value": "not_detected"}]}, "state": {"instance": "gas", "value": "not_detected"}}}}, {"water_leak": {"desc": "Протечка", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "water_leak", "events": [{"value": "dry"}, {"value": "leak"}]}, "state": {"instance": "water_leak", "value": "dry"}}}}, {"battery_level": {"desc": "Заряд батареи (событие low/normal)", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "battery_level", "events": [{"value": "low"}, {"value": "normal"}]}, "state": {"instance": "battery_level", "value": "normal"}}}}, {"water_level": {"desc": "Уровень воды (событие low/normal)", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "water_level", "events": [{"value": "low"}, {"value": "normal"}]}, "state": {"instance": "water_level", "value": "normal"}}}}, {"food_level": {"desc": "Уровень корма (empty/normal)", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "food_level", "events": [{"value": "empty"}, {"value": "normal"}]}, "state": {"instance": "food_level", "value": "normal"}}}}]};
 
 te_currentYaObj = null;
-te_currentYaData = null; // рабочий объект редактора
+te_currentYaData = null; // editor working object
 
 te_yre_getObj = function() {
   return te_currentYaData;
@@ -2560,7 +2570,7 @@ te_yre_setObj = function(obj) {
   te_yre_refreshPreview();
 };
 
-// ─── Превью JSON ───
+// ─── JSON preview ───
 te_yre_refreshPreview = function() {
   const pre = document.getElementById('te_yre_preview');
   if (!pre) return;
@@ -2569,7 +2579,7 @@ te_yre_refreshPreview = function() {
   pre.textContent = JSON.stringify(d, null, 2);
 };
 
-// ─── Рендер списка шаблонов ───
+// ─── Template list render ───
 te_yre_renderList = function() {
   const container = document.getElementById('te_yre_list');
   if (!container) return;
@@ -2587,7 +2597,7 @@ te_yre_renderList = function() {
   container.innerHTML = html;
 };
 
-// ─── Выбор шаблона из списка ───
+// ─── Template selection from the list ───
 te_yre_selectTpl = function(cat, i) {
   document.querySelectorAll('.yre-item').forEach(el => el.classList.remove('yre-active'));
   for (const el of document.querySelectorAll('.yre-item')) {
@@ -2599,7 +2609,7 @@ te_yre_selectTpl = function(cat, i) {
   const key = Object.keys(Ya[cat][i])[0];
   const tpl = JSON.parse(JSON.stringify(Ya[cat][i][key].tpl));
 
-  // Если есть arparameter — рендерим подсписок вместо превью
+  // If arparameter exists — render a sublist instead of the preview
   if (tpl.arparameter) {
     const pre = document.getElementById('te_yre_preview');
     let html = '<div style="font-size:11px;color:#555;margin-bottom:4px;">Выберите вариант:</div>';
@@ -2618,14 +2628,14 @@ te_yre_selectTpl = function(cat, i) {
   te_yre_syncFlags();
 };
 
-// Применить выбранный arparameter
+// Apply the selected arparameter
 te_yre_selectTpl_arp = function(cat, i, j) {
   const Ya  = te_YA_JSON;
   const key = Object.keys(Ya[cat][i])[0];
   const tpl = JSON.parse(JSON.stringify(Ya[cat][i][key].tpl));
   const arp = tpl.arparameter[j];
 
-  // Собираем итоговый параметр
+  // Assemble the resulting parameter
   if (tpl.type === 'devices.capabilities.range') {
     tpl.parameters = { instance: arp.instance, random_access: arp.random_access || true };
     if (arp.range)  tpl.parameters.range = arp.range;
@@ -2648,7 +2658,7 @@ te_yre_selectTpl_arp = function(cat, i, j) {
   te_yre_syncFlags();
 };
 
-// ─── Синхронизация флагов retrievable/reportable с текущим объектом ───
+// ─── retrievable/reportable flag sync with the current object ───
 te_yre_syncFlags = function() {
   const d = te_currentYaData;
   if (!d) return;
@@ -2662,7 +2672,7 @@ te_yre_syncFlags = function() {
   document.getElementById('te_yre_reportable').checked  = repo;
 };
 
-// ─── Обновление флагов в объекте при клике чекбокса ───
+// ─── Updating flags in the object on checkbox click ───
 te_yre_updateFlags = function() {
   const d = te_currentYaData;
   if (!d) return;
@@ -2703,13 +2713,13 @@ te_yre_updateMulti = function() {
   te_yre_refreshPreview();
 };
 
-// ─── Открытие редактора ───
+// ─── Opening the editor ───
 te_openYaRepEditor = function(obj) {
   te_currentYaObj = obj;
   const ro = te_file.Report[obj];
   let val = ro.ya_rep;
 
-  // Нормализуем в объект
+  // Normalize to an object
   if (!val || val === 'none') {
     te_currentYaData = null;
   } else {
@@ -2735,14 +2745,14 @@ te_openYaRepEditor = function(obj) {
   document.getElementById('te_yaRepEditorWnd').style.display = 'flex';
 };
 
-// ─── Закрытие ───
+// ─── Closing ───
 te_closeYaRepEditor = function() {
   document.getElementById('te_yaRepEditorWnd').style.display = 'none';
   te_currentYaObj  = null;
   te_currentYaData = null;
 };
 
-// ─── Установить none ───
+// ─── Set none ───
 te_setYaRepNone = function() {
   const obj = te_currentYaObj;
   if (!obj) return;
@@ -2752,7 +2762,7 @@ te_setYaRepNone = function() {
   te_closeYaRepEditor();
 };
 
-// ─── Очистить (кнопка ✖ в таблице) ───
+// ─── Clear (the ✖ button in the table) ───
 te_clearYaRep = function(obj) {
   if (!obj) return;
   te_file.Report[obj].ya_rep = 'none';
@@ -2760,7 +2770,7 @@ te_clearYaRep = function(obj) {
   te_syncLive(true);
 };
 
-// ─── Применить ───
+// ─── Apply ───
 te_applyYaRepEditor = function() {
   const obj = te_currentYaObj;
   if (!obj) return;
@@ -2775,7 +2785,7 @@ te_applyYaRepEditor = function() {
   te_closeYaRepEditor();
 };
 
-// ─── Обновление превью в строке таблицы ───
+// ─── Table row preview update ───
 te_yre_updateView = function(obj, d) {
   const el = document.getElementById(obj + '_te_ya_rep_view');
   if (!el) return;
@@ -2795,26 +2805,26 @@ te_applyCfgReportEditor = function() {
   const obj = te_currentCfgObj;
   if (!obj) return;
 
-  // DataType — берём из hex-input (приоритет), иначе из select
+  // DataType — taken from hex-input (priority), else from select
   const hexIn = document.getElementById('te_cre_DataType_hex');
   const sel   = document.getElementById('te_cre_DataType');
   let dtRaw = (hexIn.value.trim() || sel.value || '').replace(/^0x/i,'');
   const dataType = dtRaw ? dtRaw.toUpperCase().padStart(2,'0') : '';
 
-  // Интервалы — десятичный → hex 4 символа
+  // Intervals — decimal → 4-char hex
   const minI = te_toHex4(document.getElementById('te_cre_MinInterval').value);
   const maxI = te_toHex4(document.getElementById('te_cre_MaxInterval').value);
   const tmO  = te_toHex4(document.getElementById('te_cre_TimeOut').value);
   const chg  = te_toHex4(document.getElementById('te_cre_Change').value);
 
-  // Если DataType не задан — очищаем
+  // If DataType is unset — clear
   if (!dataType) {
     te_clearCfgReport(obj);
     te_closeCfgReportEditor();
     return;
   }
 
-  // Формируем объект в точном нужном формате
+  // Build the object in the exact required format
   const cfg = {
     DataType:    dataType,
     MinInterval: minI,
@@ -2825,10 +2835,10 @@ te_applyCfgReportEditor = function() {
 
   te_file.Report[obj].cfg_report = cfg;
 
-  // Дублируем в JoinSetup.reports — источник для настройки при подключении
+  // Duplicate into JoinSetup.reports — the source for setup on connect
   try { te_jsUpsertReport(obj, cfg); } catch(e) {}
 
-  // Обновляем превью в строке таблицы
+  // Refresh the preview in the table row
   const view = document.getElementById(obj + '_te_cfg_report_view');
   if (view) {
     const decMin = te_hexToDec(minI);
@@ -2854,7 +2864,7 @@ te_clearCfgReport = function(obj) {
   te_refreshJoinSetup();
 };
 
-// Синхронизация cfg_report объекта → JoinSetup.reports (ключ — полный obj EEPPCCCCAAAA)
+// Sync the object cfg_report → JoinSetup.reports (key — full obj EEPPCCCCAAAA)
 te_jsUpsertReport = function(obj, cfg) {
   var js = te_normJoinSetup(te_file);
   var ep = obj.substring(0, 2), cl = obj.substring(2, 6), at = obj.substring(6, 10);
@@ -2869,7 +2879,7 @@ te_jsUpsertReport = function(obj, cfg) {
   if (!found) js.reports.push({ ep: ep, cluster: cl, attr: at, dataType: cfg.DataType, min: cfg.MinInterval, max: cfg.MaxInterval, change: cfg.Change });
 };
 
-// ===== BIND EDITOR (строка Bind в карточке объекта → JoinSetup.binds, ключ EP+cluster) =====
+// ===== BIND EDITOR (Bind row in the object card → JoinSetup.binds, EP+cluster key) =====
 te_currentBindObj = null;
 
 te_findBind = function(ep, cl) {
@@ -2967,7 +2977,7 @@ te_closeBindEditor = function() {
 te_updateDeviceField = function(field, value) {
     if (!te_file) return;
     
-    // Обновляем соответствующее поле
+    // Update the corresponding field
     if (field === 'Name') {
         te_file.Name = value;
     } else if (field === 'type') {
@@ -2976,12 +2986,12 @@ te_updateDeviceField = function(field, value) {
         te_file.Location = value;
     }
     
-    // Обновляем заголовок окна
+    // Update the window title
     if (field === 'Name') {
         teSetTitle([`${te_fileName} - ${te_file.ModelId}`]);
     }
 
-    // Живой синк: макет редактора + deviceList + десктоп
+    // Live sync: editor mock + deviceList + desktop
     te_syncLive(true);
 
     console.log(`Поле ${field} обновлено на:`, value);
