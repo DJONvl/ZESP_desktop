@@ -12,3 +12,4 @@ workspace.xml
 # бэкапы и временные копии — никогда в репо
 *.bak
 *.tmp
+_devicesjs.txt

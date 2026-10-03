@@ -865,6 +865,9 @@ dm.setBleTpl = function (dev, adr, name) {
         if (cur.Name) obj.Name = cur.Name;
         if (cur.Location) obj.Location = cur.Location;
         if (cur.DevType) obj.DevType = cur.DevType;
+        // EP — только из интервью: серверный профиль может не совпадать
+        // с реальным железом, а по EP идут Bind/репорты/JoinSetup.
+        if (cur.EP && Object.keys(cur.EP).length) obj.EP = cur.EP;
       }
       WSsend('SaveJson|/Devices/' + d.ieee + '|' + JSON.stringify(obj));
       eventE.once('updateDeviceList', function () {
