@@ -1,0 +1,53 @@
+{
+  "Device": "4EA9",
+  "Name": "DS01",
+  "IEEE": "00124B001F54F43E",
+  "ModelId": "DS01",
+  "Location": "Дом",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0003",
+        "0500",
+        "0001"
+      ],
+      "ClO": [
+        "0003"
+      ]
+    }
+  },
+  "DevType": "ZED",
+  "Report": {
+    "0105000002": {
+      "label": "Lock",
+      "val": "0000",
+      "mat": "1",
+      "role": "binary_sensor",
+      "parsed": "0000",
+      "time": "0",
+      "retain": "0",
+      "class": {
+        "device_class": "lock",
+        "payload_on": "1",
+        "payload_off": "0"
+      }
+    },
+    "0100010020": {
+      "label": "Battery",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"20\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "time": "0",
+      "retain": "0",
+      "class": {
+        "device_class": "battery",
+        "unit_of_measurement": "%"
+      }
+    }
+  },
+  "type": "devices.types.other"
+}

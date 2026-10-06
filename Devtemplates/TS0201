@@ -1,0 +1,62 @@
+{
+  "Device": "",
+  "Name": "TS0201",
+  "IEEE": "",
+  "ModelId": "TS0201",
+  "Location": "2 этаж",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0001",
+        "0402",
+        "0405"
+      ],
+      "ClO": [
+        "0019"
+      ]
+    }
+  },
+  "Report": {
+    "0100010020": {
+      "label": "Battery",
+      "val": "0x1E",
+      "mat": "0.1",
+      "role": "sensor",
+      "parsed": "30",
+      "class": {
+        "device_class": "battery",
+        "unit_of_measurement": "V"
+      }
+    },
+    "0100010021": {
+      "label": "POWER_CONFIGURATION",
+      "val": "0xC8",
+      "mat": "1",
+      "role": "",
+      "parsed": "200",
+      "class": {}
+    },
+    "0104020000": {
+      "label": "Temperature",
+      "val": "0x0AD2",
+      "mat": "0.01",
+      "role": "sensor",
+      "parsed": "27.70",
+      "class": {
+        "device_class": "temperature"
+      }
+    },
+    "0104050000": {
+      "label": "Humidity",
+      "val": "0x128E",
+      "mat": "0.01",
+      "role": "sensor",
+      "parsed": "47.50",
+      "class": {
+        "device_class": "humidity"
+      }
+    }
+  }
+}

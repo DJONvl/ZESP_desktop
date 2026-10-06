@@ -1,0 +1,77 @@
+{
+  "Device": "8E00",
+  "Name": "lumi.weather",
+  "IEEE": "00158D000484F76D",
+  "ModelId": "lumi.weather",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0003",
+        "FFFF",
+        "0402",
+        "0403",
+        "0405"
+      ],
+      "ClO": [
+        "0000",
+        "0004",
+        "FFFF"
+      ]
+    }
+  },
+  "Report": {
+    "0104020000": {
+      "label": "Temperature",
+      "val": "0x09C2",
+      "mat": "0.01",
+      "role": "sensor",
+      "class": {
+        "device_class": "temperature",
+        "unit_of_measurement": "C"
+      }
+    },
+    "0104050000": {
+      "label": "Humidity",
+      "val": "0x114C",
+      "mat": "0.01",
+      "role": "sensor",
+      "class": {
+        "device_class": "humidity",
+        "unit_of_measurement": "%"
+      }
+    },
+    "0104030010": {
+      "label": "Pressure",
+      "val": "0x03D7",
+      "mat": "0.0750062",
+      "role": "sensor",
+      "class": {
+        "device_class": "pressure",
+        "unit_of_measurement": "mm Hg"
+      }
+    },
+    "0104030000": {
+      "label": "Pressure",
+      "val": "0x03D7",
+      "mat": "1",
+      "role": "sensor",
+      "class": {
+        "device_class": "pressure",
+        "unit_of_measurement": "mbar"
+      }
+    },
+    "010000FF01": {
+      "label": "Battery",
+      "val": "3.02",
+      "mat": "[{\"label\":\"Battery\",\"sig\":\"0121\",\"dl\":\"2\",\"mat\":\"0.001\",\"role\":\"sensor\"}]",
+      "role": "sensor",
+      "class": {
+        "device_class": "battery",
+        "unit_of_measurement": "V"
+      }
+    }
+  },
+  "Location": "undefined"
+}

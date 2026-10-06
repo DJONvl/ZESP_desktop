@@ -1,0 +1,67 @@
+{
+  "Device": "5A22",
+  "Name": "TS004F",
+  "IEEE": "04CD15FFFE23EBF3",
+  "ModelId": "TS004F",
+  "Location": "Home",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0001",
+        "0003",
+        "0004",
+        "0006",
+        "1000"
+      ],
+      "ClO": [
+        "0019",
+        "000A",
+        "0003",
+        "0004",
+        "0005",
+        "0006",
+        "0008",
+        "1000"
+      ]
+    }
+  },
+  "DevType": "ZED",
+  "Report": {
+    "0100060000": {
+      "label": "On_Off",
+      "val": "02",
+      "mat": "1",
+      "role": "sensor",
+      "ya_rep": "none",
+      "class": {}
+    },
+    "0100080000": {
+      "label": "Level",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "ya_rep": "none",
+      "class": {
+        "device_class": "none"
+      }
+    },
+    "0100010020": {
+      "label": "Battery",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "ya_rep": "none",
+      "class": {
+        "device_class": "battery",
+        "unit_of_measurement": "%"
+      }
+    }
+  },
+  "type": "devices.types.sensor"
+}

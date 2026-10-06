@@ -1,0 +1,49 @@
+{
+  "Device": "2747",
+  "Name": "Door_Sensor",
+  "IEEE": "00158D0000B57DF8",
+  "ModelId": "Door_Sensor",
+  "Location": "undefined",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0003",
+        "0500",
+        "0001"
+      ],
+      "ClO": []
+    }
+  },
+  "DevType": "ZED",
+  "Report": {
+    "0100010021": {
+      "label": "Battery",
+      "val": "64",
+      "mat": "1",
+      "role": "sensor",
+      "parsed": "64",
+      "class": {
+        "device_class": "battery",
+        "unit_of_measurement": "%"
+      }
+    },
+    "0105000000": {
+      "label": "win_open",
+      "val": "",
+      "mat": "1",
+      "role": "binary_sensor",
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "class": {
+        "device_class": "door",
+        "payload_on": "1",
+        "payload_off": "0"
+      }
+    }
+  },
+  "ClusterToBind": [
+    "010500"
+  ]
+}

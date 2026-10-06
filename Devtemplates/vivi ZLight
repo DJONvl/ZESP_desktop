@@ -1,0 +1,86 @@
+{
+  "Device": "9ED5",
+  "Name": "vivi ZLight",
+  "IEEE": "00124B000A9E26D8",
+  "ModelId": "vivi ZLight",
+  "Location": "undefined",
+  "EP": {
+    "0C": {
+      "PrfId": "0104",
+      "ClI": [],
+      "ClO": []
+    },
+    "0B": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0003",
+        "0004",
+        "0005",
+        "0006",
+        "0008",
+        "0300"
+      ],
+      "ClO": []
+    },
+    "0D": {
+      "PrfId": "C05E",
+      "ClI": [
+        "1000"
+      ],
+      "ClO": [
+        "1000"
+      ]
+    }
+  },
+  "Report": {
+    "0B00060000": {
+      "label": "OnOff",
+      "val": "",
+      "mat": "1",
+      "role": "light",
+      "parsed": "",
+      "class": {}
+    },
+    "0B00080000": {
+      "label": "brightness",
+      "val": "",
+      "mat": "1",
+      "role": "light",
+      "parsed": "",
+      "class": {}
+    },
+    "0B03000000": {
+      "label": "Color_Control",
+      "val": "",
+      "mat": "1",
+      "role": "light",
+      "parsed": "",
+      "class": {}
+    },
+    "0B03000003": {
+      "label": "X",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {},
+      "parsed": ""
+    },
+    "0B03000004": {
+      "label": "Y",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {},
+      "parsed": ""
+    },
+    "0B03000007": {
+      "label": "Color_Temp",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {},
+      "parsed": ""
+    }
+  }
+}

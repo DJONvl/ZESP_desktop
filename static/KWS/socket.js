@@ -174,7 +174,6 @@ function parseSocket(msg) {
 		
 		
 		if (z[0] === "/groups.json") { groups = JSON.parse(z[1]); eventE.emit('groups', groups); }
-		if (z[0] === "joinSetup") { eventE.emit('joinSetup:' + z[1], z.slice(2).join('|')); }
 		// Full device/template file (JoinSetup etc.): deviceFile:/Devices/XXX
 		if (z[0].indexOf('/Devices/')===0 || z[0].indexOf('/Devtemplates/')===0) { eventE.emit('deviceFile:'+z[0], z.slice(1).join('|')); }
 
@@ -653,13 +652,27 @@ function widgetReport(rep) {
 				const sysKey = Object.keys(dev.Report || {}).find(k => /^01\d{4}001C$/.test(k));
 				const sysMap = {0:'off', 1:'auto', 3:'cool', 4:'heat', 7:'fan_only', 8:'dry'};
 				const modeVal = sysKey ? (sysMap[parseInt(val,10)] || val) : val;
-				const modeColors = {heat:"#ff7043",cool:"#42a5f5",auto:"#ab47bc","fan_only":"#29b6f6",dry:"#ffca28",off:"#616161"};
+				const modeColors = {heat:"#ff7043",cool:"#42a5f5",auto:"#ab47bc","fan_only":"#29b6f6",dry:"#ffca28",eco:"#66bb6a",off:"#616161"};
 				document.querySelectorAll(`span[onclick*="climate_mode|${cls}"]`).forEach(btn => {
 					const m = btn.getAttribute("onclick")?.match(/'([^']+)'\)$/)?.[1];
 					if (!m) return;
 					const active = m === modeVal;
 					btn.style.background = active ? (modeColors[m] || "#888") : "#444";
 					btn.style.border = `${active ? "2" : "1"}px solid ${modeColors[m] || "#888"}`;
+				});
+			} catch {}
+		}
+
+		// --- refresh the fan preset buttons ---
+		if (role === "fan" && typeof val === "string") {
+			try {
+				const cur = String(val).toLowerCase().trim();
+				document.querySelectorAll(`span[onclick*="fan_speed|${cls}"]`).forEach(btn => {
+					const m = btn.getAttribute("onclick")?.match(/'([^']+)'\)$/)?.[1];
+					if (!m) return;
+					const active = m.toLowerCase() === cur;
+					btn.style.background = active ? "#29b6f6" : "#444";
+					btn.style.border = `${active ? "2" : "1"}px solid #29b6f6`;
 				});
 			} catch {}
 		}

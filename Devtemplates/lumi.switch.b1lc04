@@ -1,0 +1,53 @@
+{
+  "Device": "3291",
+  "IEEE": "54EF441000EA8E86",
+  "ModelId": "lumi.switch.b1lc04",
+  "ManufName": "LUMI",
+  "Name": "lumi.switch.b1lc04",
+  "PwrSrc": "",
+  "Location": "Дом",
+  "DevType": "ZED",
+  "leave": 0,
+  "type": "",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0002",
+        "0003",
+        "0004",
+        "0005",
+        "0006",
+        "0009"
+      ],
+      "ClO": [
+        "000a",
+        "0019"
+      ]
+    },
+    "F2": {
+      "PrfId": "a1e0",
+      "ClI": [],
+      "ClO": [
+        "0021"
+      ]
+    }
+  },
+  "Report": {
+    "0100060000": {
+      "label": "свет",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "retain": "0",
+      "class": {
+        "off_on": "off_on",
+        "device_class": "none"
+      }
+    }
+  },
+  "lastSeen": 1732818944691
+}

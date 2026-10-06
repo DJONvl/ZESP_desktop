@@ -1,0 +1,51 @@
+{
+  "Device": "799C",
+  "Name": "роутер",
+  "Type": "",
+  "IEEE": "01124B001C2E6980",
+  "ModelId": "Lamp_01",
+  "EP": {
+    "0B": {
+      "PrfId": "0104",
+      "ClI": ["0000", "0003", "0004", "0005", "0006"],
+      "ClO": ["0000"]
+    }
+  },
+  "Report": {
+    "0B00060000": {
+      "label": "ON_OFF",
+      "val": "0x01",
+      "mat": "1",
+      "role": "switch",
+      "class": {},
+      "parsed": "1",
+      "ya_rep": "{\"capabilities\":[{\"type\":\"devices.capabilities.on_off\",\"retrievable\":true,\"reportable\":true,\"state\":{\"instance\":\"on\",\"value\":false}}]}",
+      "retain": "1"
+    }
+  },
+  "Commands": {
+    "0B00060000": {
+      "Off": "00",
+      "On": "01",
+      "Toggle": "02"
+    }
+  },
+  "ClusterToBind": ["0B0006"],
+  "ConfigureReporting": [{
+    "obj": "0B00060000",
+    "DataType": "10",
+    "MinInterval": "0001",
+    "MaxInterval": "012C",
+    "TimeOut": "0000",
+    "Change": "0001"
+  }],
+  "ReadAttributes": {
+    "0000": ["0000", "0001", "0002", "0003", "0004", "0005"],
+    "0001": ["0020", "0021"],
+    "0402": [],
+    "0405": []
+  },
+  "Location": "Кухня",
+  "type": "devices.types.switch",
+  "DevType": "ZR"
+}

@@ -62,7 +62,33 @@ function grpMemberGroup(ieee) {
   }
   return '';
 }
-// Remove a listener: from the group Members + drop membership from the device file + live remove
+// Ключ объекта-держателя групп на EP: существующий 0004* либо новый EP+'00040000'
+function grpHolderKey(dev, ep) {
+  ep = String(ep || '').toUpperCase();
+  var keys = Object.keys(dev.Report || {});
+  for (var i = 0; i < keys.length; i++) {
+    var k = String(keys[i]).toUpperCase();
+    if (k.length >= 6 && k.substring(0, 2) === ep && k.substring(2, 6) === '0004') return keys[i];
+  }
+  return ep + '00040000';
+}
+function grpEnsureHolder(dev, ep) {
+  var key = grpHolderKey(dev, ep);
+  dev.Report = dev.Report || {};
+  if (!dev.Report[key]) {
+    dev.Report[key] = { label: 'Groups', role: 'sensor', class: { entity_category: 'config' }, dataType: '18', val: '', mat: '1', parsed: '', retain: '0', ya_rep: 'none', polling: 0, debounce: 0, groups: [] };
+  }
+  if (!Array.isArray(dev.Report[key].groups)) dev.Report[key].groups = [];
+  return key;
+}
+function grpSyncParsed(dev, key) {
+  try {
+    var g = dev.Report[key].groups || [];
+    dev.Report[key].parsed = g.join(',');
+    dev.Report[key].val = dev.Report[key].parsed;
+  } catch (e) {}
+}
+// Remove a listener: from the group Members + drop membership from Report 0004-objects + live remove
 function grpKick(gIeee, ieee) {
   if (!gIeee || !ieee) return;
   try {
@@ -76,16 +102,19 @@ function grpKick(gIeee, ieee) {
       try {
         if (!data || data === 'NULL') return;
         var dev = JSON.parse(data);
-        var removed = ((dev.JoinSetup || {}).groups || []).filter(function (x) {
-          return x.addr === gAddr;
+        var removed = [];
+        Object.keys(dev.Report || {}).forEach(function (k) {
+          var arr = dev.Report[k].groups;
+          if (!Array.isArray(arr) || arr.indexOf(gAddr) === -1) return;
+          dev.Report[k].groups = arr.filter(function (a) { return a !== gAddr; });
+          grpSyncParsed(dev, k);
+          removed.push(k.substring(0, 2));
         });
-        dev.JoinSetup = dev.JoinSetup || {}; dev.JoinSetup.groups = (dev.JoinSetup.groups || []).filter(function (x) {
-          return !(x.addr === gAddr);
-        });
-        if (removed.length) SaveJson('/Devices/' + ieee, JSON.stringify(dev));
+        if (!removed.length) return;
+        SaveJson('/Devices/' + ieee, JSON.stringify(dev));
         // Live command to the device — per EP of each removed membership
-        if (d && d.Device) removed.forEach(function (x) {
-          WSsend('groupRemove|' + d.Device + '|' + x.ep + '|' + gAddr);
+        if (d && d.Device) removed.forEach(function (ep) {
+          WSsend('groupRemove|' + d.Device + '|' + ep + '|' + gAddr);
         });
       } catch (e) {}
     });
@@ -224,10 +253,9 @@ function grpAddToDo() {
         try {
           if (!data || data === 'NULL') return;
           var dev = JSON.parse(data);
-          dev.JoinSetup = dev.JoinSetup || {}; dev.JoinSetup.groups = dev.JoinSetup.groups || [];
-          if (!dev.JoinSetup.groups.some(function (x) { return x.addr === gAddr && x.ep === ep; })) {
-            dev.JoinSetup.groups.push({ addr: gAddr, ep: ep });
-          }
+          var key = grpEnsureHolder(dev, ep);
+          if (dev.Report[key].groups.indexOf(gAddr) === -1) dev.Report[key].groups.push(gAddr);
+          grpSyncParsed(dev, key);
           SaveJson('/Devices/' + d.IEEE, JSON.stringify(dev));
         } catch (e) {}
       });

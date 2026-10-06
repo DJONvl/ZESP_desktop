@@ -1,0 +1,51 @@
+{
+  "Device": "85B1",
+  "Name": "lumi.sensor_switch",
+  "IEEE": "00158D0003961E4F",
+  "ModelId": "lumi.sensor_switch",
+  "Location": "Дом",
+  "DevType": "ZED",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0006"
+      ],
+      "ClO": [
+        "0006"
+      ]
+    }
+  },
+  "Report": {
+    "010000FF02": {
+      "label": "Battery",
+      "val": "9A4E2000192100000000012413A8210BB02101",
+      "mat": "[{\"label\":\"Battery\",\"sig\":\"0121\",\"dl\":\"2\",\"mat\":\"0.001\",\"role\":\"sensor\"}]",
+      "role": "sensor",
+      "class": {
+        "device_class": "battery",
+        "unit_of_measurement": "V"
+      }
+    },
+    "0100060000": {
+      "label": "Btn_state",
+      "val": "0x01",
+      "mat": "1",
+      "role": "binary_sensor",
+      "class": {
+        "payload_on": "0",
+        "payload_off": "1"
+      }
+    },
+    "0100068000": {
+      "label": "Multiclick",
+      "val": "0x02",
+      "mat": "1",
+      "role": "sensor",
+      "class": {
+        "force_update": true
+      }
+    }
+  }
+}

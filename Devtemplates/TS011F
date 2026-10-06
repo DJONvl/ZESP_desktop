@@ -1,0 +1,107 @@
+{
+  "Device": "8774",
+  "IEEE": "A49E69FFFE012BCF",
+  "ModelId": "TS011F",
+  "ManufName": "_TZ3000_qeuvnohg",
+  "Name": "TS011F",
+  "PwrSrc": "",
+  "Location": "Дом",
+  "DevType": "ZED",
+  "leave": 0,
+  "type": "devices.types.switch",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0003",
+        "0004",
+        "0005",
+        "0006",
+        "0702",
+        "0b04",
+        "0402",
+        "e000",
+        "e001"
+      ],
+      "ClO": [
+        "0019",
+        "000a"
+      ]
+    },
+    "F2": {
+      "PrfId": "a1e0",
+      "ClI": [],
+      "ClO": [
+        "0021"
+      ]
+    }
+  },
+  "Report": {
+    "0100060000": {
+      "label": "On_Off",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "retain": "0",
+      "ya_rep": "none",
+      "class": {}
+    },
+    "0104020000": {
+      "label": "Temperature",
+      "val": "",
+      "mat": "0.003992523364486",
+      "role": "sensor",
+      "class": {
+        "device_class": "temperature",
+        "unit_of_measurement": "°C"
+      },
+      "parsed": "",
+      "retain": "0",
+      "ya_rep": "none"
+    },
+    "010B040505": {
+      "label": "Voltage",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {
+        "device_class": "voltage",
+        "unit_of_measurement": "V"
+      },
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "ya_rep": "{\"properties\":[{\"type\":\"devices.properties.float\",\"retrievable\":true,\"reportable\":true,\"parameters\":{\"instance\":\"voltage\",\"unit\":\"unit.volt\"},\"state\":{\"instance\":\"voltage\",\"value\":0}}]}",
+      "retain": "0"
+    },
+    "010B040508": {
+      "label": "Curent",
+      "val": "",
+      "mat": "0.001",
+      "role": "sensor",
+      "class": {
+        "device_class": "current",
+        "unit_of_measurement": "A"
+      },
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "ya_rep": "{\"properties\":[{\"type\":\"devices.properties.float\",\"retrievable\":true,\"reportable\":true,\"parameters\":{\"instance\":\"amperage\",\"unit\":\"unit.ampere\"},\"state\":{\"instance\":\"amperage\",\"value\":0}}]}",
+      "retain": "0"
+    },
+    "010B04050B": {
+      "label": "Power",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {
+        "device_class": "energy",
+        "unit_of_measurement": "Wh"
+      },
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "ya_rep": "{\"properties\":[{\"type\":\"devices.properties.float\",\"retrievable\":true,\"reportable\":false,\"parameters\":{\"instance\":\"power\",\"unit\":\"unit.watt\"},\"state\":{\"instance\":\"power\",\"value\":0}}]}",
+      "retain": "0"
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "Device": "",
+  "Name": "MS01",
+  "IEEE": "",
+  "ModelId": "MS01",
+  "Location": "",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0003",
+        "0500",
+        "0001"
+      ],
+      "ClO": [
+        "0003"
+      ]
+    }
+  },
+  "Report": {
+    "0100010021": {
+      "label": "Battery",
+      "val": "0xC8",
+      "mat": "{\"fn\":\"h2f(report)\"}",
+      "role": "sensor",
+      "parsed": "0xC8",
+      "class": {
+        "device_class": "battery",
+        "unit_of_measurement": "V"
+      }
+    },
+    "0105000000": {
+      "label": "IAS_ZONE",
+      "val": "0001",
+      "mat": "1",
+      "role": "binary_sensor",
+      "parsed": "0001",
+      "class": {
+        "device_class": "motion",
+        "off_delay": "60",
+        "payload_on": "1",
+        "payload_off": "0"
+      }
+    }
+  },
+  "ClusterToBind": [
+    "010001",
+    "010500"
+  ]
+}

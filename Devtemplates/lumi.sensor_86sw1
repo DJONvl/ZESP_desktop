@@ -1,0 +1,72 @@
+{
+  "Device": "522D",
+  "Name": "lumi.sensor_86sw1",
+  "IEEE": "00158D00010B521F",
+  "ModelId": "lumi.sensor_86sw1",
+  "Location": "undefined",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0003",
+        "0019",
+        "FFFF",
+        "0012"
+      ],
+      "ClO": [
+        "0000",
+        "0004",
+        "0003",
+        "0005",
+        "0019",
+        "FFFF",
+        "0012"
+      ]
+    },
+    "02": {
+      "PrfId": "0104",
+      "ClI": [
+        "0003",
+        "0012"
+      ],
+      "ClO": [
+        "0004",
+        "0003",
+        "0005",
+        "0012"
+      ]
+    },
+    "03": {
+      "PrfId": "0104",
+      "ClI": [
+        "0003",
+        "000C"
+      ],
+      "ClO": [
+        "0004",
+        "0003",
+        "0005",
+        "000C"
+      ]
+    }
+  },
+  "DevType": "ZED",
+  "Report": {
+    "010000FF01": {
+      "label": "Battery",
+      "val": "0121E50B03281A0421A813052149000624EB000100000A21000012",
+      "mat": "[{\"label\":\"Battery\",\"sig\":\"0121\",\"dl\":\"2\",\"mat\":\"0.001\",\"role\":\"sensor\"}]",
+      "role": "sensor",
+      "class": {"device_class": "battery", "unit_of_measurement": "V"}
+    },
+    "0100060000": {
+      "label": "Btn",
+      "val": "00",
+      "mat": "1",
+      "role": "binary_sensor",
+      "class": {"device_class": "light", "payload_on": "1", "payload_off": "0"},
+      "parsed": "00"
+    }
+  }
+}

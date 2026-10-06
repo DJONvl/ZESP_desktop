@@ -1,0 +1,37 @@
+{
+  "Device": "A387",
+  "Name": "TI0001",
+  "IEEE": "00124B000BEFC42E",
+  "ModelId": "TI0001",
+  "Location": "undefined",
+  "EP": {
+    "06": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0003"
+      ],
+      "ClO": [
+        "0006"
+      ]
+    }
+  },
+  "DevType": "ZED",
+  "Report": {
+    "0600000005": {
+      "label": "06Basic",
+      "val": "TI0001          ",
+      "mat": "1",
+      "role": "sensor",
+      "class": {}
+    },
+    "0600060000": {
+      "label": "06On_Off_0000",
+      "val": "",
+      "mat": "1",
+      "role": "livolo_swith1ch",
+      "parsed": "",
+      "class": {}
+    }
+  }
+}

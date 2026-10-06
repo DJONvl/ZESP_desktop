@@ -1,0 +1,33 @@
+{
+  "Device": "736C",
+  "Name": "lumi.sensor_motion",
+  "IEEE": "00158D0003E7D9F4",
+  "ModelId": "lumi.sensor_motion",
+  "EP": {},
+  "DevType": "ZED",
+  "Report": {
+    "0104060000": {
+      "label": "Occupancy",
+      "val": "0x01",
+      "mat": "1",
+      "role": "binary_sensor",
+      "class": {
+        "device_class": "motion",
+        "off_delay": "60",
+        "payload_on": "1",
+        "payload_off": "0"
+      }
+    },
+    "010000FF02": {
+      "label": "Battery",
+      "val": "AC562000052100000000162423A8210BD12101",
+      "mat": "[{\"label\":\"Battery\",\"sig\":\"0121\",\"dl\":\"2\",\"mat\":\"0.001\",\"role\":\"sensor\",\"per\":\"1\"}]",
+      "role": "sensor",
+      "class": {
+        "device_class": "battery",
+        "unit_of_measurement": "%"
+      }
+    }
+  },
+  "Location": "Зал"
+}

@@ -1,0 +1,204 @@
+{
+  "Device": "39FC",
+  "Name": "FreePad_LeTV_8",
+  "IEEE": "00124B000ADB794D",
+  "ModelId": "FreePad_LeTV_8",
+  "Location": "Зал",
+  "EP": {
+    "08": {
+      "PrfId": "0104",
+      "ClI": [],
+      "ClO": [
+        "0006",
+        "0012"
+      ]
+    },
+    "07": {
+      "PrfId": "0104",
+      "ClI": [],
+      "ClO": [
+        "0006",
+        "0012"
+      ]
+    },
+    "06": {
+      "PrfId": "0104",
+      "ClI": [],
+      "ClO": [
+        "0006",
+        "0012"
+      ]
+    },
+    "05": {
+      "PrfId": "0104",
+      "ClI": [],
+      "ClO": [
+        "0006",
+        "0012",
+        "0008",
+        "0300",
+        "0006",
+        "0012",
+        "0008",
+        "0300"
+      ]
+    },
+    "04": {
+      "PrfId": "0104",
+      "ClI": [],
+      "ClO": [
+        "0006",
+        "0012"
+      ]
+    },
+    "03": {
+      "PrfId": "0104",
+      "ClI": [],
+      "ClO": [
+        "0006",
+        "0012"
+      ]
+    },
+    "02": {
+      "PrfId": "0104",
+      "ClI": [],
+      "ClO": [
+        "0006",
+        "0012"
+      ]
+    },
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0000"
+      ],
+      "ClO": [
+        "0006",
+        "0012",
+        "0008",
+        "0300",
+        "0006",
+        "0012",
+        "0008",
+        "0300"
+      ]
+    },
+    "0D": {
+      "PrfId": "C05E",
+      "ClI": [
+        "1000"
+      ],
+      "ClO": [
+        "1000"
+      ]
+    }
+  },
+  "DevType": "ZED",
+  "Report": {
+    "0100060000": {
+      "label": "Key01",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {
+        "force_update": true
+      },
+      "parsed": ""
+    },
+    "0200060000": {
+      "label": "Key02",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {
+        "force_update": true
+      },
+      "parsed": ""
+    },
+    "0300060000": {
+      "label": "Key03",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {
+        "force_update": true
+      },
+      "parsed": ""
+    },
+    "0400060000": {
+      "label": "Key04",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {
+        "force_update": true
+      },
+      "parsed": ""
+    },
+    "0500060000": {
+      "label": "Key05",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {
+        "force_update": true
+      },
+      "parsed": ""
+    },
+    "0600060000": {
+      "label": "Key06",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {
+        "force_update": true
+      },
+      "parsed": ""
+    },
+    "0700060000": {
+      "label": "Key07",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {
+        "force_update": true
+      },
+      "parsed": ""
+    },
+    "0800060000": {
+      "label": "Key08",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {
+        "force_update": true
+      },
+      "parsed": ""
+    },
+    "0100010020": {
+      "label": "battery",
+      "val": "",
+      "mat": "0.1",
+      "role": "sensor",
+      "class": {
+        "device_class": "battery",
+        "unit_of_measurement": "V"
+      },
+      "parsed": ""
+    }
+  },
+  "ClusterToBind": [
+    "010001",
+    "010006",
+    "020006",
+    "030006",
+    "040006",
+    "050006",
+    "060006",
+    "070006",
+    "080006",
+    "010008",
+    "050008"
+  ]
+}

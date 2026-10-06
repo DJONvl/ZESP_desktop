@@ -1,0 +1,38 @@
+{
+  "Device": "28A4",
+  "Name": "",
+  "IEEE": "5C0272FFFECA9FC6",
+  "ModelId": "TS0041",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "000A",
+        "0001",
+        "0006"
+      ],
+      "ClO": [
+        "0019"
+      ]
+    }
+  },
+  "Report": {
+    "0100010021": {
+      "label": "POWER_CONFIGURATION",
+      "val": "0xC8",
+      "mat": "1",
+      "role": "sensor",
+      "parsed": "0xC8",
+      "class": {}
+    },
+    "0100060000": {
+      "label": "ON_OFF",
+      "val": "0x00",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "0x00",
+      "class": {}
+    }
+  }
+}

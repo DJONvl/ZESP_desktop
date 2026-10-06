@@ -1,0 +1,75 @@
+{
+  "Device": "",
+  "Name": "sensor_magnet",
+  "IEEE": "",
+  "ModelId": "lumi.sensor_magnet",
+  "DevType": "ZED",
+  "EP": {},
+  "Report": {
+    "01FF020001": {
+      "label": "Battery",
+      "val": "",
+      "mat": "1",
+
+      "parsed": "",
+      "retain": "0",
+      "ya_rep": "none",
+      "role": "sensor",
+      "class": {"device_class": "battery","unit_of_measurement": "V"}
+    },
+    "010000FF02": {
+      "label": "Battery",
+      "val": [
+        {
+          "elmType": 16,
+          "elmVal": 1
+        },
+        {
+          "elmType": 33,
+          "elmVal": 3045
+        },
+        {
+          "elmType": 33,
+          "elmVal": 17320
+        },
+        {
+          "elmType": 36,
+          "elmVal": [
+            0,
+            1
+          ]
+        },
+        {
+          "elmType": 33,
+          "elmVal": 536
+        },
+        {
+          "elmType": 32,
+          "elmVal": 96
+        }
+      ],
+      "mat": "[{\"label\":\"Battery\",\"sig\":\"0121\",\"dl\":\"2\",\"mat\":\"0.001\",\"role\":\"sensor\"}]",
+      "role": "sensor",
+      "class": {
+        "device_class": "battery",
+        "unit_of_measurement": "V"
+      },
+      "parsed": "3.04",
+      "time": 1770813735267
+    },
+    "0100060000": {
+      "label": "win_open",
+      "val": 1,
+      "mat": "1",
+      "role": "binary_sensor",
+      "class": {
+        "device_class": "door",
+        "payload_on": "1",
+        "payload_off": "0"
+      },
+      "parsed": "1",
+      "time": 1770726576582
+    }
+  },
+  "Location": "Зал"
+}

@@ -1,0 +1,81 @@
+{
+  "Device": "E807",
+  "IEEE": "A4C1387CCB6E9D54",
+  "ModelId": "TS0013",
+  "ManufName": "_TZ3000_5e5ptb24",
+  "Name": "TS0013",
+  "PwrSrc": "",
+  "Location": "Коридор",
+  "DevType": "ZED",
+  "leave": 0,
+  "type": "devices.types.switch",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0003",
+        "0004",
+        "0005",
+        "0006",
+        "0000"
+      ],
+      "ClO": [
+        "0019",
+        "000A"
+      ]
+    },
+    "02": {
+      "PrfId": "0104",
+      "ClI": [
+        "0004",
+        "0005",
+        "0006"
+      ],
+      "ClO": []
+    },
+    "03": {
+      "PrfId": "0104",
+      "ClI": [
+        "0004",
+        "0005",
+        "0006"
+      ],
+      "ClO": []
+    }
+  },
+  "Report": {
+    "0100060000": {
+      "label": "свет_коридор",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "retain": "0",
+      "ya_rep": "{\"capabilities\":[{\"type\":\"devices.capabilities.on_off\",\"retrievable\":true,\"reportable\":true,\"state\":{\"instance\":\"on\",\"value\":false}}],\"multi_id\":{\"name\":\"\",\"room\":\"\",\"type\":\"devices.types.switch\"}}",
+      "class": {}
+    },
+    "0200060000": {
+      "label": "свет_ванная",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "retain": "0",
+      "ya_rep": "{\"capabilities\":[{\"type\":\"devices.capabilities.on_off\",\"retrievable\":true,\"reportable\":true,\"state\":{\"instance\":\"on\",\"value\":false}}],\"multi_id\":{\"name\":\"\",\"room\":\"\",\"type\":\"devices.types.other\"}}",
+      "class": {}
+    },
+    "0300060000": {
+      "label": "свет_кухня",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "cfg_report": "{\"DataType\":\"21\",\"MinInterval\":\"0001\",\"MaxInterval\":\"012C\",\"TimeOut\":\"0000\",\"Change\":\"0001\"}",
+      "retain": "0",
+      "ya_rep": "{\"capabilities\":[{\"type\":\"devices.capabilities.on_off\",\"retrievable\":true,\"reportable\":true,\"state\":{\"instance\":\"on\",\"value\":false}}],\"multi_id\":{\"name\":\"\",\"room\":\"\",\"type\":\"devices.types.other\"}}",
+      "class": {}
+    }
+  }
+}

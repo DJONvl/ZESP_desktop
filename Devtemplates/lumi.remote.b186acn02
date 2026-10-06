@@ -1,0 +1,42 @@
+{
+  "Device": "",
+  "Name": "lumi.remote.b186acn02 коридор",
+  "IEEE": "",
+  "ModelId": "lumi.remote.b186acn02",
+  "Location": "Коридор",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": ["0000", "0003", "0019", "FFFF", "0012"],
+      "ClO": ["0000", "0004", "0003", "0005", "0019", "FFFF", "0012"]
+    },
+    "02": {
+      "PrfId": "0104",
+      "ClI": ["0003", "0012"],
+      "ClO": ["0004", "0003", "0005", "0012"]
+    },
+    "03": {
+      "PrfId": "0104",
+      "ClI": ["0003", "000C"],
+      "ClO": ["0004", "0003", "0005", "000C"]
+    }
+  },
+  "DevType": "ZED",
+  "Report": {
+    "010000FF01": {
+      "label": "Battery",
+      "val": "0121EF0B03281D0421A8010521160006240100000000082109140A21000000",
+      "mat": "[{\"label\":\"Battery\",\"sig\":\"0121\",\"dl\":\"2\",\"mat\":\"0.001\",\"role\":\"sensor\"}]",
+      "role": "sensor",
+      "class": {"device_class": "battery", "unit_of_measurement": "%"}
+    },
+    "0100120055": {
+      "label": "Key",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "class": {"force_update": true},
+      "parsed": ""
+    }
+  }
+}

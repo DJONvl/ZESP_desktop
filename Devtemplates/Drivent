@@ -1,0 +1,120 @@
+{
+  "Device": "",
+  "Name": "Drivent",
+  "IEEE": "",
+  "ModelId": "Drivent",
+  "Location": "Кухня",
+  "EP": {
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0003",
+        "0004",
+        "0005",
+        "0006",
+        "0008"
+      ],
+      "ClO": [
+        "0000"
+      ]
+    },
+    "02": {
+      "PrfId": "0104",
+      "ClI": [
+        "0008"
+      ],
+      "ClO": [
+        "0006"
+      ]
+    },
+    "03": {
+      "PrfId": "0104",
+      "ClI": [
+        "0006"
+      ],
+      "ClO": [
+        "0006"
+      ]
+    }
+  },
+  "DevType": "ZR",
+  "Report": {
+    "0100060000": {
+      "label": "open_close",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "time": "0",
+      "Location": "Кухня",
+      "retain": "0",
+      "ya_rep": "{\"capabilities\":[{\"type\":\"devices.capabilities.on_off\",\"retrievable\":true,\"reportable\":true,\"state\":{\"instance\":\"on\",\"value\":false}}]}",
+      "class": {}
+    },
+    "0200060000": {
+      "label": "alarm",
+      "val": "",
+      "mat": "1",
+      "role": "binary_sensor",
+      "parsed": "",
+      "time": "0",
+      "retain": "0",
+      "ya_rep": "none",
+      "class": {
+        "device_class": "problem",
+        "payload_on": "1",
+        "payload_off": "0"
+      }
+    },
+    "0100080000": {
+      "label": "Target",
+      "val": "",
+      "mat": "1",
+      "role": "cover",
+      "parsed": "0",
+      "time": "0",
+      "Data": "00",
+      "retain": "0",
+      "ya_rep": "{\"capabilities\":[{\"type\":\"devices.capabilities.range\",\"retrievable\":true,\"reportable\":true,\"parameters\":{\"instance\":\"open\",\"random_access\":true,\"range\":{\"max\":100,\"min\":1,\"precision\":1},\"unit\":\"unit.percent\"},\"state\":{\"instance\":\"open\",\"value\":1}}]}",
+      "class": {
+        "cmd_t": "~/Target/set",
+        "position_topic": "~/Current/state",
+        "set_position_topic": "~/Target/set",
+        "dev_cla": "window",
+        "pl_open": "100",
+        "pl_cls": "0",
+        "pl_stop": "stop",
+        "pos_open": 100,
+        "pos_clsd": 0
+      }
+    },
+    "0200080000": {
+      "label": "Curent",
+      "val": "",
+      "mat": "1",
+      "role": "sensor",
+      "parsed": "0",
+      "time": "0",
+      "Data": "00",
+      "retain": "0",
+      "ya_rep": "none",
+      "class": {
+        "device_class": "none"
+      }
+    },
+    "0300060000": {
+      "label": "wifi",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "time": "0",
+      "retain": "0",
+      "ya_rep": "none",
+      "class": {}
+    }
+  },
+  "lastSeen": 1734184785650,
+  "type": "devices.types.openable"
+}

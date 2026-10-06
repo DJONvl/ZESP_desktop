@@ -8,7 +8,7 @@ function teShowAbout(){}
 var te_mock={show:function(){},hide:function(){},bringToFront:function(){},destroy:function(){},clickClose:function(){},render:function(){}};
 var te_cm1={setItemState:function(){},setState:function(){}};
 window.te_timers=[];
-function te_reset(){ var v=["file","fileName","filePath","docChanged","ClassterAttr","tmpFile","dragItem","dragStartIndex","dragStartY","dragStartX","dragOffsetY","isDragging","placeholder","dragContainer","currentEditObj","currentCfgObj","currentYaObj","currentYaData","sniffSelected","jsEditIdx","currentBindObj","jsVarEdit","jsNewGroup","groupsReq"]; v.forEach(function(v2){ try{ window["te_"+v2]=null; }catch(e){} }); }
+function te_reset(){ var v=["file","fileName","filePath","docChanged","ClassterAttr","tmpFile","dragItem","dragStartIndex","dragStartY","dragStartX","dragOffsetY","isDragging","placeholder","dragContainer","currentEditObj","currentCfgObj","currentYaObj","currentYaData","sniffSelected","currentBindObj","groupsReq","currentObj"]; v.forEach(function(v2){ try{ window["te_"+v2]=null; }catch(e){} }); }
 function te_openFromManager(ieee){ if(window.WinEngine) WinEngine.open("templateedit",{params:"1#"+ieee}); }
 
 
@@ -34,6 +34,9 @@ te_dragContainer = null;
 te_DeviceWidgetHandler=function(event){
 let obj=""
  const target = event.target;
+  // Clicks on live controls (select/input/button/label) must not rebuild the right panel —
+  // otherwise an open dropdown collapses from the layout shift. Row navigation only.
+  if (target.closest('select,input,textarea,button,label')) return;
   let switchFlexDiv = target.closest('.switch.flex');
   if (switchFlexDiv) {
     switchFlexDiv.querySelectorAll('span, input[type="checkbox"]').forEach(element => {
@@ -45,7 +48,7 @@ let obj=""
 	  te_drawJson(te_file,obj)
 }
 
-te_wMain_cbResizeEnd=function(){ if(!window.te_body){return;} var t=window.te_body; var w=t.clientWidth; var h=t.clientHeight; t.style.width="100%"; t.style.height="100%"; var widget=document.getElementById("te_DeviceWidget"); var widgetW=(widget&&widget.offsetWidth)||258; var json=document.getElementById("te_DeviceJson"); if(json){json.style.width=(w-widgetW-6)+"px"; json.style.height=(h)+"px";} }
+te_wMain_cbResizeEnd=function(){ if(!window.te_body){return;} var t=window.te_body; var w=t.clientWidth; var h=t.clientHeight; t.style.width="100%"; t.style.height="100%"; var widget=document.getElementById("te_DeviceWidget"); var widgetW=(widget&&widget.offsetWidth)||258; var json=document.getElementById("te_DeviceJson"); if(json){json.style.width=(w-widgetW-6)+"px"; json.style.height=(h)+"px";} var leftCol=document.getElementById("te_leftCol"); if(leftCol){leftCol.style.maxHeight=(h)+"px";} }
 
 te_wMain_onDrop=function(dsktp,files,dsktpRcvr)
 {
@@ -79,10 +82,6 @@ te_parseFile=function(file)
 	if (window.te_retryIv) { clearInterval(window.te_retryIv); window.te_retryIv = null; }
 	if (window.te_retryHdl && window.eventE) { eventE.off("updateDeviceList", window.te_retryHdl); window.te_retryHdl = null; }
 	te_file={ ...src };
-
-	// JoinSetup lives in the file, deviceList lacks it — normalize and fetch the full LoadJson
-	te_normJoinSetup(te_file);
-	te_fetchJoinSetup(file);
 
 	// Migrate all Report objects to the new format right after loading
 	te_migrateRoleFormat(te_file);
@@ -406,8 +405,11 @@ te_drawJson = function(js, obj) {
         objectTable.innerHTML = `
             ${createInputRow("Label", "te_label", ro.label)}
             ${createInputRow("Val.raw.Hex", "te_val", ro.val)}
-            <tr><td title="ZCL-тип атрибута для записи (hex). Заполняется кнопкой + Add из cl.js">DataType</td>
-                <td><input type="text" id="${obj}_te_dataType" list="lDTL" oninput="te_devObjEd(this.id,this.value)" value="${ro.dataType || ''}" placeholder="—" title="hex: 10, 20, 21, 29..."></td>
+            <tr><td title="ZCL-тип атрибута и код производителя для записи (hex). Тип заполняется кнопкой + Add из cl.js">DataType / Manuf</td>
+                <td><div style="display:flex;gap:3px;align-items:center;">
+                    <input type="text" id="${obj}_te_dataType" list="lDTL" oninput="te_devObjEd(this.id,this.value)" value="${ro.dataType || ''}" placeholder="тип" title="hex: 10, 20, 21, 29..." style="width:90px">
+                    <input type="text" id="${obj}_te_manuf" oninput="te_devObjEd(this.id,this.value)" value="${ro.manuf || ''}" placeholder="0000" title="Manuf code hex" style="width:64px">
+                </div></td>
                 <td></td></tr>
             ${createInputRow("Mat", "te_mat", ro.mat)}
             ${createInputRow("Val.parsed", "te_parsed", ro.parsed, true)}
@@ -449,16 +451,39 @@ te_drawJson = function(js, obj) {
                     </div>
                 </td>
             </tr>
+            ${['select', 'number', 'button'].includes(String(ro.role || '').split('&')[0]) ? `
             <tr>
-                <td title="Куда слать репорты этого кластера. Сохраняется в JoinSetup.binds">Bind</td>
+                <td title="Системная настройка: писать значение в устройство при (пере)джойне">Setup</td>
+                <td><div style="display:flex;align-items:center;gap:6px;">
+                    <input type="checkbox" id="${obj}_te_setup" ${ro.setup ? 'checked' : ''} onchange="te_devObjEd(this.id,this.checked)">
+                    <button class="obj-mnu-btn" style="padding:1px 5px" onclick="te_testWrite('${obj}')" title="Записать текущее значение в устройство сейчас">▶</button>
+                </div></td>
+                <td></td></tr>
+            <tr>
+                <td title="Имя юнита: записи select с одним именем сливаются в один дропдаун">Unit</td>
+                <td><input type="text" id="${obj}_te_unit" oninput="te_devObjEd(this.id,this.value)" value="${te_escJs(ro.unitname || '')}" placeholder="как название"></td>
+                <td></td></tr>` : ''}
+            <tr>
+                <td title="Куда слать репорты этого кластера (поле bind записи)">Bind</td>
                 <td colspan="2">
                     <div style="display:flex;align-items:center;gap:3px;">
                         <div class="cfg-rpt-preview" id="${obj}_te_bind_view">${te_bindPreview(obj)}</div>
                         <button class="obj-mnu-btn" style="padding:1px 5px" onclick="te_openBindEditor('${obj}')">✏️</button>
+                        <button class="obj-mnu-btn" style="padding:1px 5px" onclick="te_testBind('${obj}',true)" title="Проверить живьём">🔗</button>
                         <button class="obj-mnu-btn" style="padding:1px 5px" onclick="te_clearBind('${obj}')">✖</button>
                     </div>
                 </td>
             </tr>
+            ${obj.substring(2, 6).toUpperCase() === '0004' ? `
+            <tr>
+                <td title="Группы, которые слушает эндпоинт (поле groups записи)">Groups</td>
+                <td colspan="2">
+                    <div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap">
+                        <span id="te_groups_list" data-obj="${obj}">${te_groupsHtml(obj)}</span>
+                        ${te_groupsAddForm(obj)}
+                    </div>
+                </td>
+            </tr>` : ''}
             <tr>
                 <td>Location</td>
                 <td colspan="2">
@@ -518,21 +543,12 @@ te_drawJson = function(js, obj) {
             dragContainer.appendChild(object);
         }
         container.appendChild(dragContainer);
-        // JoinSetup section ("Connection setup") — below the object list.
-        // innerHTML is set right here (container not in DOM yet), refresh — after insertion below.
-        try {
-            const jsBlock = document.createElement("div");
-            jsBlock.id = "te_JoinSetup";
-            try { jsBlock.innerHTML = te_joinSetupHtml(); } catch(e2) { console.warn("te JoinSetup html", e2); }
-            container.appendChild(jsBlock);
-        } catch(e) { console.warn("te JoinSetup render", e); }
     }
     
     // Clear and fill DeviceJson
     const deviceJson = document.getElementById("te_DeviceJson");
     deviceJson.innerHTML = '';
     deviceJson.appendChild(container);
-    try { te_refreshJoinSetup(); } catch(e) {}
 
     // ========== FIX: CREATE THE PICKER AFTER ADDING TO DOM ==========
     // Small delay to guarantee the DOM has updated
@@ -740,7 +756,7 @@ te_updateReportOrder = function() {
     console.log('Порядок обновлен:', newOrder);
 	te_markSave(0);
 	let ind=deviceList.findIndex(d => d.IEEE === te_file.IEEE)
-	if(ind>=0){deviceList[ind]=te_strippedLive(te_file)}
+	if(ind>=0){deviceList[ind]=te_file}
 	try{redrawDevice(te_file.IEEE)}catch{}
 };
 
@@ -754,10 +770,9 @@ te_syncLive = function(immediate) {
     te_docChanged = true;
     try { te_markSave(0); } catch(e) {}
     var push = function() {
-        try { te_primeJsCache(); } catch(e) {}
         try {
             var ind = deviceList.findIndex(function(d){ return d.IEEE === te_file.IEEE; });
-            if (ind >= 0) deviceList[ind] = te_strippedLive(te_file);
+            if (ind >= 0) deviceList[ind] = te_file;
         } catch(e) {}
         try { if (typeof redrawDevice === "function") redrawDevice(te_file.IEEE); } catch(e) {}
         try { if (window.eventE) eventE.emit("updateDeviceList", deviceList); } catch(e) {}
@@ -800,6 +815,19 @@ te_devObjEd=function(id,value){
 	if(key==='dataType'){
 		value=String(value).split(":")[0].trim().toUpperCase();
 	}
+	// Manuf — hex uppercase
+	if(key==='manuf'){
+		value=String(value).trim().toUpperCase();
+	}
+	// Setup — checkbox boolean
+	if(key==='setup'){
+		value = !!value;
+	}
+	// Unit — имя юнита для мерджа селектов (поле unitname)
+	if(key==='unit'){
+		value=String(value).trim();
+		key='unitname';
+	}
 	te_file.Report[obj][key]=value
 
 	if(key==='role') te_setClassOptions(value)
@@ -814,6 +842,8 @@ te_saveDeviceChanges=function(){
 
 te_objEd=function(obj,value){
 	console.log(obj,value)
+	window.te_currentObj = obj;
+	try { te_ensureGroups(); } catch(e) {}
 	te_drawJson(te_file,obj)
 }
 
@@ -923,7 +953,6 @@ te_cmSave_click=function()
 		return;
 
 	te_migrateRoleFormat(te_file);
-	te_normJoinSetup(te_file);
 	// Pin the object order as data: the Go map does not store it,
 	// the backend writes Report in this array's order (MarshalJSON).
 	if (te_file.Report) te_file.ReportOrder = Object.keys(te_file.Report);
@@ -931,7 +960,7 @@ te_cmSave_click=function()
 	WSsend(`SaveJson|/Devices/${te_fileName}|` + JSON.stringify(te_file));
 	te_markSave(1);	
 	let ind=deviceList.findIndex(d => d.IEEE === te_file.IEEE)
-	if(ind>=0){deviceList[ind]=te_strippedLive(te_file)}
+	if(ind>=0){deviceList[ind]=te_file}
 	// Live desktop update: tiles will catch up via the alldev broadcast from the backend,
 	// repaint the open device popup immediately
 	try{ if(typeof redrawDevice==="function") redrawDevice(te_file.IEEE); }catch(e){}
@@ -1082,7 +1111,9 @@ te_wMain_about=function()
         '0405': { label: 'Humidity', role: 'sensor' },
         '0406': { label: 'Occupancy', role: 'sensor' },
         'E000': { label: 'Custom1', role: 'sensor' },
-        'E001': { label: 'Custom2', role: 'sensor' }
+        'E001': { label: 'Custom2', role: 'sensor' },
+        '0201': { label: 'Thermostat', role: 'climate' },
+        '0202': { label: 'Fan', role: 'fan' }
     };
 
     // ZCL lamp attributes (ch.3 General: 0006/0008; ch.5 Lighting: 0300/0301)
@@ -1107,6 +1138,15 @@ te_wMain_about=function()
         '03004010': { label: 'StartUpColorTemperature', role: 'sensor' },
         '03010000': { label: 'MaxLevel', role: 'sensor' },
         '03010001': { label: 'MinLevel', role: 'sensor' }
+    };
+    // ZCL Thermostat (0201) / Fan Control (0202) attributes → standalone climate entities (one table row each).
+    // Wins over the cluster mapping in te_Add_obj, same as te_lampAttrLabels.
+    const te_thermostatAttrLabels = {
+        '02010000': { label: 'Temperature', role: 'sensor' },
+        '02010011': { label: 'CoolingSetpoint', role: 'climate_temp' },
+        '02010012': { label: 'HeatingSetpoint', role: 'climate_temp' },
+        '0201001C': { label: 'SystemMode', role: 'climate_mode' },
+        '02020000': { label: 'FanMode', role: 'fan' }
     };
 function generateReportsFromEP(epData) {
     const reports = {};
@@ -1172,8 +1212,9 @@ if (te_file.Report[id]) {alert("Уже существует");return}//objEnbl
 	const mapping = te_clusterMappings[cluster] || { label: `Cluster_${cluster}`, role: 'sensor' };
 	// The lamp attribute ZCL label/role (te_lampAttrLabels) wins over cluster ones
 	const lampAttr = (typeof te_lampAttrLabels !== 'undefined') ? te_lampAttrLabels[cluster + attr] : null;
-	const lampAttrLbl = lampAttr ? lampAttr.label : null;
-	const lampAttrRole = lampAttr ? lampAttr.role : null;
+	const thermoAttr = (!lampAttr && typeof te_thermostatAttrLabels !== 'undefined') ? te_thermostatAttrLabels[cluster + attr] : null;
+	const lampAttrLbl = lampAttr ? lampAttr.label : (thermoAttr ? thermoAttr.label : null);
+	const lampAttrRole = lampAttr ? lampAttr.role : (thermoAttr ? thermoAttr.role : null);
     const dataTypeMappings = {
         'switch': '10',    // Boolean
         'light_onoff': '10',      // Boolean (On_Off)
@@ -1194,6 +1235,7 @@ if (te_file.Report[id]) {alert("Уже существует");return}//objEnbl
 	// Real ZCL attribute type from the cluster descriptor (cl.js), hex string ("21").
 	// Stored on the object so writes/widgets take the type from here instead of guessing.
 	// Do not confuse with cfg_report.DataType — that one is for the reporting subscription.
+	// Manuf code likewise comes from cl.js (atEntry.m); empty = standard attribute.
 	let attrDataType = "";
 	try {
 		const clEntry = (typeof clusters !== "undefined" && clusters) ? clusters[parseInt(cluster, 16)] : null;
@@ -1476,92 +1518,12 @@ te_closeApp = function() {
 };
 
 // ============================================================
-// JOINSETUP — "Connection setup" (writes/binds/reports/groups)
-// Stored in the device/template file, never lands in deviceList/broadcast.
+// OBJECT-LEVEL SETUP — всё живёт в записях Report (JoinSetup упразднён):
+// bind / groups / setup / manuf / unitname / selected.
 // ============================================================
 
-// A te_file copy without JoinSetup — for deviceList/desktop (memory stays clean)
-te_strippedLive = function(src) {
-    if (!src) return src;
-    var c = Object.assign({}, src);
-    try { delete c.JoinSetup; } catch(e) {}
-    // Widget flag: units exist — the card will pull the projection from the shared jsCache
-    try {
-        if (src.JoinSetup && src.JoinSetup.writes && src.JoinSetup.writes.length) c.hasSetup = true;
-    } catch(e) {}
-    return c;
-};
-
-// Push the unit projection from te_file into the shared jsCache — previews and tiles
-// render instantly, without waiting for getJoinSetup and save
-te_primeJsCache = function() {
-    try {
-        if (!window.te_file || !te_file.IEEE || !te_file.JoinSetup) return;
-        var proj = (te_file.JoinSetup.writes || []).map(function(w) {
-            return { id: w.id, unitname: w.unitname, label: w.label, kind: w.kind, entity_category: w.entity_category, value: w.value, options: w.options, selected: !!w.selected };
-        });
-        window.jsCache = window.jsCache || {};
-        window.jsCache[te_file.IEEE] = { state: 'ready', writes: proj };
-    } catch(e) {}
-};
-
-// Normalization to {writes:[],binds:[],reports:[],groups:[]} — fixes in place, returns the reference
-te_normJoinSetup = function(dev) {
-    if (!dev) return { writes: [], binds: [], reports: [], groups: [] };
-    var js = dev.JoinSetup;
-    if (!js || typeof js !== 'object' || Array.isArray(js)) js = {};
-    ['writes', 'binds', 'reports', 'groups'].forEach(function(k) {
-        if (!Array.isArray(js[k])) js[k] = [];
-    });
-    // Migration: options strings → [{v,l}], unit → unitname, unitname ← label
-    js.writes.forEach(function(w) {
-        if (Array.isArray(w.options)) {
-            w.options = w.options.map(function(o) {
-                if (typeof o === 'string') return { v: o, l: o };
-                return o;
-            });
-        }
-        if (w.unit && !w.unitname) { w.unitname = w.unit; delete w.unit; }
-        if (!w.unitname) w.unitname = w.label || w.id || '';
-    });
-    // Cleanup: in a merged group (2+ selects per unit) nested options are meaningless — the entries are the variants
-    var selCount = {};
-    js.writes.forEach(function(w) {
-        if ((w.kind || 'select') === 'select') {
-            var u = w.unitname || w.label || '';
-            selCount[u] = (selCount[u] || 0) + 1;
-        }
-    });
-    js.writes.forEach(function(w) {
-        if ((w.kind || 'select') === 'select' && (selCount[w.unitname || w.label || ''] || 0) > 1 && w.options && w.options.length) {
-            w.options = [];
-        }
-    });
-    dev.JoinSetup = js;
-    return js;
-};
-
-// Fetch the full file from disk (deviceList has no JoinSetup) — merge JoinSetup only
-te_fetchJoinSetup = function(ieee) {
-    if (!ieee || !window.eventE || typeof WSsend !== 'function') return;
-    try {
-        var key = 'deviceFile:/Devices/' + ieee;
-        eventE.once(key, function(data) {
-            try {
-                if (!data || data === 'NULL') return;
-                if (!window.te_file || te_file.IEEE !== ieee) return; // window already closed/switched
-                var full = JSON.parse(data);
-                if (full && full.JoinSetup) {
-                    te_file.JoinSetup = te_normJoinSetup(full);
-                    te_refreshJoinSetup();
-                }
-            } catch(e) { console.warn('te JoinSetup merge', e); }
-        });
-        WSsend('LoadJson|/Devices/' + ieee);
-    } catch(e) {}
-};
-
-te_jsDirty = function() {
+// te_file грязный + живой синк (виджет, deviceList, десктоп)
+te_markDirty = function() {
     te_docChanged = true;
     try { te_markSave(0); } catch(e) {}
     te_syncLive(true);
@@ -1571,385 +1533,17 @@ te_escJs = function(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 };
 
-// ---------- HTML ----------
-te_joinSetupHtml = function() {
-    var js = te_normJoinSetup(te_file || {});
-    var h = '<div class="obj-mnu-divider"></div>';
-    h += '<div class="te_edObj" id="te_jsHead"><div class="ep">⚙</div><div class="cl">JoinSetup</div><div>— Настройка подключения (применяется при подключении)</div></div>';
-    h += '<div class="te_edAttr show" style="display:block">';
+// ---------- BIND (поле bind записи; EP/кластер — из ключа объекта) ----------
+te_currentBindObj = null;
 
-    // --- WRITES: everything is edited in place, no edit modes ---
-    h += '<div class="obj-mnu-section"><div class="obj-mnu-row"><label class="obj-mnu-label">Записи</label>'
-        + '<span style="font-size:11px;color:var(--text-muted)">юниты: запись значения в EP+кластер+атрибут</span></div>';
-    if (!js.writes.length) h += '<div style="font-size:11px;color:#bbb;padding:2px 6px">— пусто —</div>';
-    // Grouping by unitname; select entries of one unit = variants of one select
-    var dup = te_jsDupKeys(js);
-    var groups = {}, order = [];
-    js.writes.forEach(function(w, i) {
-        var u = w.unitname || w.label || '';
-        if (!groups[u]) { groups[u] = []; order.push(u); }
-        groups[u].push(i);
-    });
-    order.forEach(function(u) {
-        var nsel = groups[u].filter(function(i) { return (js.writes[i].kind || 'select') === 'select'; }).length;
-        h += '<div class="obj-mnu-row" style="margin-top:4px;background:var(--bg3);border-radius:4px;padding:2px 5px">'
-            + '<label class="obj-mnu-label" style="font-weight:bold">📦</label>'
-            + '<input class="obj-mnu-dt-input" style="width:160px;font-weight:bold" value="' + te_escJs(u) + '" data-old="' + te_escJs(u) + '" onchange="te_jsSetUnit(this)" title="Имя юнита (одинаковое = один юнит)">'
-            + '<span style="font-size:10px;color:var(--text-muted)">' + groups[u].length + ' зап.</span>'
-            + (nsel > 1 ? '<span style="font-size:10px;color:var(--accent)" title="Эти select-записи сольются в один селект в виджете">→ один селект</span>' : '')
-            + '</div>';
-        groups[u].forEach(function(i) {
-            var w = js.writes[i];
-            var cat = w.entity_category || '';
-            var dkey = ((w.ep || '') + (w.cluster || '') + (w.attr || '')).toUpperCase();
-            var isDup = (dup[dkey] || 0) > 1;
-            var kind = w.kind || 'select';
-            h += '<div style="border:1px solid ' + (isDup ? 'var(--red)' : 'var(--border2)') + ';border-radius:4px;padding:3px 5px;margin:2px 0 2px 8px">'
-                + '<div class="obj-mnu-row" style="gap:3px">'
-                + '<input class="obj-mnu-dt-input" style="width:120px" value="' + te_escJs(w.label || '') + '" onchange="te_jsSetF(' + i + ',\'label\',this.value)" title="Название">'
-                + '<select class="obj-mnu-dt-input" title="Тип юнита" onchange="te_jsSetKind(' + i + ',this.value)">'
-                + ['select', 'number', 'button'].map(function(k) { return '<option value="' + k + '"' + (k === kind ? ' selected' : '') + '>' + k + '</option>'; }).join('')
-                + '</select>'
-                + '<select class="obj-mnu-dt-input" title="Где показывать: пусто — в виджете" onchange="te_jsSetF(' + i + ',\'entity_category\',this.value)">'
-                + '<option value=""' + (cat === '' ? ' selected' : '') + '>виджет</option>'
-                + '<option value="config"' + (cat === 'config' ? ' selected' : '') + '>config</option>'
-                + '<option value="diagnostic"' + (cat === 'diagnostic' ? ' selected' : '') + '>diagnostic</option>'
-                + '</select>'
-                + '<button class="obj-mnu-btn" onclick="te_jsDel(\'writes\',' + i + ')" title="Удалить запись">🗑</button>'
-                + (w.selected ? '<b style="color:var(--accent)" title="Выбранный вариант юнита (уйдёт в устройство при подключении)">●</b>' : '')
-                + (isDup ? '<span style="font-size:10px;color:var(--red)" title="Две записи пишут в один атрибут — останется одна">⚠ дубль атрибута</span>' : '')
-                + '</div>'
-                + '<div class="obj-mnu-row" style="gap:3px">'
-                + '<input class="obj-mnu-dt-input" style="width:36px" value="' + te_escJs(w.ep || '') + '" onchange="te_jsSetF(' + i + ',\'ep\',this.value)" title="Endpoint hex" placeholder="EP">'
-                + '<input class="obj-mnu-dt-input" style="width:52px" value="' + te_escJs(w.cluster || '') + '" onchange="te_jsSetF(' + i + ',\'cluster\',this.value)" title="Cluster hex" placeholder="Clust">'
-                + '<input class="obj-mnu-dt-input" style="width:52px" value="' + te_escJs(w.attr || '') + '" onchange="te_jsSetF(' + i + ',\'attr\',this.value)" title="Attribute hex" placeholder="Attr">'
-                + '<input class="obj-mnu-dt-input" style="width:52px" value="' + te_escJs(w.manuf || '') + '" onchange="te_jsSetF(' + i + ',\'manuf\',this.value)" title="Manuf code hex" placeholder="Manuf">'
-                + '<input class="obj-mnu-dt-input" style="width:44px" value="' + te_escJs(w.dataType || '') + '" onchange="te_jsSetF(' + i + ',\'dataType\',this.value)" title="DataType hex" placeholder="Type">'
-                + '<button class="obj-mnu-btn" onclick="te_jsReadWrite(' + i + ')" title="Прочитать текущее значение из устройства">🔄</button>'
-                + '<button class="obj-mnu-btn" onclick="te_jsApplyWrite(' + i + ')" title="Выполнить сейчас: записать в устройство">▶</button>'
-                + '</div>';
-            if (kind === 'select' && nsel < 2) {
-                h += '<div class="obj-mnu-row" style="flex-wrap:wrap;gap:3px">';
-                var nopts = (w.options || []).length;
-                if (nopts < 2) h += '<span style="font-size:10px;color:#e6a23c">⚠ нужен ещё вариант:</span>';
-                (w.options || []).forEach(function(o, j) {
-                    var cur = (String(o.v) === String(w.value)) ? ' <b style="color:var(--accent)" title="Текущий">●</b>' : '';
-                    h += '<span style="font-size:11px;border:1px solid var(--border2);border-radius:6px;padding:1px 3px;display:inline-flex;gap:2px;align-items:center">'
-                        + '<input class="obj-mnu-dt-input" style="width:40px" value="' + te_escJs(o.v) + '" onchange="te_jsSetVar(' + i + ',' + j + ',\'v\',this.value)" title="Значение hex">'
-                        + '<input class="obj-mnu-dt-input" style="width:76px" value="' + te_escJs(o.l) + '" onchange="te_jsSetVar(' + i + ',' + j + ',\'l\',this.value)" title="Название варианта">'
-                        + cur
-                        + '<span onclick="te_jsTestVariant(' + i + ',' + j + ')" style="cursor:pointer" title="Проверить: записать в устройство">▶</span>'
-                        + '<span onclick="te_jsDelVariant(' + i + ',' + j + ')" style="cursor:pointer;color:var(--red)" title="Убрать вариант">×</span></span>';
-                });
-                h += '<input id="te_js_ov_' + i + '" class="obj-mnu-dt-input" style="width:40px" placeholder="val" title="Значение hex">'
-                    + '<input id="te_js_ol_' + i + '" class="obj-mnu-dt-input" style="width:76px" placeholder="название" title="Название варианта">'
-                    + '<button class="obj-mnu-btn" onclick="te_jsAddVariant(' + i + ')" title="Добавить вариант">+</button>'
-                    + '</div>';
-            } else if (kind === 'select') {
-                h += '<div class="obj-mnu-row"><span style="font-size:11px;color:var(--text-muted)">вариант селекта: <b>' + te_escJs(w.label || '') + ' = ' + te_escJs(w.value || '') + '</b> (меняется полями выше)</span></div>';
-            } else {
-                h += '<div class="obj-mnu-row"><span style="font-size:11px;color:var(--text-muted)">значение:</span>'
-                    + '<input class="obj-mnu-dt-input" style="width:80px" value="' + te_escJs(w.value || '') + '" onchange="te_jsSetF(' + i + ',\'value\',this.value)" title="Значение">'
-                    + '</div>';
-            }
-            h += '</div>';
-        });
-    });
-    h += '<div class="obj-mnu-row"><button class="obj-mnu-btn obj-mnu-btn-primary" onclick="te_jsAddUnit()" title="Добавить пустой юнит, заполнить прямо тут">+ юнит</button></div></div>';
-
-    // --- BINDS (configured from the object card, Bind row ✏️) ---
-    h += '<div class="obj-mnu-divider"></div><div class="obj-mnu-section"><div class="obj-mnu-row"><label class="obj-mnu-label">Бинды</label>'
-        + '<span style="font-size:11px;color:var(--text-muted)">настройка — из карточки объекта (строка Bind ✏️)</span></div>';
-    if (!js.binds.length) h += '<div style="font-size:11px;color:#bbb;padding:2px 6px">— пусто —</div>';
-    js.binds.forEach(function(b, i) {
-        h += '<div class="obj-mnu-row" style="border:1px solid var(--border2);border-radius:4px;padding:3px 5px;margin:2px 0">'
-            + '<b>' + te_escJs(te_jsClusterName(b.cluster) + ' · EP ' + (b.ep || '')) + '</b>'
-            + '<span class="obj-mnu-prev">→ ' + te_escJs(te_jsDstName(b.dst)) + (b.dstEP ? ':' + te_escJs(b.dstEP) : '') + '</span>'
-            + '<button class="obj-mnu-btn" onclick="te_jsApplyBind(' + i + ',true)" title="Выполнить сейчас: Bind">🔗</button>'
-            + '<button class="obj-mnu-btn" onclick="te_jsApplyBind(' + i + ',false)" title="Выполнить сейчас: Unbind">🔓</button>'
-            + '<button class="obj-mnu-btn" onclick="te_jsDel(\'binds\',' + i + ')" title="Удалить">🗑</button>'
-            + '</div>';
-    });
-    h += '</div>';
-
-    // --- REPORTS (configured from the object card, cfg_report row ✏️) ---
-    h += '<div class="obj-mnu-divider"></div><div class="obj-mnu-section"><div class="obj-mnu-row"><label class="obj-mnu-label">Репорты</label>'
-        + '<span style="font-size:11px;color:var(--text-muted)">настройка — из карточки объекта (строка cfg_report ✏️)</span></div>';
-    if (!js.reports.length) h += '<div style="font-size:11px;color:#bbb;padding:2px 6px">— пусто —</div>';
-    js.reports.forEach(function(r, i) {
-        var rkey = (r.ep || '') + (r.cluster || '') + (r.attr || '');
-        var rlabel = '';
-        try { if (te_file && te_file.Report && te_file.Report[rkey]) rlabel = te_file.Report[rkey].label + ' · '; } catch(e) {}
-        h += '<div class="obj-mnu-row" style="border:1px solid var(--border2);border-radius:4px;padding:3px 5px;margin:2px 0">'
-            + '<b>' + te_escJs(rlabel + te_jsClusterName(r.cluster)) + '</b>'
-            + '<span class="obj-mnu-prev">Dt:<b>' + te_escJs(r.dataType || '') + '</b> ' + te_hexDec(r.min) + '..' + te_hexDec(r.max) + 's Δ' + te_hexDec(r.change) + '</span>'
-            + '<button class="obj-mnu-btn" onclick="te_jsApplyReport(' + i + ')" title="Выполнить сейчас: настроить репорт">▶</button>'
-            + '<button class="obj-mnu-btn" onclick="te_jsDelReport(' + i + ')" title="Удалить (и из объекта)">🗑</button>'
-            + '</div>';
-    });
-    h += '</div>';
-
-    // --- GROUPS: the device LISTENS to a group (needs 0004). Bind = the device SENDS — that is in the Bind row ---
-    if (te_jsHasGroups()) {
-    te_ensureGroups();
-    h += '<div class="obj-mnu-divider"></div><div class="obj-mnu-section"><div class="obj-mnu-row"><label class="obj-mnu-label">Группы</label>'
-        + '<span style="font-size:11px;color:var(--text-muted)">устройство слушает группу · применяется при подключении</span></div>';
-    if (!js.groups.length) h += '<div style="font-size:11px;color:#bbb;padding:2px 6px">— пусто —</div>';
-    js.groups.forEach(function(g, i) {
-        h += '<div class="obj-mnu-row" style="border:1px solid var(--border2);border-radius:4px;padding:3px 5px;margin:2px 0">'
-            + '<b>' + te_escJs(g.addr || '') + '</b>'
-            + '<span style="font-size:11px;color:var(--text-muted)">' + te_escJs(te_jsGroupName(g.addr)) + '</span>'
-            + '<span class="obj-mnu-prev">→ EP ' + te_escJs(g.ep || '') + '</span>'
-            + '<button class="obj-mnu-btn" onclick="te_jsApplyGroup(' + i + ')" title="Прописать группу в устройство сейчас">▶</button>'
-            + '<button class="obj-mnu-btn" onclick="te_jsDelGroup(' + i + ')" title="Убрать везде: из устройства и из файла">🗑</button>'
-            + '</div>';
-    });
-    var eps = te_jsEpList();
-    var eOpts = eps.map(function(e) {
-        return '<option value="' + te_escJs(e.ep) + '">EP ' + te_escJs(e.ep) + (e.has4 ? ' · 0004' : '') + '</option>';
-    }).join('');
-    var gOpts = '';
+te_bindPreview = function(obj) {
     try {
-        (window.groups || []).forEach(function(gr) {
-            gOpts += '<option value="' + te_escJs((gr.adress || '').toUpperCase()) + '">' + te_escJs((gr.adress || '').toUpperCase()) + ' — ' + te_escJs(gr.name || '') + '</option>';
-        });
-    } catch(e) {}
-    gOpts += '<option value="NEW">+ новая…</option>';
-    h += '<div class="obj-mnu-row" style="flex-wrap:wrap">'
-        + '<select id="te_js_g_sel" class="obj-mnu-dt-input" style="width:150px" onchange="te_jsNewGroupToggle()" title="Группа">' + gOpts + '</select>'
-        + '<select id="te_js_g_ep" class="obj-mnu-dt-input" style="width:90px" title="Эндпоинт устройства">' + eOpts + '</select>'
-        + '<span id="te_js_g_new" style="display:' + (window.te_jsNewGroup ? 'flex' : 'none') + ';gap:3px;align-items:center">'
-        + '<input id="te_js_g_name" class="obj-mnu-dt-input" style="width:90px" placeholder="Имя" title="Имя новой группы">'
-        + '<input id="te_js_g_newaddr" class="obj-mnu-dt-input" style="width:60px" placeholder="Addr" title="Адрес hex, 4 символа">'
-        + '</span>'
-        + '<button class="obj-mnu-btn obj-mnu-btn-primary" onclick="te_jsAddGroup()" title="Добавить">+</button>'
-        + '</div></div>';
-    } // te_jsHasGroups
-
-    h += '</div>';
-    return h;
-};
-
-// Whether the device has the Groups cluster (0004) in at least one EP — otherwise group membership will not work
-te_jsHasGroups = function() {
-    try {
-        var eps = (window.te_file && te_file.EP) || {};
-        for (var epId in eps) {
-            if (!eps.hasOwnProperty(epId)) continue;
-            var cl = (eps[epId].ClI || []).concat(eps[epId].ClO || []);
-            for (var i = 0; i < cl.length; i++) {
-                if (String(cl[i]).toUpperCase() === '0004') return true;
-            }
-        }
-    } catch(e) {}
-    return false;
-};
-
-te_refreshJoinSetup = function() {
-    var el = document.getElementById('te_JoinSetup');
-    if (!el) return;
-    try { el.innerHTML = te_joinSetupHtml(); } catch(e) { console.warn('te JoinSetup refresh', e); }
-    try { te_primeJsCache(); } catch(e) {}
-    // Live preview on the left — repaint with units immediately, no save
-    try {
-        var w = document.getElementById("te_DeviceWidget");
-        if (w && window.te_file) w.innerHTML = getWidget(te_file);
-    } catch(e) {}
-};
-
-te_jsVal = function(id) {
-    var el = document.getElementById(id);
-    return el ? (el.value || '').trim() : '';
-};
-
-// ---------- WRITES: everything edited inline, onchange saves (no modes) ----------
-te_jsAddUnit = function() {
-    if (!window.te_file) return;
-    var js = te_normJoinSetup(te_file);
-    var n = js.writes.length + 1;
-    js.writes.push({
-        id: 'w' + Date.now().toString(36),
-        unitname: 'Юнит ' + n, label: 'Юнит ' + n, kind: 'select', entity_category: '',
-        ep: '', cluster: '', attr: '', manuf: '0000', dataType: '', value: '', options: []
-    });
-    te_jsDirty();
-    te_refreshJoinSetup();
-};
-
-// Entry field (label/cat/hex/value) — clean hex to upper case
-te_jsSetF = function(i, f, v) {
-    if (!window.te_file) return;
-    var w = te_normJoinSetup(te_file).writes[i];
-    if (!w) return;
-    v = (v || '').trim();
-    if (f === 'label') {
-        var old = w.label;
-        w.label = v;
-        if (!w.unitname || w.unitname === old) w.unitname = v;
-    } else if (f === 'ep' || f === 'cluster' || f === 'attr' || f === 'manuf' || f === 'dataType') {
-        w[f] = v.toUpperCase();
-    } else {
-        w[f] = v;
-    }
-    te_jsDirty();
-    te_refreshJoinSetup();
-};
-
-// Renaming a unit as a whole (all entries with this unitname)
-te_jsSetUnit = function(el) {
-    if (!window.te_file || !el) return;
-    var old = el.dataset.old || '', nw = (el.value || '').trim() || old;
-    if (nw === old) return;
-    te_normJoinSetup(te_file).writes.forEach(function(w) {
-        if ((w.unitname || w.label || '') === old) w.unitname = nw;
-    });
-    te_jsDirty();
-    te_refreshJoinSetup();
-};
-
-// Variant field (value, name)
-te_jsSetVar = function(i, j, f, v) {
-    if (!window.te_file) return;
-    var w = te_normJoinSetup(te_file).writes[i];
-    if (!w || !w.options || !w.options[j]) return;
-    w.options[j][f] = (v || '').trim();
-    te_jsDirty();
-    te_refreshJoinSetup();
-};
-
-te_jsDel = function(list, i) {
-    if (!window.te_file) return;
-    var js = te_normJoinSetup(te_file);
-    if (js[list]) js[list].splice(i, 1);
-    te_jsDirty();
-    te_refreshJoinSetup();
-};
-
-// Duplicates: one EP+cluster+attribute on several entries.
-// NOT a duplicate: select entries of one unit on one attribute — they merge into one select.
-te_jsDupKeys = function(js) {
-    var byKey = {};
-    try {
-        (js.writes || []).forEach(function(w) {
-            var k = ((w.ep || '') + (w.cluster || '') + (w.attr || '')).toUpperCase();
-            if (!k) return;
-            (byKey[k] = byKey[k] || []).push(w);
-        });
-    } catch(e) {}
-    var m = {};
-    Object.keys(byKey).forEach(function(k) {
-        var lst = byKey[k];
-        if (lst.length < 2) return;
-        var u0 = lst[0].unitname || lst[0].label || '';
-        var merged = lst.every(function(w) {
-            return (w.kind || 'select') === 'select' && (w.unitname || w.label || '') === u0;
-        });
-        if (!merged) m[k] = lst.length;
-    });
-    return m;
-};
-
-// Switching the unit type right from the block header
-te_jsSetKind = function(i, kind) {
-    if (!window.te_file) return;
-    var w = te_normJoinSetup(te_file).writes[i];
-    if (!w) return;
-    w.kind = kind;
-    if (kind === 'select') {
-        if (!w.options || !w.options.length) {
-            var v = w.value || '00';
-            w.options = [{ v: v, l: v }];
-            w.value = v;
-        }
-    } else {
-        if (w.options && w.options.length) w.value = w.options[0].v;
-        delete w.options;
-    }
-    te_jsDirty();
-    te_refreshJoinSetup();
-};
-
-// Select variants: adding by row, editing — right in the variant fields
-te_jsAddVariant = function(i) {
-    if (!window.te_file) return;
-    var w = te_normJoinSetup(te_file).writes[i];
-    if (!w) return;
-    var vel = document.getElementById('te_js_ov_' + i);
-    var lel = document.getElementById('te_js_ol_' + i);
-    var v = vel ? vel.value.trim() : '', l = lel ? lel.value.trim() : '';
-    if (!v) { window.zespAlert && zespAlert('Укажи значение варианта', { title: 'JoinSetup' }); return; }
-    w.options = w.options || [];
-    w.options.push({ v: v, l: l || v });
-    if (!w.value) w.value = v;
-    te_jsDirty();
-    te_refreshJoinSetup();
-};
-
-// Test a variant: write its value to the device (and remember as current)
-te_jsTestVariant = function(i, j) {
-    if (!window.te_file) return;
-    var w = te_normJoinSetup(te_file).writes[i];
-    if (!w || !w.options || !w.options[j]) return;
-    w.value = w.options[j].v;
-    te_jsDirty();
-    te_refreshJoinSetup();
-    te_jsApplyWrite(i);
-};
-
-te_jsDelVariant = function(i, j) {
-    if (!window.te_file) return;
-    var w = te_normJoinSetup(te_file).writes[i];
-    if (!w || !w.options) return;
-    var gone = w.options.splice(j, 1)[0];
-    if (gone && String(w.value) === String(gone.v)) w.value = (w.options[0] && w.options[0].v) || '';
-    te_jsDirty();
-    te_refreshJoinSetup();
-};
-
-te_jsApplyWrite = function(i) {
-    if (!window.te_file || !te_file.Device) return;
-    var js = te_normJoinSetup(te_file);
-    var w = js.writes[i];
-    if (!w) return;
-    // Unit selection: drop selected on same-group peers (replay writes the selected one)
-    var u = w.unitname || w.label || '';
-    js.writes.forEach(function(o) {
-        if ((o.unitname || o.label || '') === u) delete o.selected;
-    });
-    w.selected = true;
-    te_jsDirty();
-    te_refreshJoinSetup();
-    var json = {
-        u16ShortAddr: te_file.Device,
-        u8SrcEndPoint: '01',
-        u8DstEndPoint: w.ep,
-        u16ClusterID: w.cluster,
-        u8Direction: '00',
-        u8ManuSpecific: (w.manuf && w.manuf !== '0000') ? '01' : '00',
-        u16ManuID: w.manuf || '0000',
-        u16AttribID: w.attr,
-        u8AttribType: w.dataType,
-        au8Data: w.value,
-        u8DataLen: '01'
-    };
-    WSsend('writeAtribute|' + JSON.stringify(json));
-};
-
-te_jsReadWrite = function(i) {
-    if (!window.te_file || !te_file.Device) return;
-    var w = te_normJoinSetup(te_file).writes[i];
-    if (!w) return;
-    WSsend('reqAtribute|' + te_file.Device + '|' + w.ep + '|' + w.cluster + '|' + w.attr + '|' + (w.manuf || '0000'));
-};
-
-// ---------- BINDS ----------
-// ---------- human-readable names for the section ----------
-te_jsClusterName = function(cl) {
-    try {
-        cl = (cl || '').toUpperCase();
-        if (window.te_ClassterAttr && te_ClassterAttr[cl] && te_ClassterAttr[cl].n) return te_ClassterAttr[cl].n;
-    } catch(e) {}
-    return 'Cluster_' + (cl || '?');
+        var ro = window.te_file && te_file.Report && te_file.Report[obj];
+        var b = ro && ro.bind;
+        if (!b || !b.dst) return '<span style="color:#bbb">—</span>';
+        var dst = b.dst === 'COORD' ? 'координатор' : te_escJs(te_jsDstName(b.dst));
+        return '→ <b>' + dst + '</b>' + (b.dstEP ? ':' + te_escJs(b.dstEP) : '');
+    } catch(e) { return '<span style="color:#bbb">—</span>'; }
 };
 
 te_jsDstName = function(dst) {
@@ -1970,18 +1564,79 @@ te_jsDstName = function(dst) {
     return dst;
 };
 
-te_hexDec = function(hex) {
-    var n = parseInt(hex, 16);
-    return isNaN(n) ? '?' : n;
+te_openBindEditor = function(obj) {
+    te_currentBindObj = obj;
+    var ep = obj.substring(0, 2), cl = obj.substring(2, 6);
+    document.getElementById('te_be_obj').textContent = ep + ' / ' + cl;
+    var sel = document.getElementById('te_be_dst');
+    var html = '';
+    try {
+        var devs = window.deviceList || [];
+        devs.forEach(function(z) { if (z.DevType === 'ZC') html += '<option value="COORD">⭐ Координатор' + (z.Name ? ' (' + te_escJs(z.Name) + ')' : '') + '</option>'; });
+        devs.forEach(function(z) {
+            if (z.DevType === 'ZR' || z.DevType === 'ZED') html += '<option value="' + te_escJs(z.IEEE) + '">' + te_escJs(z.Name || z.ModelId || z.IEEE) + '</option>';
+        });
+        (window.groups || []).forEach(function(gr) {
+            html += '<option value="GROUP:' + te_escJs(gr.adress) + '">🗄 ' + te_escJs(gr.adress) + ' — ' + te_escJs(gr.name) + '</option>';
+        });
+    } catch(e) {}
+    sel.innerHTML = html || '<option value="COORD">⭐ Координатор</option>';
+    var cur = null;
+    try { cur = te_file.Report[obj].bind; } catch(e) {}
+    sel.value = (cur && cur.dst) ? cur.dst : 'COORD';
+    if (cur && cur.dst && sel.value !== cur.dst) {
+        var o = document.createElement('option'); o.value = cur.dst; o.textContent = cur.dst + ' (нет в сети)';
+        sel.appendChild(o); sel.value = cur.dst;
+    }
+    document.getElementById('te_be_dstep').value = (cur && cur.dstEP) || '01';
+    te_be_syncEp();
+    document.getElementById('te_bindEditorWnd').style.display = 'flex';
 };
 
-te_jsApplyBind = function(i, bind) {
-    if (!window.te_file) return;
-    var b = te_normJoinSetup(te_file).binds[i];
-    if (!b) return;
+te_be_syncEp = function() {
+    var sel = document.getElementById('te_be_dst');
+    var epIn = document.getElementById('te_be_dstep');
+    if (!sel || !epIn) return;
+    if (/^GROUP:/.test(sel.value || '')) { epIn.value = ''; epIn.disabled = true; }
+    else { epIn.disabled = false; }
+};
+
+te_applyBindEditor = function() {
+    var obj = te_currentBindObj;
+    if (!obj || !window.te_file || !te_file.Report[obj]) return;
+    var dst = document.getElementById('te_be_dst').value;
+    var dstEP = document.getElementById('te_be_dstep').value.trim().toUpperCase();
+    var mode = '3';
+    if (/^GROUP:/.test(dst)) { dstEP = ''; mode = '1'; }
+    else if (!dstEP) { mode = '1'; }
+    te_file.Report[obj].bind = { dst: dst, dstEP: dstEP, dstMode: mode };
+    var view = document.getElementById(obj + '_te_bind_view');
+    if (view) view.innerHTML = te_bindPreview(obj);
+    te_markDirty();
+    te_closeBindEditor();
+};
+
+te_clearBind = function(obj) {
+    if (!obj || !window.te_file || !te_file.Report[obj]) return;
+    delete te_file.Report[obj].bind;
+    var view = document.getElementById(obj + '_te_bind_view');
+    if (view) view.innerHTML = '<span style="color:#bbb">—</span>';
+    te_markDirty();
+};
+
+te_closeBindEditor = function() {
+    document.getElementById('te_bindEditorWnd').style.display = 'none';
+    te_currentBindObj = null;
+};
+
+// Проверить бинд живьём (не сохраняет — только шлёт BIND/UNBIND)
+te_testBind = function(obj, bind) {
+    if (!obj || !window.te_file || !te_file.Report[obj] || !te_file.Report[obj].bind) return;
+    var b = te_file.Report[obj].bind;
+    var ep = obj.substring(0, 2).toUpperCase(), cl = obj.substring(2, 6).toUpperCase();
     var dst = b.dst === 'COORD' ? '' : b.dst;
-    var gm = /^GROUP:(.+)$/i.exec(dst || '');
-    if (gm) dst = gm[1];
+    var m = /^GROUP:(.+)$/i.exec(dst || '');
+    if (m) dst = m[1];
     if (!dst) {
         try {
             var zc = (window.deviceList || []).find(function(z) { return z.DevType === 'ZC'; });
@@ -1991,8 +1646,8 @@ te_jsApplyBind = function(i, bind) {
     var req = {};
     req[bind ? 'BIND_REQUEST' : 'UNBIND_REQUEST'] = {
         _u64TargetExtAddr: te_file.IEEE,
-        u8TargetEndPoint: b.ep,
-        u16ClusterID: b.cluster,
+        u8TargetEndPoint: ep,
+        u16ClusterID: cl,
         _u64DstAddr: dst,
         u8DstEndPoint: b.dstEP || '',
         u8DstAddrMode: parseInt(b.dstMode || '3', 10)
@@ -2000,64 +1655,33 @@ te_jsApplyBind = function(i, bind) {
     WSsend(JSON.stringify(req));
 };
 
-// ---------- REPORTS ----------
-// Deletion from the section + cfg_report cleanup on the object (two-way sync)
-te_jsDelReport = function(i) {
-    if (!window.te_file) return;
-    var js = te_normJoinSetup(te_file);
-    var r = js.reports[i];
-    if (r) {
-        var key = (r.ep || '') + (r.cluster || '') + (r.attr || '');
-        try { if (te_file.Report && te_file.Report[key]) te_file.Report[key].cfg_report = ''; } catch(e) {}
-        var view = document.getElementById(key + '_te_cfg_report_view');
-        if (view) view.innerHTML = '<span style="color:#bbb">—</span>';
+// Проверить бинд живьём (не сохраняет — только шлёт BIND/UNBIND)
+te_testBind = function(obj, bind) {
+    if (!obj || !window.te_file || !te_file.Report[obj] || !te_file.Report[obj].bind) return;
+    var b = te_file.Report[obj].bind;
+    var ep = obj.substring(0, 2).toUpperCase(), cl = obj.substring(2, 6).toUpperCase();
+    var dst = b.dst === 'COORD' ? '' : b.dst;
+    var m = /^GROUP:(.+)$/i.exec(dst || '');
+    if (m) dst = m[1];
+    if (!dst) {
+        try {
+            var zc = (window.deviceList || []).find(function(z) { return z.DevType === 'ZC'; });
+            if (zc) dst = zc.IEEE;
+        } catch(e) {}
     }
-    js.reports.splice(i, 1);
-    te_jsDirty();
-    te_refreshJoinSetup();
-};
-
-te_jsApplyReport = function(i) {
-    if (!window.te_file || !te_file.Device) return;
-    var r = te_normJoinSetup(te_file).reports[i];
-    if (!r) return;
-    var json = {
-        u16ShortAddr: te_file.Device,
-        u8SrcEndPoint: '01',
-        u8DstEndPoint: r.ep,
-        u16ClusterID: r.cluster,
-        u16MinInterval: r.min,
-        u16MaxInterval: r.max,
-        u16TimeOut: '0000',
-        u8Change: r.change
+    var req = {};
+    req[bind ? 'BIND_REQUEST' : 'UNBIND_REQUEST'] = {
+        _u64TargetExtAddr: te_file.IEEE,
+        u8TargetEndPoint: ep,
+        u16ClusterID: cl,
+        _u64DstAddr: dst,
+        u8DstEndPoint: b.dstEP || '',
+        u8DstAddrMode: parseInt(b.dstMode || '3', 10)
     };
-    WSsend('ConfigReportReg|' + JSON.stringify(json));
+    WSsend(JSON.stringify(req));
 };
 
-// ---------- GROUPS ----------
-// Device EPs as a list (0004 first), global groups — lazy load for the picker
-te_jsEpList = function() {
-    var eps = [];
-    try {
-        var EPs = (window.te_file && te_file.EP) || {};
-        Object.keys(EPs).forEach(function(ep) {
-            var cl = (EPs[ep].ClI || []).concat(EPs[ep].ClO || []);
-            var has4 = cl.some(function(c) { return String(c).toUpperCase() === '0004'; });
-            eps.push({ ep: ep, has4: has4 });
-        });
-        eps.sort(function(a, b) { return ((b.has4 ? 1 : 0) - (a.has4 ? 1 : 0)); });
-    } catch(e) {}
-    return eps;
-};
-
-te_jsGroupName = function(addr) {
-    try {
-        var g = (window.groups || []).find(function(gr) { return (gr.adress || '').toUpperCase() === String(addr || '').toUpperCase(); });
-        if (g) return g.name || '';
-    } catch(e) {}
-    return '';
-};
-
+// ---------- GROUPS (поле groups записи 0004; EP — из ключа объекта) ----------
 te_ensureGroups = function() {
     if (window.te_groupsReq) return;
     window.te_groupsReq = true;
@@ -2069,74 +1693,124 @@ te_ensureGroups = function() {
 
 te_onGroups = function() {
     try { eventE.off('groups', te_onGroups); } catch(e) {}
-    try { te_refreshJoinSetup(); } catch(e) {}
-};
-
-te_jsNewGroupToggle = function() {
-    var s = document.getElementById('te_js_g_sel');
-    var box = document.getElementById('te_js_g_new');
-    window.te_jsNewGroup = !!(s && s.value === 'NEW');
-    if (box) box.style.display = window.te_jsNewGroup ? 'flex' : 'none';
-};
-
-te_jsAddGroup = function() {
-    if (!window.te_file) return;
-    var js = te_normJoinSetup(te_file);
-    var sel = te_jsVal('te_js_g_sel');
-    var ep = te_jsVal('te_js_g_ep').toUpperCase();
-    if (!ep) { window.zespAlert && zespAlert('Выбери EP', { title: 'Группы' }); return; }
-    var addr = sel;
-    if (sel === 'NEW' || !sel) {
-        var nm = te_jsVal('te_js_g_name'), na = te_jsVal('te_js_g_newaddr').toUpperCase();
-        if (!/^[0-9A-F]{4}$/.test(na)) { window.zespAlert && zespAlert('Адрес группы — 4 hex-символа', { title: 'Группы' }); return; }
-        if (!nm) { window.zespAlert && zespAlert('Укажи имя группы', { title: 'Группы' }); return; }
-        window.groups = window.groups || [];
-        if (!window.groups.some(function(gr) { return (gr.adress || '').toUpperCase() === na; })) {
-            window.groups.push({ name: nm, adress: na, devices: [] });
-            WSsend('SaveJson|/groups.json|' + JSON.stringify(window.groups));
+    // Догрузился справочник групп — перерисовать карточку объекта
+    try {
+        if (window.te_currentObj && document.getElementById('te_groups_list')) {
+            te_drawJson(te_file, window.te_currentObj);
         }
-        addr = na;
-    } else {
-        addr = sel.toUpperCase();
-        if (!/^[0-9A-F]{4}$/.test(addr)) { window.zespAlert && zespAlert('Битый адрес группы', { title: 'Группы' }); return; }
-    }
-    if (js.groups.some(function(g) { return g.addr === addr && g.ep === ep; })) {
-        window.zespAlert && zespAlert('Уже есть', { title: 'Группы' });
-        return;
-    }
-    js.groups.push({ addr: addr, ep: ep });
-    window.te_jsNewGroup = false;
-    te_jsDirty();
-    te_refreshJoinSetup();
-    // Group surface: pull EP clusters + register the listener
+    } catch(e) {}
+};
+
+te_jsGroupName = function(addr) {
+    try {
+        var g = (window.groups || []).find(function(gr) { return (gr.adress || '').toUpperCase() === String(addr || '').toUpperCase(); });
+        if (g) return g.name || '';
+    } catch(e) {}
+    return '';
+};
+
+// Перерисовать карточку объекта (после правок групп)
+te_redrawObjCard = function(obj) {
+    try { te_drawJson(te_file, obj); } catch(e) {}
+};
+
+te_groupsHtml = function(obj) {
+    var ro = (window.te_file && te_file.Report[obj]) || {};
+    var arr = ro.groups || [];
+    var h = '';
+    if (!arr.length) h += '<span style="color:#bbb">—</span>';
+    arr.forEach(function(a, i) {
+        h += '<span style="font-size:11px;border:1px solid var(--border2);border-radius:6px;padding:1px 3px;display:inline-flex;gap:4px;align-items:center;margin:1px">'
+            + '<b>' + te_escJs(a) + '</b><span style="color:var(--text-muted)">' + te_escJs(te_jsGroupName(a)) + '</span>'
+            + '<span onclick="te_testGroup(\'' + obj + '\',' + i + ')" style="cursor:pointer" title="Прописать сейчас">▶</span>'
+            + '<span onclick="te_delGroup(\'' + obj + '\',' + i + ')" style="cursor:pointer;color:var(--red)" title="Убрать">×</span></span>';
+    });
+    return h;
+};
+
+te_groupsAddForm = function(obj) {
+    var grpOpts = '';
+    try {
+        (window.groups || []).forEach(function(gr) {
+            grpOpts += '<option value="' + te_escJs((gr.adress || '').toUpperCase()) + '">' + te_escJs((gr.adress || '').toUpperCase()) + ' — ' + te_escJs(gr.name || '') + '</option>';
+        });
+    } catch(e) {}
+    // Только существующие группы: новые создаются в приложении Группы.
+    // Членство пишется в поле groups этой записи (EP — из ключа объекта).
+    return '<select id="te_groups_sel" class="obj-mnu-dt-input" style="width:130px" title="Группа">' + grpOpts + '</select>'
+        + '<button class="obj-mnu-btn" onclick="te_addGroup(\'' + obj + '\')">+</button>';
+};
+
+te_addGroup = function(obj) {
+    if (!window.te_file || !te_file.Report[obj]) return;
+    var sel = document.getElementById('te_groups_sel');
+    var addr = (sel ? sel.value : '').toUpperCase();
+    if (!/^[0-9A-F]{4}$/.test(addr)) return;
+    var ep = obj.substring(0, 2).toUpperCase();
+    var ro = te_file.Report[obj];
+    ro.groups = ro.groups || [];
+    if (ro.groups.indexOf(addr) === -1) ro.groups.push(addr);
+    ro.parsed = ro.groups.join(',');
+    ro.val = ro.parsed;
+    te_markDirty();
+    te_drawJson(te_file, obj);
+    // Поверхность группы + слушатель
     try {
         var ecl = [];
-        if (te_file.EP && te_file.EP[ep]) ecl = (te_file.EP[ep].ClI || []).concat(te_file.EP[ep].ClO || []);
+        Object.keys(te_file.EP || {}).forEach(function(e) {
+            if (e.toUpperCase() === ep) ecl = (te_file.EP[e].ClI || []).concat(te_file.EP[e].ClO || []);
+        });
         if (window.grpExtendSurface) window.grpExtendSurface('GROUP_' + addr, te_file.IEEE, ecl);
     } catch(e) {}
 };
 
-// Write to the live device now
-te_jsApplyGroup = function(i) {
-    if (!window.te_file || !te_file.Device) return;
-    var g = te_normJoinSetup(te_file).groups[i];
-    if (!g) return;
-    WSsend('groupAdd|' + te_file.Device + '|' + g.ep + '|' + g.addr);
+// Прописать группу сейчас (живая команда)
+te_testGroup = function(obj, i) {
+    if (!window.te_file || !te_file.Device || !te_file.Report[obj]) return;
+    var ep = obj.substring(0, 2).toUpperCase();
+    var a = (te_file.Report[obj].groups || [])[i];
+    if (!a) return;
+    WSsend('groupAdd|' + te_file.Device + '|' + ep + '|' + a);
 };
 
-// Remove everywhere: from the device (best-effort) and from the file
-te_jsDelGroup = function(i) {
-    if (!window.te_file) return;
-    var js = te_normJoinSetup(te_file);
-    var g = js.groups[i];
-    if (!g) return;
-    js.groups.splice(i, 1);
-    te_jsDirty();
-    te_refreshJoinSetup();
+// Убрать везде: из устройства живьём + из записи + из Members группы
+te_delGroup = function(obj, i) {
+    if (!window.te_file || !te_file.Report[obj]) return;
+    var ep = obj.substring(0, 2).toUpperCase();
+    var arr = te_file.Report[obj].groups || [];
+    var a = arr[i];
+    if (!a) return;
+    arr.splice(i, 1);
+    if (!arr.length) delete te_file.Report[obj].groups;
+    te_file.Report[obj].parsed = (te_file.Report[obj].groups || []).join(',');
+    te_file.Report[obj].val = te_file.Report[obj].parsed;
+    te_markDirty();
+    te_drawJson(te_file, obj);
     if (te_file.Device) {
-        try { WSsend('groupRemove|' + te_file.Device + '|' + g.ep + '|' + g.addr); } catch(e) {}
+        try { WSsend('groupRemove|' + te_file.Device + '|' + ep + '|' + a); } catch(e) {}
     }
-    try { if (window.grpRemoveMember) window.grpRemoveMember('GROUP_' + g.addr, te_file.IEEE); } catch(e) {}
+    try { if (window.grpRemoveMember) window.grpRemoveMember('GROUP_' + a, te_file.IEEE); } catch(e) {}
+};
+
+// ---------- RECORD: тестовая запись текущего значения ----------
+te_testWrite = function(obj) {
+    if (!window.te_file || !te_file.Device || !te_file.Report[obj]) return;
+    var ro = te_file.Report[obj];
+    var ep = obj.substring(0, 2), cl = obj.substring(2, 6), at = obj.substring(6, 10);
+    var json = {
+        u16ShortAddr: te_file.Device,
+        u8SrcEndPoint: '01',
+        u8DstEndPoint: ep,
+        u16ClusterID: cl,
+        u8Direction: '00',
+        u8ManuSpecific: (ro.manuf && ro.manuf !== '0000') ? '01' : '00',
+        u16ManuID: ro.manuf || '0000',
+        u16AttribID: at,
+        u8AttribType: ro.dataType || '',
+        au8Data: String(ro.val != null ? ro.val : ''),
+        u8DataLen: '01'
+    };
+    WSsend('writeAtribute|' + JSON.stringify(json));
 };
 
 // ============================================================
@@ -2276,7 +1950,7 @@ te_HA_CLASSES = {
       "min_temp":   {"type":"number","hint":"5"},
       "max_temp":   {"type":"number","hint":"35"},
       "temp_step":  {"type":"number","hint":"0.5"},
-      "modes":      {"type":"text","hint":"off,auto,heat,cool"},
+      "modes":      {"type":"text","hint":"off,auto,heat,cool,dry,fan_only,eco"},
       "icon":       {"type":"text","hint":"mdi:thermostat"}
     }
   },
@@ -2835,9 +2509,6 @@ te_applyCfgReportEditor = function() {
 
   te_file.Report[obj].cfg_report = cfg;
 
-  // Duplicate into JoinSetup.reports — the source for setup on connect
-  try { te_jsUpsertReport(obj, cfg); } catch(e) {}
-
   // Refresh the preview in the table row
   const view = document.getElementById(obj + '_te_cfg_report_view');
   if (view) {
@@ -2854,125 +2525,9 @@ te_applyCfgReportEditor = function() {
 te_clearCfgReport = function(obj) {
   if (!obj) return;
   te_file.Report[obj].cfg_report = '';
-  try {
-    var js = te_normJoinSetup(te_file);
-    js.reports = js.reports.filter(function(r) { return (r.ep + r.cluster + r.attr) !== obj; });
-  } catch(e) {}
   const view = document.getElementById(obj + '_te_cfg_report_view');
   if (view) view.innerHTML = '<span style="color:#bbb">—</span>';
   te_syncLive(true);
-  te_refreshJoinSetup();
-};
-
-// Sync the object cfg_report → JoinSetup.reports (key — full obj EEPPCCCCAAAA)
-te_jsUpsertReport = function(obj, cfg) {
-  var js = te_normJoinSetup(te_file);
-  var ep = obj.substring(0, 2), cl = obj.substring(2, 6), at = obj.substring(6, 10);
-  var found = false;
-  js.reports.forEach(function(r) {
-    if ((r.ep + r.cluster + r.attr) === obj) {
-      r.ep = ep; r.cluster = cl; r.attr = at;
-      r.dataType = cfg.DataType; r.min = cfg.MinInterval; r.max = cfg.MaxInterval; r.change = cfg.Change;
-      found = true;
-    }
-  });
-  if (!found) js.reports.push({ ep: ep, cluster: cl, attr: at, dataType: cfg.DataType, min: cfg.MinInterval, max: cfg.MaxInterval, change: cfg.Change });
-};
-
-// ===== BIND EDITOR (Bind row in the object card → JoinSetup.binds, EP+cluster key) =====
-te_currentBindObj = null;
-
-te_findBind = function(ep, cl) {
-  try {
-    var js = te_normJoinSetup(te_file);
-    for (var i = 0; i < js.binds.length; i++) {
-      if ((js.binds[i].ep || '').toUpperCase() === ep && (js.binds[i].cluster || '').toUpperCase() === cl) return js.binds[i];
-    }
-  } catch(e) {}
-  return null;
-};
-
-te_bindPreview = function(obj) {
-  try {
-    var b = te_findBind(obj.substring(0, 2), obj.substring(2, 6));
-    if (!b) return '<span style="color:#bbb">—</span>';
-    var dst = b.dst === 'COORD' ? 'координатор' : te_escJs(b.dst);
-    return '→ <b>' + dst + '</b>' + (b.dstEP ? ':' + te_escJs(b.dstEP) : '');
-  } catch(e) { return '<span style="color:#bbb">—</span>'; }
-};
-
-te_openBindEditor = function(obj) {
-  te_currentBindObj = obj;
-  var ep = obj.substring(0, 2), cl = obj.substring(2, 6);
-  document.getElementById('te_be_obj').textContent = ep + ' / ' + cl;
-  var sel = document.getElementById('te_be_dst');
-  var html = '';
-  try {
-    var devs = window.deviceList || [];
-    devs.forEach(function(z) { if (z.DevType === 'ZC') html += '<option value="COORD">⭐ Координатор' + (z.Name ? ' (' + te_escJs(z.Name) + ')' : '') + '</option>'; });
-    devs.forEach(function(z) {
-      if (z.DevType === 'ZR' || z.DevType === 'ZED') html += '<option value="' + te_escJs(z.IEEE) + '">' + te_escJs(z.Name || z.ModelId || z.IEEE) + '</option>';
-    });
-    (window.groups || []).forEach(function(gr) {
-      html += '<option value="GROUP:' + te_escJs(gr.adress) + '">🗄 ' + te_escJs(gr.adress) + ' — ' + te_escJs(gr.name) + '</option>';
-    });
-  } catch(e) {}
-  sel.innerHTML = html || '<option value="COORD">⭐ Координатор</option>';
-  var cur = te_findBind(ep, cl);
-  sel.value = (cur && cur.dst) ? cur.dst : 'COORD';
-  if (cur && cur.dst && sel.value !== cur.dst) {
-    var o = document.createElement('option'); o.value = cur.dst; o.textContent = cur.dst + ' (нет в сети)';
-    sel.appendChild(o); sel.value = cur.dst;
-  }
-  document.getElementById('te_be_dstep').value = (cur && cur.dstEP) || '01';
-  te_be_syncEp();
-  document.getElementById('te_bindEditorWnd').style.display = 'flex';
-};
-
-te_be_syncEp = function() {
-  var sel = document.getElementById('te_be_dst');
-  var epIn = document.getElementById('te_be_dstep');
-  if (!sel || !epIn) return;
-  if (/^GROUP:/.test(sel.value || '')) { epIn.value = ''; epIn.disabled = true; }
-  else { epIn.disabled = false; }
-};
-
-te_applyBindEditor = function() {
-  var obj = te_currentBindObj;
-  if (!obj || !window.te_file) return;
-  var ep = obj.substring(0, 2).toUpperCase(), cl = obj.substring(2, 6).toUpperCase();
-  var dst = document.getElementById('te_be_dst').value;
-  var dstEP = document.getElementById('te_be_dstep').value.trim().toUpperCase();
-  var mode = '3';
-  if (/^GROUP:/.test(dst)) { dstEP = ''; mode = '1'; }
-  else if (!dstEP) { mode = '1'; }
-  var js = te_normJoinSetup(te_file);
-  var b = te_findBind(ep, cl);
-  if (b) { b.dst = dst; b.dstEP = dstEP; b.dstMode = mode; }
-  else js.binds.push({ ep: ep, cluster: cl, dst: dst, dstEP: dstEP, dstMode: mode });
-  var view = document.getElementById(obj + '_te_bind_view');
-  if (view) view.innerHTML = te_bindPreview(obj);
-  te_syncLive(true);
-  te_refreshJoinSetup();
-  te_closeBindEditor();
-};
-
-te_clearBind = function(obj) {
-  if (!obj || !window.te_file) return;
-  var ep = obj.substring(0, 2).toUpperCase(), cl = obj.substring(2, 6).toUpperCase();
-  try {
-    var js = te_normJoinSetup(te_file);
-    js.binds = js.binds.filter(function(b) { return !((b.ep || '').toUpperCase() === ep && (b.cluster || '').toUpperCase() === cl); });
-  } catch(e) {}
-  var view = document.getElementById(obj + '_te_bind_view');
-  if (view) view.innerHTML = '<span style="color:#bbb">—</span>';
-  te_syncLive(true);
-  te_refreshJoinSetup();
-};
-
-te_closeBindEditor = function() {
-  document.getElementById('te_bindEditorWnd').style.display = 'none';
-  te_currentBindObj = null;
 };
 te_updateDeviceField = function(field, value) {
     if (!te_file) return;
@@ -3839,7 +3394,7 @@ var TE_CSS="\n\
     word-break: break-all;\n\
 }\n\
 ";
-var TE_BODY="\n\n\n<div style='position:absolute;display:flex; align-items: flex-start;' id='te_d'>\n<div style=\"flex-shrink:0; display:flex; flex-direction:column; overflow:hidden;\">\n  <div id=\"te_DeviceWidget\" style=\"flex-shrink:0;\"></div>\n  <!-- SNIFF PANEL — постоянная левая колонка, не пропадает при навигации -->\n  <div id=\"te_sniffPanel\" style=\"display:none; flex-shrink:0;\">\n    <div class=\"sniff-header\">\n      <span>🎧 Sniff</span>\n      <div style=\"display:flex;gap:5px;align-items:center;\">\n        <span id=\"te_sniffCount\" class=\"sniff-count\">0</span>\n        <button class=\"sniff-add-all-btn\" onclick=\"te_sniffAddAll()\" title=\"Добавить все объекты\">+ All</button>\n        <button class=\"sniff-clear-btn\" onclick=\"te_clearSniff()\" title=\"Очистить\">🗑</button>\n      </div>\n    </div>\n    <div id=\"te_sniffList\" class=\"sniff-list\"></div>\n  </div>\n</div>\n<div id=\"te_DeviceJson\"></div>\t\n</div>\n\n<!-- CFG REPORT EDITOR MODAL -->\n<div id=\"te_cfgReportEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal cre-modal\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>⚙️ Конфигурация репорта</span>\n      <button class=\"ce-close\" onclick=\"te_closeCfgReportEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body cre-body\">\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">DataType</label>\n        <select class=\"cre-select\" id=\"te_cre_DataType\" onchange=\"te_cre_syncType()\">\n          <option value=\"\">— выбрать —</option>\n          <option value=\"10\">10h · BOOLEAN</option>\n          <option value=\"18\">18h · BITMAP8</option>\n          <option value=\"19\">19h · BITMAP16</option>\n          <option value=\"20\">20h · UINT8</option>\n          <option value=\"21\">21h · UINT16</option>\n          <option value=\"22\">22h · UINT24</option>\n          <option value=\"23\">23h · UINT32</option>\n          <option value=\"28\">28h · INT8</option>\n          <option value=\"29\">29h · INT16</option>\n          <option value=\"2a\">2Ah · INT24</option>\n          <option value=\"30\">30h · ENUM8</option>\n          <option value=\"31\">31h · ENUM16</option>\n          <option value=\"41\">41h · OCTSTR</option>\n          <option value=\"42\">42h · STRING</option>\n        </select>\n        <input class=\"cre-input cre-hex\" id=\"te_cre_DataType_hex\" placeholder=\"hex\" maxlength=\"4\" title=\"hex вручную\" oninput=\"te_cre_syncSel()\">\n      </div>\n      <div class=\"cre-divider\"></div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">MinInterval</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_MinInterval\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"1\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_MinInterval_hex\">0001</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">MaxInterval</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_MaxInterval\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"300\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_MaxInterval_hex\">012C</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">TimeOut</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_TimeOut\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"0\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_TimeOut_hex\">0000</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Change</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_Change\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"порог (дес)\" value=\"1\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_Change_hex\">0001</span>\n      </div>\n      <div class=\"cre-hint\">Ввод в десятичных · hex рассчитывается автоматически</div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeCfgReportEditor()\">Отмена</button>\n      <button class=\"ce-btn-cancel\" onclick=\"te_clearCfgReport(te_currentCfgObj);te_closeCfgReportEditor();\" style=\"background:#f8d8d8;border-color:var(--red);\">✖ Очистить</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyCfgReportEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- BIND EDITOR MODAL -->\n<div id=\"te_bindEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal cre-modal\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>🔗 Бинд кластера</span>\n      <button class=\"ce-close\" onclick=\"te_closeBindEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body cre-body\">\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Объект</label>\n        <span class=\"cre-hex-preview\" id=\"te_be_obj\" style=\"min-width:90px\">—</span>\n      </div>\n      <div class=\"cre-divider\"></div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Получатель</label>\n        <select class=\"cre-select\" id=\"te_be_dst\" onchange=\"te_be_syncEp()\"></select>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Dst EP</label>\n        <input class=\"cre-input cre-dec\" id=\"te_be_dstep\" placeholder=\"01\" maxlength=\"2\">\n      </div>\n      <div class=\"cre-hint\">Координатор / устройство / группа (GROUP:0001). Пустой Dst EP = бинд на группу. Сохраняется в JoinSetup.binds</div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeBindEditor()\">Отмена</button>\n      <button class=\"ce-btn-cancel\" onclick=\"te_clearBind(te_currentBindObj);te_closeBindEditor();\" style=\"background:#f8d8d8;border-color:var(--red);\">✖ Очистить</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyBindEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- YA REP EDITOR MODAL -->\n<div id=\"te_yaRepEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal\" style=\"width:500px;max-height:85vh;\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>🏠 Редактор Яндекс</span>\n      <button class=\"ce-close\" onclick=\"te_closeYaRepEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body\" style=\"padding:0;display:flex;flex-direction:column;gap:0;\">\n\n      <!-- Список шаблонов -->\n      <div style=\"display:flex;height:260px;border-bottom:1px solid var(--border);\">\n        <!-- Левая панель: категории + элементы -->\n        <div id=\"te_yre_list\" style=\"width:200px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--border);padding:4px 0;font-size:12px;\"></div>\n        <!-- Правая панель: описание выбранного -->\n        <div style=\"flex:1;padding:8px;overflow-y:auto;font-size:11px;color:var(--muted);\">\n          <div class=\"ce-section-title\">Предпросмотр</div>\n          <pre id=\"te_yre_preview\" style=\"font-size:10px;color:var(--text);white-space:pre-wrap;word-break:break-all;margin:0;background:var(--bg2);border-radius:4px;padding:6px;min-height:60px;\"></pre>\n          <div class=\"ce-divider\"></div>\n          <div class=\"ce-section-title\">Опции</div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Retrievable</label>\n            <input type=\"checkbox\" id=\"te_yre_retrievable\" class=\"ce-check\" onchange=\"te_yre_updateFlags()\">\n          </div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Reportable</label>\n            <input type=\"checkbox\" id=\"te_yre_reportable\" class=\"ce-check\" onchange=\"te_yre_updateFlags()\">\n          </div>\n          <div class=\"ce-divider\"></div>\n          <div class=\"ce-section-title\">Multi-device</div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Включить</label>\n            <input type=\"checkbox\" id=\"te_yre_multi\" class=\"ce-check\" onchange=\"te_yre_toggleMulti()\">\n          </div>\n          <div id=\"te_yre_multi_fields\" style=\"display:none;\">\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Name</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mname\" oninput=\"te_yre_updateMulti()\">\n            </div>\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Room</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mroom\" oninput=\"te_yre_updateMulti()\">\n            </div>\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Type</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mtype\" list=\"te_yre_types\" oninput=\"te_yre_updateMulti()\">\n              <datalist id=\"te_yre_types\">\n                <option value=\"devices.types.light\">\n                <option value=\"devices.types.socket\">\n                <option value=\"devices.types.switch\">\n                <option value=\"devices.types.thermostat\">\n                <option value=\"devices.types.thermostat.ac\">\n                <option value=\"devices.types.media_device\">\n                <option value=\"devices.types.media_device.tv\">\n                <option value=\"devices.types.media_device.tv_box\">\n                <option value=\"devices.types.media_device.receiver\">\n                <option value=\"devices.types.openable\">\n                <option value=\"devices.types.openable.curtain\">\n                <option value=\"devices.types.humidifier\">\n                <option value=\"devices.types.purifier\">\n                <option value=\"devices.types.vacuum_cleaner\">\n                <option value=\"devices.types.cooking.kettle\">\n                <option value=\"devices.types.cooking.coffee_maker\">\n                <option value=\"devices.types.cooking.multicooker\">\n                <option value=\"devices.types.sensor\">\n                <option value=\"devices.types.sensor.motion\">\n                <option value=\"devices.types.sensor.door\">\n                <option value=\"devices.types.sensor.water_leak\">\n                <option value=\"devices.types.sensor.smoke\">\n                <option value=\"devices.types.sensor.gas\">\n                <option value=\"devices.types.sensor.vibration\">\n                <option value=\"devices.types.sensor.button\">\n                <option value=\"devices.types.other\">\n              </datalist>\n            </div>\n          </div>\n        </div>\n      </div>\n\n      <!-- none режим -->\n      <div style=\"padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;\">\n        <span style=\"font-size:11px;color:var(--muted);\">Установить none (отключить репортинг):</span>\n        <button class=\"ce-btn-cancel\" style=\"font-size:11px;padding:2px 10px;\" onclick=\"te_setYaRepNone()\">none</button>\n      </div>\n\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeYaRepEditor()\">Отмена</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyYaRepEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- CLASS EDITOR MODAL -->\n<div id=\"te_classEditorWnd\" style=\"display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:9999; align-items:center; justify-content:center; background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal\">\n    <div class=\"ce-header\">\n      <span>🏷️ Редактор класса</span>\n      <button class=\"ce-close\" onclick=\"te_closeClassEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body\">\n      <div class=\"ce-row\">\n        <label class=\"ce-label\">Role</label>\n        <select class=\"ce-select ce-select-role\" id=\"ce_role_sel\" onchange=\"te_onCeRoleChange(this.value)\"></select>\n      </div>\n      <div class=\"ce-divider\"></div>\n      <div id=\"ce_dc_wrap\"></div>\n      <div class=\"ce-section-title\">Свойства</div>\n      <div id=\"ce_props\"></div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeClassEditor()\">Отмена</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyClassEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n";
+var TE_BODY="\n\n\n<div style='position:absolute;display:flex; align-items: flex-start;' id='te_d'>\n<div id=\"te_leftCol\" style=\"flex-shrink:0; display:flex; flex-direction:column; overflow-y:auto;\">\n  <div id=\"te_DeviceWidget\" style=\"flex-shrink:0;\"></div>\n  <!-- SNIFF PANEL — постоянная левая колонка, не пропадает при навигации -->\n  <div id=\"te_sniffPanel\" style=\"display:none; flex-shrink:0;\">\n    <div class=\"sniff-header\">\n      <span>🎧 Sniff</span>\n      <div style=\"display:flex;gap:5px;align-items:center;\">\n        <span id=\"te_sniffCount\" class=\"sniff-count\">0</span>\n        <button class=\"sniff-add-all-btn\" onclick=\"te_sniffAddAll()\" title=\"Добавить все объекты\">+ All</button>\n        <button class=\"sniff-clear-btn\" onclick=\"te_clearSniff()\" title=\"Очистить\">🗑</button>\n      </div>\n    </div>\n    <div id=\"te_sniffList\" class=\"sniff-list\"></div>\n  </div>\n</div>\n<div id=\"te_DeviceJson\"></div>\t\n</div>\n\n<!-- CFG REPORT EDITOR MODAL -->\n<div id=\"te_cfgReportEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal cre-modal\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>⚙️ Конфигурация репорта</span>\n      <button class=\"ce-close\" onclick=\"te_closeCfgReportEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body cre-body\">\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">DataType</label>\n        <select class=\"cre-select\" id=\"te_cre_DataType\" onchange=\"te_cre_syncType()\">\n          <option value=\"\">— выбрать —</option>\n          <option value=\"10\">10h · BOOLEAN</option>\n          <option value=\"18\">18h · BITMAP8</option>\n          <option value=\"19\">19h · BITMAP16</option>\n          <option value=\"20\">20h · UINT8</option>\n          <option value=\"21\">21h · UINT16</option>\n          <option value=\"22\">22h · UINT24</option>\n          <option value=\"23\">23h · UINT32</option>\n          <option value=\"28\">28h · INT8</option>\n          <option value=\"29\">29h · INT16</option>\n          <option value=\"2a\">2Ah · INT24</option>\n          <option value=\"30\">30h · ENUM8</option>\n          <option value=\"31\">31h · ENUM16</option>\n          <option value=\"41\">41h · OCTSTR</option>\n          <option value=\"42\">42h · STRING</option>\n        </select>\n        <input class=\"cre-input cre-hex\" id=\"te_cre_DataType_hex\" placeholder=\"hex\" maxlength=\"4\" title=\"hex вручную\" oninput=\"te_cre_syncSel()\">\n      </div>\n      <div class=\"cre-divider\"></div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">MinInterval</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_MinInterval\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"1\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_MinInterval_hex\">0001</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">MaxInterval</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_MaxInterval\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"300\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_MaxInterval_hex\">012C</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">TimeOut</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_TimeOut\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"0\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_TimeOut_hex\">0000</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Change</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_Change\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"порог (дес)\" value=\"1\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_Change_hex\">0001</span>\n      </div>\n      <div class=\"cre-hint\">Ввод в десятичных · hex рассчитывается автоматически</div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeCfgReportEditor()\">Отмена</button>\n      <button class=\"ce-btn-cancel\" onclick=\"te_clearCfgReport(te_currentCfgObj);te_closeCfgReportEditor();\" style=\"background:#f8d8d8;border-color:var(--red);\">✖ Очистить</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyCfgReportEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- BIND EDITOR MODAL -->\n<div id=\"te_bindEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal cre-modal\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>🔗 Бинд кластера</span>\n      <button class=\"ce-close\" onclick=\"te_closeBindEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body cre-body\">\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Объект</label>\n        <span class=\"cre-hex-preview\" id=\"te_be_obj\" style=\"min-width:90px\">—</span>\n      </div>\n      <div class=\"cre-divider\"></div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Получатель</label>\n        <select class=\"cre-select\" id=\"te_be_dst\" onchange=\"te_be_syncEp()\"></select>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Dst EP</label>\n        <input class=\"cre-input cre-dec\" id=\"te_be_dstep\" placeholder=\"01\" maxlength=\"2\">\n      </div>\n      <div class=\"cre-hint\">Координатор / устройство / группа (GROUP:0001). Пустой Dst EP = бинд на группу. Сохраняется в поле bind записи</div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeBindEditor()\">Отмена</button>\n      <button class=\"ce-btn-cancel\" onclick=\"te_clearBind(te_currentBindObj);te_closeBindEditor();\" style=\"background:#f8d8d8;border-color:var(--red);\">✖ Очистить</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyBindEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- YA REP EDITOR MODAL -->\n<div id=\"te_yaRepEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal\" style=\"width:500px;max-height:85vh;\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>🏠 Редактор Яндекс</span>\n      <button class=\"ce-close\" onclick=\"te_closeYaRepEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body\" style=\"padding:0;display:flex;flex-direction:column;gap:0;\">\n\n      <!-- Список шаблонов -->\n      <div style=\"display:flex;height:260px;border-bottom:1px solid var(--border);\">\n        <!-- Левая панель: категории + элементы -->\n        <div id=\"te_yre_list\" style=\"width:200px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--border);padding:4px 0;font-size:12px;\"></div>\n        <!-- Правая панель: описание выбранного -->\n        <div style=\"flex:1;padding:8px;overflow-y:auto;font-size:11px;color:var(--muted);\">\n          <div class=\"ce-section-title\">Предпросмотр</div>\n          <pre id=\"te_yre_preview\" style=\"font-size:10px;color:var(--text);white-space:pre-wrap;word-break:break-all;margin:0;background:var(--bg2);border-radius:4px;padding:6px;min-height:60px;\"></pre>\n          <div class=\"ce-divider\"></div>\n          <div class=\"ce-section-title\">Опции</div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Retrievable</label>\n            <input type=\"checkbox\" id=\"te_yre_retrievable\" class=\"ce-check\" onchange=\"te_yre_updateFlags()\">\n          </div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Reportable</label>\n            <input type=\"checkbox\" id=\"te_yre_reportable\" class=\"ce-check\" onchange=\"te_yre_updateFlags()\">\n          </div>\n          <div class=\"ce-divider\"></div>\n          <div class=\"ce-section-title\">Multi-device</div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Включить</label>\n            <input type=\"checkbox\" id=\"te_yre_multi\" class=\"ce-check\" onchange=\"te_yre_toggleMulti()\">\n          </div>\n          <div id=\"te_yre_multi_fields\" style=\"display:none;\">\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Name</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mname\" oninput=\"te_yre_updateMulti()\">\n            </div>\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Room</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mroom\" oninput=\"te_yre_updateMulti()\">\n            </div>\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Type</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mtype\" list=\"te_yre_types\" oninput=\"te_yre_updateMulti()\">\n              <datalist id=\"te_yre_types\">\n                <option value=\"devices.types.light\">\n                <option value=\"devices.types.socket\">\n                <option value=\"devices.types.switch\">\n                <option value=\"devices.types.thermostat\">\n                <option value=\"devices.types.thermostat.ac\">\n                <option value=\"devices.types.media_device\">\n                <option value=\"devices.types.media_device.tv\">\n                <option value=\"devices.types.media_device.tv_box\">\n                <option value=\"devices.types.media_device.receiver\">\n                <option value=\"devices.types.openable\">\n                <option value=\"devices.types.openable.curtain\">\n                <option value=\"devices.types.humidifier\">\n                <option value=\"devices.types.purifier\">\n                <option value=\"devices.types.vacuum_cleaner\">\n                <option value=\"devices.types.cooking.kettle\">\n                <option value=\"devices.types.cooking.coffee_maker\">\n                <option value=\"devices.types.cooking.multicooker\">\n                <option value=\"devices.types.sensor\">\n                <option value=\"devices.types.sensor.motion\">\n                <option value=\"devices.types.sensor.door\">\n                <option value=\"devices.types.sensor.water_leak\">\n                <option value=\"devices.types.sensor.smoke\">\n                <option value=\"devices.types.sensor.gas\">\n                <option value=\"devices.types.sensor.vibration\">\n                <option value=\"devices.types.sensor.button\">\n                <option value=\"devices.types.other\">\n              </datalist>\n            </div>\n          </div>\n        </div>\n      </div>\n\n      <!-- none режим -->\n      <div style=\"padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;\">\n        <span style=\"font-size:11px;color:var(--muted);\">Установить none (отключить репортинг):</span>\n        <button class=\"ce-btn-cancel\" style=\"font-size:11px;padding:2px 10px;\" onclick=\"te_setYaRepNone()\">none</button>\n      </div>\n\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeYaRepEditor()\">Отмена</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyYaRepEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- CLASS EDITOR MODAL -->\n<div id=\"te_classEditorWnd\" style=\"display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:9999; align-items:center; justify-content:center; background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal\">\n    <div class=\"ce-header\">\n      <span>🏷️ Редактор класса</span>\n      <button class=\"ce-close\" onclick=\"te_closeClassEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body\">\n      <div class=\"ce-row\">\n        <label class=\"ce-label\">Role</label>\n        <select class=\"ce-select ce-select-role\" id=\"ce_role_sel\" onchange=\"te_onCeRoleChange(this.value)\"></select>\n      </div>\n      <div class=\"ce-divider\"></div>\n      <div id=\"ce_dc_wrap\"></div>\n      <div class=\"ce-section-title\">Свойства</div>\n      <div id=\"ce_props\"></div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeClassEditor()\">Отмена</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyClassEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n";
 
 window.WinEngine && window.WinEngine.register({
   id:"templateedit",
@@ -3867,7 +3422,7 @@ window.WinEngine && window.WinEngine.register({
     var parts=p.split("#");
     var IEEE = parts.length>1 ? parts[1] : "";
     if(IEEE){ te_fileName=IEEE; window.te_fileLoaded=false; window.te_retryOnce=false; try{te_parseFile(IEEE);}catch(e){console.log("te parse",e);} if(window.WSsend) WSsend("getDeviceList"); }
-    else { te_file={Name:"",Location:"",IEEE:"",Report:{}}; te_normJoinSetup(te_file); try{te_drawJson(te_file);}catch(e){} }
+    else { te_file={Name:"",Location:"",IEEE:"",Report:{}}; try{te_drawJson(te_file);}catch(e){} }
     try{ te_wMain_cbResizeEnd(); }catch(e){}
     var dw0=document.getElementById("te_DeviceWidget");
     if(dw0){ dw0.addEventListener("touchend",te_DeviceWidgetHandler); dw0.addEventListener("click",te_DeviceWidgetHandler); }

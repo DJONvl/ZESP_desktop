@@ -321,12 +321,52 @@ function getWidget(IEEE) {
 
 	
 	var tpl = `<div class="ac flex flex-c">`
+	var cfgReportHtml = '';
 	tpl += `<div class="device-name flex "><div></div>${dev.Name}<div onclick="cfgDev('${IEEE}')"    class="icon flex">${getIconSvg("gear")}</div></div>`
+	// Тоггл настроек — сверху, под именем: внизу длинной карточки его не видно.
+	// Плейсхолдер заменяем в конце, если config-записи реально есть.
+	tpl += `<!--CFGTOGGLE-->`
+	tpl += `<div class="w-part-work" style="width:100%">`
 
 	var _speakerWidgetRendered = false
 
+	// Merged selects: role=select records with one unitname → a single dropdown.
+	// Non-first members are skipped in the loop; the first renders them all.
+	var mergedFirst = {}, mergedSkip = {};
+	try {
+		var byUnit = {};
+		Object.entries(dev.Report || {}).forEach(function (kv) {
+			var k = kv[0], v = kv[1] || {};
+			var r = String(v.role || '').split('&')[0];
+			var u = v.unitname || '';
+			if (u && r === 'select') { (byUnit[u] = byUnit[u] || []).push(k); }
+		});
+		Object.keys(byUnit).forEach(function (u) {
+			if (byUnit[u].length > 1) {
+				mergedFirst[byUnit[u][0]] = byUnit[u];
+				byUnit[u].slice(1).forEach(function (k) { mergedSkip[k] = 1; });
+			}
+		});
+	} catch (_e0) {}
+
 	for (let [key, value] of Object.entries(dev.Report)) {
 		value = value || {};
+		// Report-level entity_category: config objects render into the settings view,
+		// diagnostic objects are not rendered at all.
+		var repCat = '';
+		try {
+			var _rc = (value && value.class) || {};
+			repCat = _rc.entity_category || '';
+			if (!repCat) {
+				var _rp = String(value.role || '').split('&');
+				if (_rp[1]) { try { repCat = JSON.parse(_rp[1]).entity_category || ''; } catch(_e0) {} }
+			}
+		} catch(_e0) {}
+		if (repCat === 'diagnostic') continue;
+		if (mergedSkip[key]) continue;
+		var isCfgObj = (repCat === 'config');
+		var tplSave = null;
+		if (isCfgObj) { tplSave = tpl; tpl = ''; }
 		try {
 		try {var device_class = dev.Report[key].class.device_class 
 		} catch { 
@@ -556,15 +596,30 @@ function getWidget(IEEE) {
 				tpl += `<div class="switch flex">`
 				tpl += `<div class="icon flex">${getIconSvg(device_class)}</div>`; 
 				tpl += `<div class="labelObj">${value.label}</div>`
-				
-				tpl += `<input type="button" class="${id} button-input" id="btn-toggle${id}" 
-							onclick="widgetEvnt('button_press|${id}', 1)" />`
+				if (value.setup) {
+					tpl += `<input type="button" class="${id} button-input" value="${value.label || '▶'}" onclick="widgetEvnt('setup|${dev.IEEE}#setup:${key}','${(value.val != null ? value.val : '1')}')" />`;
+				} else {
+					tpl += `<input type="button" class="${id} button-input" id="btn-toggle${id}" 
+								onclick="widgetEvnt('button_press|${id}', 1)" />`;
+				}
 				break;			
-            case 'select':
+            case 'select': {
+                // Merged unit: one dropdown from member records (label + own address).
+                var mg = mergedFirst[key];
+                if (mg) {
+                    var members = mg.map(function (k) { return { key: k, value: dev.Report[k] || {} }; });
+                    var uname = (value.unitname || value.label || key);
+                    tpl += setupMergedHtml(dev.IEEE, uname, members);
+                    break;
+                }
+                // Setup record: write through the setup command (manuf-aware),
+                // staged select + OK button instead of immediate write.
+                var isSetup = !!value.setup;
+                var setupId = dev.IEEE + '#setup:' + key;
                 tpl += `<div class="switch flex">`;
                 tpl += `<div class="icon flex">${getIconSvg(device_class)}</div>`;
 				tpl += `<div class="labelObj">${value.label}</div>`			   
-                tpl += `<select id="${id}" class="select ${dev.IEEE + "#" + key}" onchange="widgetEvnt('select|${id}', this.value)" style="width: 150px;">`;
+                tpl += `<select id="${id}" class="select ${dev.IEEE + "#" + key}" style="width: 150px;"${isSetup ? '' : ` onchange="widgetEvnt('select|${id}', this.value)"`}>`;
 
                 var opts = [];
                 if (attr && attr.options != null) {
@@ -577,15 +632,30 @@ function getWidget(IEEE) {
                     }
                 }
                 opts.forEach(option => {
-                    var selected = (option === value.parsed) ? "selected" : "";
-                    tpl += `<option value="${option}" ${selected}>${option}</option>`;
+                    // Опция формата "label:HEX" (вариант А): показываем label, шлём hex.
+                    // Чистые строки без ':' — как раньше.
+                    var optStr = String(option);
+                    var optVal = optStr, optLabel = optStr;
+                    var ci = optStr.lastIndexOf(':');
+                    if (ci > 0 && ci < optStr.length - 1) {
+                        optLabel = optStr.slice(0, ci);
+                        optVal = optStr.slice(ci + 1);
+                    }
+                    var selected = (optVal === value.parsed || option === value.parsed) ? "selected" : "";
+                    tpl += `<option value="${optVal}" ${selected}>${optLabel}</option>`;
                 });
                 tpl += `</select>`;
-                break;	
+                if (isSetup) {
+                    tpl += `<button type="button" title="Записать" style="background:#2e7d32;color:#fff;border:1px solid #43a047;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px;" onclick="var s=this.parentNode.querySelector('select');widgetEvnt('setup|${setupId}',s.value)">OK</button>`;
+                }
+                break;
+            }
             case 'number':
 					tpl += `<div class="switch flex">`
 					tpl += `<div class="icon flex">${getIconSvg(device_class)}</div>`;
 					tpl += `<div class="labelObj">${value.label}</div>`
+					// Setup records go through the manuf-aware setup command, not the generic one.
+					var numCmd = value.setup ? ('setup|' + dev.IEEE + '#setup:' + key) : null;
 					if ((attr&&attr.mode)==='box') {
 						const nMinB = (attr&&attr.min!=null)?attr.min:0;
 						const nMaxB = (attr&&attr.max!=null)?attr.max:100;
@@ -594,12 +664,12 @@ function getWidget(IEEE) {
 						if (!isFinite(nValB)) nValB = Number(nMinB)||0;
 						tpl += `<span style="display:inline-flex;align-items:center;gap:3px;">`
 						+ `<button type="button" title="-" style="background:#333;color:#fff;border:1px solid #555;border-radius:6px;min-width:24px;padding:2px 6px;cursor:pointer;font-size:14px;line-height:1;" onclick="var el=this.parentNode.querySelector('input');var st=parseFloat(el.step)||1;var v=(parseFloat(el.value)||0)-st;var mn=parseFloat(el.min);if(isFinite(mn)&&v<mn)v=mn;el.value=v;">&#8249;</button>`
-						+ `<input class="${id} number-box" type="number" id="number|${id}" style="width:52px;background:#1e1e1e;color:#fff;border:1px solid #555;border-radius:6px;padding:3px 4px;font-size:14px;text-align:center;" min="${nMinB}" max="${nMaxB}" step="${nStepB}" value="${nValB}" onkeydown="if(event.key==='Enter'){widgetEvnt('number|${id}',this.value)}">`
+						+ `<input class="${id} number-box" type="number" id="number|${id}" style="width:52px;background:#1e1e1e;color:#fff;border:1px solid #555;border-radius:6px;padding:3px 4px;font-size:14px;text-align:center;" min="${nMinB}" max="${nMaxB}" step="${nStepB}" value="${nValB}" onkeydown="if(event.key==='Enter'){widgetEvnt('${numCmd || ('number|' + id)}',this.value)}">`
 						+ `<button type="button" title="+" style="background:#333;color:#fff;border:1px solid #555;border-radius:6px;min-width:24px;padding:2px 6px;cursor:pointer;font-size:14px;line-height:1;" onclick="var el=this.parentNode.querySelector('input');var st=parseFloat(el.step)||1;var v=(parseFloat(el.value)||0)+st;var mx=parseFloat(el.max);if(isFinite(mx)&&v>mx)v=mx;el.value=v;">&#8250;</button>`
-						+ `<button type="button" title="Send" style="background:#2e7d32;color:#fff;border:1px solid #43a047;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px;" onclick="widgetEvnt('number|${id}',this.parentNode.querySelector('input').value)">OK</button>`
+						+ `<button type="button" title="Send" style="background:#2e7d32;color:#fff;border:1px solid #43a047;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px;" onclick="widgetEvnt('${numCmd || ('number|' + id)}',this.parentNode.querySelector('input').value)">OK</button>`
 						+ `</span>`;
 					} else {
-						tpl += `<input class="${id} level" type="range" id="number|${id}" style="width: 66%;" onchange="widgetEvnt(this.id,this.value)" min="${(attr&&attr.min!=null)?attr.min:0}" max="${(attr&&attr.max!=null)?attr.max:100}" value="${value.parsed}" step="${(attr&&attr.step!=null)?attr.step:1}">`;
+						tpl += `<input class="${id} level" type="range" id="number|${id}" style="width: 66%;" onchange="widgetEvnt('${numCmd || ('number|' + id)}',this.value)" min="${(attr&&attr.min!=null)?attr.min:0}" max="${(attr&&attr.max!=null)?attr.max:100}" value="${value.parsed}" step="${(attr&&attr.step!=null)?attr.step:1}">`;
 					}
 					tpl += `<span  "type="label" class="${id}" style="color:white;" >${value.parsed||"?"}</span>`
 
@@ -616,8 +686,8 @@ function getWidget(IEEE) {
                 tpl += `<input class="${id} level" type="range" id="level|${id}" style="width:55%;margin:0 6px;"
                     min="${rMin}" max="${rMax}" step="${rStep}" value="${rVal}"
                     onchange="widgetEvnt(this.id,this.value)"
-                    oninput="document.getElementById('rng_${idw}').textContent=this.value">`;
-                tpl += `<span id="rng_${idw}" style="color:#ff9800;font-size:14px;min-width:36px;text-align:right;">${rVal}</span>`;
+                    oninput="document.getElementById('rng_${id.replace(/[^a-zA-Z0-9]/g, '')}').textContent=this.value">`;
+                tpl += `<span id="rng_${id.replace(/[^a-zA-Z0-9]/g, '')}" style="color:#ff9800;font-size:14px;min-width:36px;text-align:right;">${rVal}</span>`;
                 tpl += `</div>`;
                 break;
             }
@@ -625,31 +695,32 @@ function getWidget(IEEE) {
 			case 'climate': {
 				const sysKey = Object.keys(dev.Report || {}).find(k => /^01\d{4}001C$/.test(k));
 				const isThermostat = !!sysKey;
+				const heatKey = Object.keys(dev.Report || {}).find(k => /^01\d{4}0012$/.test(k));
+				const coolKey = Object.keys(dev.Report || {}).find(k => /^01\d{4}0011$/.test(k));
 				let curTemp   = value.parsed || '—';
 				let setTemp   = (attr && attr.target_temp != null) ? attr.target_temp : (value.set_temp || '—');
-				let hvacMode  = (attr && attr.hvac_mode) ? attr.hvac_mode : (value.mode || 'off');
+				let hvacMode  = String((attr && attr.hvac_mode) || (value.mode || 'off')).toLowerCase().trim();
 				// modes may arrive as objects [{value:'heat'}...] (ya_rep) — normalize to strings,
 				// otherwise buttons render [object Object]
 				const normHvacModes = function(m) {
-					if (Array.isArray(m)) return m.map(function(x){ return (x && typeof x === 'object') ? (x.value || x.name || x.mode || '') : String(x); }).map(function(s){ return String(s).trim(); }).filter(function(s){ return !!s; });
-					if (typeof m === 'string') return m.split(',').map(function(s){ return s.trim(); }).filter(function(s){ return !!s; });
+					if (Array.isArray(m)) return m.map(function(x){ return (x && typeof x === 'object') ? (x.value || x.name || x.mode || '') : String(x); }).map(function(s){ return String(s).toLowerCase().trim(); }).filter(function(s){ return !!s; });
+					if (typeof m === 'string') return m.split(',').map(function(s){ return s.toLowerCase().trim(); }).filter(function(s){ return !!s; });
 					return [];
 				};
 				let hvacModes = (attr && attr.modes) ? normHvacModes(attr.modes) : [];
-				if (!hvacModes.length) hvacModes = ['off','auto','heat','cool','fan_only','dry'];
+				if (!hvacModes.length) hvacModes = ['off','auto','heat','cool','dry','fan_only','eco'];
 				const minTemp   = (attr && attr.min_temp) ? Number(attr.min_temp) : 5;
 				const maxTemp   = (attr && attr.max_temp) ? Number(attr.max_temp) : 35;
 				const tempStep  = (attr && attr.temp_step) ? Number(attr.temp_step) : 0.5;
 
 				// Thermostat: mode from SystemMode (001C), temp/setpoint from 0000/0012
 				if (isThermostat) {
-					const sysMap = {0:'off', 1:'auto', 3:'cool', 4:'heat', 7:'fan_only', 8:'dry'};
+					const sysMap = {0:'off', 1:'auto', 2:'auto', 3:'cool', 4:'heat', 5:'heat', 6:'cool', 7:'fan_only', 8:'dry', 9:'auto'};
 					const sysVal = parseInt(dev.Report[sysKey].parsed, 10);
 					if (sysMap[sysVal]) hvacMode = sysMap[sysVal];
 					const curKey = Object.keys(dev.Report).find(k => /^01\d{4}0000$/.test(k));
-					const setKey = Object.keys(dev.Report).find(k => /^01\d{4}0012$/.test(k));
 					if (curKey && dev.Report[curKey].parsed !== undefined) curTemp = dev.Report[curKey].parsed;
-					if (setKey && dev.Report[setKey].parsed !== undefined) setTemp = dev.Report[setKey].parsed;
+					if (heatKey && dev.Report[heatKey].parsed !== undefined) setTemp = dev.Report[heatKey].parsed; else if (coolKey && dev.Report[coolKey].parsed !== undefined) setTemp = dev.Report[coolKey].parsed;
 					try {
 						var yaRep = dev.Report[sysKey].ya_rep;
 						if (typeof yaRep === 'string') { try { yaRep = JSON.parse(yaRep); } catch (e) { yaRep = null; } }
@@ -662,18 +733,36 @@ function getWidget(IEEE) {
 					if (hvacModes.indexOf('off') === -1) hvacModes.unshift('off');
 				}
 
-				const modeColors = {heat:'#ff7043', cool:'#42a5f5', auto:'#ab47bc', 'fan_only':'#29b6f6', dry:'#ffca28', off:'#616161'};
-				const modeIcons  = {heat:'🔥', cool:'❄️', auto:'♻️', 'fan_only':'💨', dry:'💧', off:'⏸'};
+			const modeColors = {heat:'#ff7043', cool:'#42a5f5', auto:'#ab47bc', 'fan_only':'#29b6f6', dry:'#ffca28', eco:'#66bb6a', off:'#616161'};
+			const modeIcons  = {heat:'🔥', cool:'❄️', auto:'♻️', 'fan_only':'💨', dry:'💧', eco:'🌱', off:'⏸'};
+			// Standalone entities own their controls: a foreign climate block shows modes/setpoints
+			// only as a legacy fallback (no climate_mode/climate_temp objects on the device).
+			// No fallback: each control lives only on its own entity.
+			// 001C → modes, 0012 → heat setpoint, 0011 → cool setpoint, anything else → header only.
+			var ownAttr = String(key).slice(-4).toUpperCase();
+			var ownIsMode = (ownAttr === '001C');
+			var ownIsHeat = (ownAttr === '0012');
+			var ownIsCool = (ownAttr === '0011');
+			var ownIsTemp = (ownAttr === '0000');
+			var showModes = ownIsMode;
+			var showHeat = ownIsHeat;
+			var showCool = ownIsCool;
 				const modeColor  = modeColors[hvacMode] || '#888';
 
 				// Current temperature
 				tpl += `<div class="switch flex" style="margin-bottom:4px;">`;
 				tpl += `<div class="icon flex">${getIconSvg('climate', 28, modeColor)}</div>`;
 				tpl += `<div class="labelObj">${value.label}</div>`;
-				tpl += `<span class="${id}" style="color:${modeColor};font-size:18px;font-weight:bold;">${curTemp}°</span>`;
+				// Header value: own reading for standalone entities, current temp otherwise
+			var ownParsed = (value.parsed !== undefined && value.parsed !== null && value.parsed !== '') ? value.parsed : '—';
+			var headVal = curTemp + '°';
+			if (ownIsMode) headVal = hvacMode;
+			else if (ownIsHeat || ownIsCool || ownIsTemp) headVal = ownParsed + '°';
+			tpl += `<span class="${id}" style="color:${modeColor};font-size:18px;font-weight:bold;">${headVal}</span>`;
 				tpl += `</div>`;
 
-				// Mode buttons
+				// Mode buttons — only on the SystemMode entity (or legacy fallback)
+				if (showModes) {
 				tpl += `<div class="switch flex" style="gap:2px;flex-wrap:wrap;justify-content:center;margin-bottom:4px;">`;
 				hvacModes.forEach(mode => {
 					const active = mode === hvacMode;
@@ -683,19 +772,91 @@ function getWidget(IEEE) {
 						${modeIcons[mode]||''}${mode}</span>`;
 				});
 				tpl += `</div>`;
+				} // showModes
 
-				// Target-temperature slider
+				// Target-temperature slider (heat 0x0012; bound to the heat key so twin blocks share one control)
+				if (showHeat) {
+				var heatId = (isThermostat && heatKey) ? (dev.IEEE + '#' + heatKey) : id;
+				var heatSpan = heatId.replace(/[^a-zA-Z0-9]/g, '');
 				tpl += `<div class="switch flex" style="margin-bottom:2px;">`;
 				tpl += `<span style="color:#aaa;font-size:12px;">🎯</span>`;
-				tpl += `<input class="${id} level" type="range" style="width:60%;margin:0 6px;"
-					id="climate_temp|${id}"
+				tpl += `<input class="${heatId} level" type="range" style="width:60%;margin:0 6px;"
+					id="climate_temp|${heatId}"
 					min="${minTemp}" max="${maxTemp}" step="${tempStep}" value="${setTemp!=='—'?setTemp:20}"
 					onchange="widgetEvnt(this.id,this.value)"
-					oninput="document.getElementById('clt_${idw}').textContent=this.value+'°'">`;
-				tpl += `<span id="clt_${idw}" style="color:#ff9800;font-size:14px;min-width:36px;text-align:right;">${setTemp!=='—'?setTemp:'20'}°</span>`;
+					oninput="document.getElementById('clt_${heatSpan}').textContent=this.value+'°'">`;
+				tpl += `<span id="clt_${heatSpan}" style="color:#ff9800;font-size:14px;min-width:36px;text-align:right;">${setTemp!=='—'?setTemp:'20'}°</span>`;
 				tpl += `</div>`;
+				} // showHeat
+
+				// Cooling setpoint (0x0011) — only on the cooling entity (or legacy fallback)
+				if (showCool) {
+					var coolId = dev.IEEE + '#' + coolKey;
+					var coolVal = (dev.Report[coolKey].parsed !== undefined) ? dev.Report[coolKey].parsed : 20;
+					var coolSpan = coolId.replace(/[^a-zA-Z0-9]/g, '');
+					tpl += `<div class="switch flex" style="margin-bottom:2px;">`;
+					tpl += `<span style="color:#aaa;font-size:12px;">❄️🎯</span>`;
+					tpl += `<input class="${coolId} level" type="range" style="width:60%;margin:0 6px;"
+						id="climate_temp|${coolId}"
+						min="${minTemp}" max="${maxTemp}" step="${tempStep}" value="${coolVal}"
+						onchange="widgetEvnt(this.id,this.value)"
+						oninput="document.getElementById('clt_${coolSpan}').textContent=this.value+'°'">`;
+					tpl += `<span id="clt_${coolSpan}" style="color:#42a5f5;font-size:14px;min-width:36px;text-align:right;">${coolVal}°</span>`;
+					tpl += `</div>`;
+				}
 
 				// Empty div — will be closed by the shared </div> after the switch
+				tpl += `<div>`;
+				break;
+			}
+
+			case 'climate_temp': {
+				// Standalone setpoint entity (table row 2): 0x0012 heat / 0x0011 cool.
+				// Suffix decides the label; value and writes stay on this object's own key.
+				var isCool = /0011$/.test(key);
+				var stVal = (value.parsed !== undefined && value.parsed !== null && value.parsed !== '') ? value.parsed : 20;
+				var stSpan = id.replace(/[^a-zA-Z0-9]/g, '');
+				tpl += `<div class="switch flex" style="margin-bottom:2px;">`;
+				tpl += `<div class="icon flex">${isCool ? '❄️' : '🔥'}</div>`;
+				tpl += `<div class="labelObj">${value.label || (isCool ? 'CoolingSetpoint' : 'HeatingSetpoint')}</div>`;
+				tpl += `<input class="${id} level" type="range" style="width:60%;margin:0 6px;"
+					id="climate_temp|${id}"
+					min="${(attr && attr.min_temp) ? Number(attr.min_temp) : 5}" max="${(attr && attr.max_temp) ? Number(attr.max_temp) : 35}" step="${(attr && attr.temp_step) ? Number(attr.temp_step) : 0.5}" value="${stVal}"
+					onchange="widgetEvnt(this.id,this.value)"
+					oninput="document.getElementById('clt_${stSpan}').textContent=this.value+'°'">`;
+				tpl += `<span id="clt_${stSpan}" style="color:${isCool ? '#42a5f5' : '#ff9800'};font-size:14px;min-width:36px;text-align:right;">${stVal}°</span>`;
+				tpl += `</div>`;
+				tpl += `<div>`;
+				break;
+			}
+
+			case 'climate_mode': {
+				// Standalone mode entity (table row 3): SystemMode 0x001C as buttons.
+				var cmRaw = (attr && attr.modes) || '';
+				var cmModes = Array.isArray(cmRaw) ? cmRaw.map(function(x){ return String((x && x.value) || x).toLowerCase().trim(); }) : String(cmRaw).split(',').map(function(s){ return s.toLowerCase().trim(); });
+				cmModes = cmModes.filter(function(s){ return !!s; });
+				if (!cmModes.length) cmModes = ['off','auto','heat','cool','dry','fan_only','eco'];
+				var cmVal = value.parsed;
+				if (/^[0-9]+$/.test(String(cmVal))) {
+					var cmMap = {0:'off', 1:'auto', 2:'auto', 3:'cool', 4:'heat', 5:'heat', 6:'cool', 7:'fan_only', 8:'dry', 9:'auto'};
+					cmVal = cmMap[parseInt(cmVal, 10)] || String(cmVal);
+				}
+				cmVal = String(cmVal || 'off').toLowerCase().trim();
+				var cmColors = {heat:'#ff7043', cool:'#42a5f5', auto:'#ab47bc', 'fan_only':'#29b6f6', dry:'#ffca28', eco:'#66bb6a', off:'#616161'};
+				var cmIcons = {heat:'🔥', cool:'❄️', auto:'♻️', 'fan_only':'💨', dry:'💧', eco:'🌱', off:'⏸'};
+				tpl += `<div class="switch flex">`;
+				tpl += `<div class="icon flex">${getIconSvg('climate', 28, cmColors[cmVal] || '#888')}</div>`;
+				tpl += `<div class="labelObj">${value.label || 'SystemMode'}</div>`;
+				tpl += `<span class="${id}" style="color:${cmColors[cmVal] || '#888'};font-weight:bold;">${cmVal}</span>`;
+				tpl += `</div>`;
+				tpl += `<div class="switch flex" style="gap:2px;flex-wrap:wrap;justify-content:center;margin-bottom:4px;">`;
+				cmModes.forEach(function(m) {
+					var mActive = m === cmVal;
+					tpl += `<span onclick="widgetEvnt('climate_mode|${id}','${m}')"
+						style="cursor:pointer;border-radius:10px;padding:2px 7px;font-size:11px;color:#fff;background:${mActive ? (cmColors[m]||'#888') : '#444'};border:${mActive?'2px':'1px'} solid ${cmColors[m]||'#888'};">
+						${cmIcons[m]||''}${m}</span>`;
+				});
+				tpl += `</div>`;
 				tpl += `<div>`;
 				break;
 			}
@@ -742,10 +903,23 @@ function getWidget(IEEE) {
 				tpl += `<input class="${id} level" type="range" style="width:66%;margin:0 4px;"
 					id="fan_speed|${id}" min="0" max="100" step="10" value="${speed}"
 					onchange="widgetEvnt(this.id,this.value)">`;
-				tpl += `<span class="${id}" style="color:#29b6f6;">${speed}%</span>`;
-				tpl += `</div>`;
-				tpl += `<div>`;
-				break;
+			tpl += `<span class="${id}" style="color:#29b6f6;">${speed}%</span>`;
+			tpl += `</div>`;
+			// Fan presets — ZCL Fan Control (0x0202) FanMode / Yandex fan_speed.
+			// Staged from class.preset_modes (comma string or array), fallback to the table set.
+			var fanPresets = (attr && attr.preset_modes) ? String(attr.preset_modes).split(',').map(function(s){ return s.trim().toLowerCase(); }).filter(function(s){ return !!s; }) : [];
+			if (!fanPresets.length && attr && Array.isArray(attr.preset_modes)) fanPresets = attr.preset_modes.map(function(s){ return String(s).toLowerCase().trim(); }).filter(function(s){ return !!s; });
+			if (!fanPresets.length) fanPresets = ['auto','low','medium','high','quiet','turbo'];
+			var fanCur = String((value && value.preset) || value.parsed || '').toLowerCase().trim();
+			tpl += `<div class="switch flex" style="gap:2px;flex-wrap:wrap;justify-content:center;margin-bottom:2px;">`;
+			fanPresets.forEach(function(fp) {
+				var fpActive = fp === fanCur;
+				tpl += `<span onclick="widgetEvnt('fan_speed|${id}','${fp}')"
+					style="cursor:pointer;border-radius:10px;padding:2px 7px;font-size:11px;color:#fff;background:${fpActive?'#29b6f6':'#444'};border:${fpActive?'2px':'1px'} solid #29b6f6;">${fp}</span>`;
+			});
+			tpl += `</div>`;
+			tpl += `<div>`;
+			break;
 			}
 
 			case 'lock': {
@@ -843,15 +1017,22 @@ function getWidget(IEEE) {
 			tpl += `</div>`
 			tpl += `<div>`
 		}
-		tpl += `</div>`
+		if (isCfgObj) { cfgReportHtml += `<div class="cfg-rep" style="width:100%">` + tpl + `</div>`; tpl = tplSave; }
+		else tpl += `</div>`
 	}
-	// --- JoinSetup units: empty category — inline, config/diagnostic — into details ---
-	try { tpl += renderSetupBlock(dev); } catch(e) { console.warn('setup block', e); }
+	tpl += `</div>`; // close .w-part-work
+	tpl += setupCfgWrap(cfgReportHtml);
+	if (cfgReportHtml) {
+		tpl = tpl.replace('<!--CFGTOGGLE-->',
+			`<div class="switch flex setup-toggle" onclick="setupViewToggle(this,event)" style="justify-content:center;cursor:pointer;color:#888;font-size:11px;padding:4px 2px;">⚙ Настройка</div>`);
+	} else {
+		tpl = tpl.replace('<!--CFGTOGGLE-->', '');
+	}
 	tpl += `</div>`
 	return tpl
 }
 
-// JoinSetup.writes projection cache: ieee -> {state, writes}. Loaded lazily, once.
+// JoinSetup-era cache (jsCache writes) упразднён: всё строится из Report напрямую.
 window.jsCache = window.jsCache || {};
 function jsEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 // isOnVal — normalized on/off comparison for Parsed:
@@ -859,157 +1040,60 @@ function jsEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').rep
 // (especially for HAD import from a foreign broker).
 function isOnVal(v) { var s = String(v == null ? '' : v).toLowerCase().trim(); return s === '1' || s === 'true' || s === 'on' || s === 'вкл'; }
 
-function setupRowHtml(ieee, w, forceLabel) {
-	var id = ieee + '#setup:' + w.id;
-	var kind = w.kind || 'select';
-	var title = forceLabel || w.unitname || w.unit || w.label || w.id;
-	var h = `<div class="switch flex">`;
-	h += `<div class="icon flex">⚙️</div>`;
-	h += `<div class="labelObj">${jsEsc(title)}</div>`;
-	if (kind === 'number') {
-		var nv = parseFloat(w.value);
-		if (!isFinite(nv)) nv = 0;
-		h += `<input class="${jsEsc(id)}" type="number" style="width:64px;background:#1e1e1e;color:#fff;border:1px solid #555;border-radius:6px;padding:3px 4px;font-size:13px;text-align:center;" value="${nv}" onkeydown="if(event.key==='Enter'){widgetEvnt('setup|${jsEsc(id)}',this.value)}">`;
-		h += `<button type="button" title="Записать" style="background:#2e7d32;color:#fff;border:1px solid #43a047;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px;" onclick="widgetEvnt('setup|${jsEsc(id)}',this.parentNode.querySelector('input').value)">OK</button>`;
-	} else if (kind === 'button') {
-		h += `<input type="button" class="${jsEsc(id)} button-input" value="${jsEsc(title)}" onclick="widgetEvnt('setup|${jsEsc(id)}','${jsEsc(w.value || '1')}')">`;
-	} else {
-		var opts = [];
-		(w.options || []).forEach(function(o) {
-			if (o && typeof o === 'object') opts.push({ v: String(o.v != null ? o.v : ''), l: String(o.l != null && o.l !== '' ? o.l : o.v) });
-			else if (o != null && o !== '') opts.push({ v: String(o), l: String(o) });
-		});
-		if (!opts.length && w.value != null && w.value !== '') opts.push({ v: String(w.value), l: String(w.value) });
-		if (!opts.length) return '';
-		// A single option — a dropdown is pointless, show text
-		if (opts.length < 2) {
-			var only = opts[0];
-			var txt = only.l !== only.v ? only.l + ' (' + only.v + ')' : only.v;
-			h += `<span class="${jsEsc(id)}" style="color:#e6a23c;font-size:12px;" title="Один вариант — дополни в редакторе">⚠ ${jsEsc(txt)}</span>`;
-			h += `</div>`;
-			return h;
-		}
-		// Selection only stages, writing happens on OK (otherwise a random click writes to the device)
-		h += `<select class="${jsEsc(id)}" onchange="jsCacheSet('${jsEsc(ieee)}','${jsEsc(w.id)}',this.value)" style="width:110px;">`;
-		opts.forEach(function(o) {
-			var sel = (o.v === String(w.value)) ? 'selected' : '';
-			h += `<option value="${jsEsc(o.v)}" ${sel}>${jsEsc(o.l)}</option>`;
-		});
-		h += `</select>`;
-		h += `<button type="button" title="Записать" style="background:#2e7d32;color:#fff;border:1px solid #43a047;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px;" onclick="var s=this.parentNode.querySelector('select');widgetEvnt('setup|${jsEsc(id)}',s.value);jsCacheSet('${jsEsc(ieee)}','${jsEsc(w.id)}',s.value)">OK</button>`;
-	}
-	h += `</div>`;
-	return h;
-}
-
-function jsCacheSet(ieee, wid, val) {
-	try {
-		var c = window.jsCache[ieee];
-		if (c && c.writes) c.writes.forEach(function(w) { if (w.id === wid) w.value = val; });
-	} catch(e) {}
-}
-
-function renderSetupBlock(dev) {
-	if (!dev || !dev.IEEE) return '';
-	// In the editor the preview is built from te_file (it has the full JoinSetup, the flag may be missing)
-	var localWrites = (dev.JoinSetup && dev.JoinSetup.writes) || [];
-	if (!dev.hasSetup && !localWrites.length) return '';
-	var ieee = dev.IEEE;
-	var c = window.jsCache[ieee];
-	if (!c) {
-		window.jsCache[ieee] = { state: 'loading', writes: [] };
-		try {
-			eventE.once('joinSetup:' + ieee, function(data) {
-				try {
-					var w = (data && data !== 'NULL') ? JSON.parse(data) : [];
-					window.jsCache[ieee] = { state: 'ready', writes: w };
-				} catch(e) { window.jsCache[ieee] = { state: 'ready', writes: [] }; }
-				try {
-					var el = document.getElementById('setup_' + ieee);
-					if (el) el.innerHTML = setupBlockInner(ieee, window.jsCache[ieee].writes);
-				} catch(e) {}
-			});
-			WSsend('getJoinSetup|' + ieee);
-		} catch(e) {}
-		return `<div class="switch flex" id="setup_${jsEsc(ieee)}"><span style="color:#888;font-size:11px;">⚙ загрузка настроек…</span></div>`;
-	}
-	if (c.state !== 'ready') return `<div class="switch flex" id="setup_${jsEsc(ieee)}"><span style="color:#888;font-size:11px;">⚙ загрузка настроек…</span></div>`;
-	return `<div id="setup_${jsEsc(ieee)}" style="width:100%">${setupBlockInner(ieee, c.writes)}</div>`;
-}
-
-function setupBlockInner(ieee, writes) {
-	if (!writes || !writes.length) return '';
-	// Grouping by unitname. Several select records of one unit —
-	// variants of a single dropdown (each record = a variant with its own address).
-	var groups = {}, order = [];
-	writes.forEach(function(w) {
-		var u = w.unitname || w.unit || w.label || w.id || '';
-		if (!groups[u]) { groups[u] = []; order.push(u); }
-		groups[u].push(w);
-	});
-	var inline = '', cfg = '';
-	var put = function(w, row) {
-		if (!row) return;
-		var cat = w.entity_category || '';
-		if (cat === 'config' || cat === 'diagnostic') cfg += row;
-		else inline += row;
-	};
-	order.forEach(function(u) {
-		var members = groups[u];
-		var sels = members.filter(function(w) { return (w.kind || 'select') === 'select'; });
-		var rest = members.filter(function(w) { return (w.kind || 'select') !== 'select'; });
-		if (sels.length > 1) {
-			var mrow = setupMergedSelectHtml(ieee, u, sels);
-			if (mrow) put(sels[0], mrow);
-			rest.forEach(function(w) { put(w, setupRowHtml(ieee, w, w.label || w.id)); });
-		} else {
-			members.forEach(function(w) { put(w, setupRowHtml(ieee, w)); });
-		}
-	});
-	var h = inline;
-	if (cfg) h += `<details style="width:100%;margin-top:2px;"><summary style="cursor:pointer;color:#aaa;font-size:11px;">⚙ Настройки</summary>${cfg}</details>`;
-	return h;
-}
-
-// One dropdown from several select records: each record = a variant
-// (name + value + its own address). Nested options are not considered here.
-function setupMergedSelectHtml(ieee, uname, entries) {
+// Merged select: several role=select records with one unitname → one dropdown.
+// Each record is a variant (label + own address). OK sends setup:<objkey>.
+function setupMergedHtml(ieee, uname, members) {
 	var opts = [];
-	entries.forEach(function(w) {
-		if (w.value == null || w.value === '') return;
-		opts.push({ entry: w.id, v: String(w.value), l: String(w.label || w.value), sel: !!w.selected });
+	members.forEach(function(m) {
+		var v = (m.value.val != null && m.value.val !== '') ? m.value.val : m.value.parsed;
+		if (v == null || v === '') return;
+		opts.push({ key: m.key, v: String(v), l: String(m.value.label || v), sel: !!m.value.selected });
 	});
 	if (!opts.length) return '';
 	var selIdx = 0;
-	for (var k = 0; k < opts.length; k++) {
-		if (opts[k].sel) { selIdx = k; break; }
-	}
+	for (var k = 0; k < opts.length; k++) { if (opts[k].sel) { selIdx = k; break; } }
 	var h = `<div class="switch flex">`;
-	h += `<div class="icon flex">⚙️</div>`;
+	h += `<div class="icon flex">🔧</div>`;
 	h += `<div class="labelObj">${jsEsc(uname)}</div>`;
 	h += `<select style="width:110px;">`;
 	opts.forEach(function(o, k) {
-		h += `<option value="${jsEsc(o.entry + '|' + o.v)}"${k === selIdx ? ' selected' : ''}>${jsEsc(o.l)}</option>`;
+		h += `<option value="${jsEsc(o.key + '|' + o.v)}"${k === selIdx ? ' selected' : ''}>${jsEsc(o.l)}</option>`;
 	});
 	h += `</select>`;
-	h += `<button type="button" title="Записать" style="background:#2e7d32;color:#fff;border:1px solid #43a047;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px;" onclick="jsMergedOk('${jsEsc(ieee)}',this)">OK</button>`;
+	h += `<button type="button" title="Записать" style="background:#2e7d32;color:#fff;border:1px solid #43a047;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px;" onclick="jsSetupMergedOk('${jsEsc(ieee)}',this)">OK</button>`;
 	h += `</div>`;
 	return h;
 }
 
-function jsMergedOk(ieee, btn) {
+function jsSetupMergedOk(ieee, btn) {
 	try {
 		var s = btn.parentNode.querySelector('select');
 		if (!s) return;
 		var p = s.value.split('|');
-		var entry = p[0], val = p.slice(1).join('|');
-		widgetEvnt('setup|' + ieee + '#setup:' + entry, val);
-		var c = window.jsCache[ieee];
-		if (c && c.writes) {
-			var u = '';
-			c.writes.forEach(function(w) { if (w.id === entry) { w.value = val; w.selected = true; u = w.unitname || w.unit || ''; } });
-			if (u) c.writes.forEach(function(w) { if (w.id !== entry && (w.unitname || w.unit || '') === u) delete w.selected; });
-		}
+		var key = p[0], val = p.slice(1).join('|');
+		widgetEvnt('setup|' + ieee + '#setup:' + key, val);
+	} catch(e) {}
+}
+
+// Config view wrapper + bottom toggle: work/config views are mutually exclusive.
+// Toggle label shows the target view.
+function setupCfgWrap(cfgRep) {
+	if (!cfgRep) return '';
+	return `<div class="w-part-cfg" style="display:none;width:100%">${cfgRep}</div>`;
+}
+
+function setupViewToggle(el, e) {
+	if (e && e.stopPropagation) e.stopPropagation();
+	try {
+		var card = el.closest('.ac');
+		if (!card) return;
+		var work = card.querySelector('.w-part-work');
+		var cfg = card.querySelector('.w-part-cfg');
+		if (!work || !cfg) return;
+		var showCfg = cfg.style.display === 'none';
+		cfg.style.display = showCfg ? '' : 'none';
+		work.style.display = showCfg ? 'none' : '';
+		el.textContent = showCfg ? '◀ Устройство' : '⚙ Настройка';
 	} catch(e) {}
 }
 

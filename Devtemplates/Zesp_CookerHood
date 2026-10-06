@@ -1,0 +1,101 @@
+{
+  "Device": "2C3A",
+  "Name": "Вытяжка",
+  "IEEE": "00124B001B8FDAA5",
+  "ModelId": "Zesp_CookerHood",
+  "Location": "Кухня",
+  "EP": {
+    "05": {
+      "PrfId": "0104",
+      "ClI": [
+        "0006"
+      ],
+      "ClO": []
+    },
+    "04": {
+      "PrfId": "0104",
+      "ClI": [
+        "0006"
+      ],
+      "ClO": []
+    },
+    "03": {
+      "PrfId": "0104",
+      "ClI": [
+        "0006"
+      ],
+      "ClO": []
+    },
+    "02": {
+      "PrfId": "0104",
+      "ClI": [
+        "0006"
+      ],
+      "ClO": []
+    },
+    "01": {
+      "PrfId": "0104",
+      "ClI": [
+        "0000",
+        "0006"
+      ],
+      "ClO": [
+        "0006"
+      ]
+    }
+  },
+  "DevType": "ZED",
+  "Report": {
+    "0100060000": {
+      "label": "Скорость1",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "ya_rep": "{\"capabilities\":[{\"type\":\"devices.capabilities.on_off\",\"retrievable\":true,\"reportable\":true,\"state\":{\"instance\":\"on\",\"value\":false}}],\"multi_id\":{\"name\":\"Скорость1\",\"room\":\"кухня\",\"type\":\"devices.types.switch\"}}",
+      "retain": "0",
+      "class": {}
+    },
+    "0200060000": {
+      "label": "Скорость2",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "ya_rep": "{\"capabilities\":[{\"type\":\"devices.capabilities.on_off\",\"retrievable\":true,\"reportable\":true,\"state\":{\"instance\":\"on\",\"value\":false}}],\"multi_id\":{\"name\":\"Скорость2\",\"room\":\"кухня\",\"type\":\"devices.types.switch\"}}",
+      "retain": "0",
+      "class": {}
+    },
+    "0300060000": {
+      "label": "Скорость3",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "ya_rep": "{\"capabilities\":[{\"type\":\"devices.capabilities.on_off\",\"retrievable\":true,\"reportable\":true,\"state\":{\"instance\":\"on\",\"value\":false}}],\"multi_id\":{\"name\":\"вытяжка скорость3\",\"room\":\"зал\",\"type\":\"devices.types.other\"}}",
+      "retain": "0",
+      "class": {}
+    },
+    "0400060000": {
+      "label": "Подсветка",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "ya_rep": "none",
+      "retain": "0",
+      "class": {}
+    },
+    "0500060000": {
+      "label": "Сирена",
+      "val": "",
+      "mat": "1",
+      "role": "switch",
+      "parsed": "",
+      "ya_rep": "none",
+      "retain": "0",
+      "class": {}
+    }
+  },
+  "type": "devices.types.cooking"
+}
