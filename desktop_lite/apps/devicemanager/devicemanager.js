@@ -185,18 +185,48 @@
 
       switch (role) {
         case 'light': {
-          // Pick the unit by the original role (label is unreliable: sometimes Russian "яркость").
-          var isOnOff = (lightKind === 'light_onoff') || (lightKind === 'light' && (value.label === 'On_Off' || value.label === 'on_off'));
-          var isLevel = (lightKind === 'light_level') || (lightKind === 'light' && (value.label === 'Level' || value.label === 'яркость' || value.label === 'brightness'));
-          var isCt = (lightKind === 'light_color_temp') || (lightKind === 'light' && (value.label === 'ColorT' || value.label === 'Color_temp'));
-          var isColor = (lightKind === 'light_color') || (lightKind === 'light' && value.label === 'Color');
+          // Single lamp role: the unit's job is class.light_part (anchor = onoff).
+          // Legacy roles and labels are fallbacks for unmigrated templates.
+          var lightPart = (attr && attr.light_part) || '';
+          if (!lightPart) {
+            if (lightKind === 'light_onoff') lightPart = 'onoff';
+            else if (lightKind === 'light_level') lightPart = 'level';
+            else if (lightKind === 'light_color_temp') lightPart = 'color_temp';
+            else if (lightKind === 'light_color') lightPart = 'color';
+          }
+          var isOnOff = (lightPart === 'onoff') || (value.label === 'On_Off' || value.label === 'on_off');
+          var isLevel = (lightPart === 'level') || (value.label === 'Level' || value.label === 'яркость' || value.label === 'brightness');
+          var isCt = (lightPart === 'color_temp') || (value.label === 'ColorT' || value.label === 'Color_temp');
+          var isColor = (lightPart === 'color') || (value.label === 'Color');
           if (isOnOff) {
             var litOn = [1, '1', true, 'on', 'ON'].indexOf(value.parsed) !== -1;
-            html += '<div style="display:flex;align-items:center;gap:5px;">' + window.getIconSvg('light_bulb', 18, litOn ? '#ffd54f' : '#666') +
+            html += '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">' + window.getIconSvg('light_bulb', 18, litOn ? '#ffd54f' : '#666') +
               '<input type="checkbox" class="' + id + ' input toggle-input" id="lt_' + idw + '"' + (litOn ? ' checked' : '') +
               ' onchange="evm(\'on_off|' + id + '\',this.checked?1:0)"/>' +
               '<label for="lt_' + idw + '"><div class="toggle-switch ' + id + '"><span></span></div></label>' +
-              '<span class="' + id + '" style="font-size:11px;color:var(--faint)">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
+              '<span class="' + id + '" style="font-size:11px;color:var(--faint)">' + (value.parsed != null ? value.parsed : '?') + '</span>';
+            // Light puzzle (like the climate row): brightness sibling as a mini
+            // slider on the anchor row, so the lamp is driven from one place.
+            try {
+              var dmLvKey = null, dmLvRep = null;
+              for (var dmK in device.Report) {
+                if (!device.Report.hasOwnProperty(dmK)) continue;
+                var dmR = device.Report[dmK] || {};
+                var dmRb = String(dmR.role || '').split('&')[0];
+                var dmCls = {};
+                try { var dmTail = String(dmR.role || '').split('&')[1]; if (dmTail) dmCls = JSON.parse(dmTail); } catch (eJ) {}
+                try { if (dmR.class && typeof dmR.class === 'object') { for (var dmCk in dmR.class) if (dmCls[dmCk] === undefined) dmCls[dmCk] = dmR.class[dmCk]; } } catch (eC) {}
+                if (dmRb === 'light_level' || (dmRb === 'light' && dmCls.light_part === 'level')) { dmLvKey = dmK; dmLvRep = dmR; break; }
+              }
+              if (dmLvKey) {
+                var dmLvId = device.IEEE + '#' + dmLvKey;
+                var dmLvPct = Math.round((parseFloat(dmLvRep.parsed) || 0) * 100 / 255);
+                html += '<span style="display:inline-flex;align-items:center;gap:3px;">' + window.getIconSvg('brightness', 14, '#ffd54f') +
+                  '<input class="' + dmLvId + ' level" type="range" id="level|' + dmLvId + '" style="width:70px" min="0" max="100" step="2" value="' + dmLvPct + '" onchange="evm(\'level|' + dmLvId + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
+                  '<span class="' + dmLvId + '" style="font-size:11px;color:var(--faint);min-width:26px">' + dmLvPct + '%</span></span>';
+              }
+            } catch (eLv) {}
+            html += '</div>';
           } else if (isLevel) {
             // parsed 0-255 → show percent, send percent (as widgets do).
             var lvlPct = Math.round((parseFloat(value.parsed) || 0) * 100 / 255);

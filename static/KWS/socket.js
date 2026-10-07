@@ -94,9 +94,9 @@ window.grpExtendSurface = function (groupIeee, memberIeee, epClusters) {
 				g.Report = g.Report || {}; g.Members = g.Members || [];
 				var ctlMap = {
 					'0006': [{ key: '0100060000', label: 'On_Off', role: 'switch', dataType: '10', cls: { optimistic: true, icon: 'mdi:lightbulb' } }],
-					'0008': [{ key: '0100080000', label: 'Level', role: 'light_level', dataType: '20', cls: { brightness_min: 0, brightness_max: 254 } }],
-					'0300': [{ key: '0103000000', label: 'Color', role: 'light_color', dataType: '20', cls: { color_modes: 'rgb' } },
-					          { key: '0103000007', label: 'ColorTemp', role: 'light_color_temp', dataType: '21', cls: { min_mireds: 153, max_mireds: 500 } }]
+				'0008': [{ key: '0100080000', label: 'Level', role: 'light', dataType: '20', cls: { light_part: 'level', brightness_min: 0, brightness_max: 254 } }],
+				'0300': [{ key: '0103000000', label: 'Color', role: 'light', dataType: '20', cls: { light_part: 'color', color_modes: 'rgb' } },
+				          { key: '0103000007', label: 'ColorTemp', role: 'light', dataType: '21', cls: { light_part: 'color_temp', min_mireds: 153, max_mireds: 500 } }]
 				};
 				(epClusters || []).forEach(function (cl) {
 					cl = String(cl || '').toUpperCase();
@@ -493,10 +493,10 @@ function widgetReport(rep) {
 								}
 							} catch {}
 
-							// Refresh the bulb (for light_onoff)
-							if (role === "light_onoff") {
+							// Refresh the bulb (lamp onoff: role light + onoff part, or legacy light_onoff)
+							if (role === "light_onoff" || role === "light") {
 								try {
-									const bulb = el.closest(".ac")?.querySelector("[id^='z']");
+									const bulb = el.closest(".ac")?.querySelector("[id^='bulb_'], [id^='z']");
 									if (bulb) {
 										bulb.style.webkitFilter = el.checked
 											? "brightness(150%)"
@@ -564,15 +564,15 @@ function widgetReport(rep) {
 							if (cluster === "0008" || role === "light_level") {
 								try {
 									const ac = el.closest(".ac");
-									const bulb = ac && ac.querySelector("[id^='z']");
+									const bulb = ac && ac.querySelector("[id^='bulb_'], [id^='z']");
 									if (bulb) bulb.style.webkitFilter = `brightness(${rangeVal}%)`;
 								} catch {}
 							}
 							// Refresh the bulb color from the color-temperature report
-							if (cluster === "0300" && role === "light_color_temp") {
+							if (cluster === "0300" && attrID.endsWith("0007") && (role === "light_color_temp" || role === "light")) {
 								try {
 									const ac = el.closest(".ac");
-									const bulb = ac && ac.querySelector("[id^='z']");
+									const bulb = ac && ac.querySelector("[id^='bulb_'], [id^='z']");
 									if (bulb) {
 										var t = rangeVal / 100, h = t < 0.5 ? 185 : 35;
 										var s = Math.round(Math.abs(t - 0.5) * 2 * 85);
@@ -589,11 +589,11 @@ function widgetReport(rep) {
 					break;
 			}
 			// Refresh the bulb color from the hex-color report (regardless of element type)
-			if (cluster === "0300" && attrID.endsWith("0000") && role === "light_color") {
+			if (cluster === "0300" && attrID.endsWith("0000") && (role === "light_color" || role === "light")) {
 				console.log('[color] hex bulb update val=', val);
 				try {
 					const ac = el.closest(".ac");
-					const bulb = ac && ac.querySelector("[id^='z']");
+					const bulb = ac && ac.querySelector("[id^='bulb_'], [id^='z']");
 					if (bulb && val && val.length >= 6) {
 						var hex = val.replace('#','');
 						if (hex.length >= 6) {

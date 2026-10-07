@@ -4175,8 +4175,9 @@ function sendCmd_showObjPopup(block) {
     var device = deviceList.find(function (d) { return d.IEEE === ieee; });
     if (!device || !device.Report) return;
 
-    // Фильтруем: только управляемые роли (не сенсоры/бинарные сенсоры)
-    var cmdRoles = ['light', 'switch', 'number', 'select', 'cover', 'climate', 'fan', 'lock', 'alarm_control_panel', 'button'];
+    // Фильтруем: только управляемые роли (не сенсоры/бинарные сенсоры).
+    // Легаси-роли ламп — алиасы, пока шаблоны не мигрировали на единый light.
+    var cmdRoles = ['light', 'light_onoff', 'light_level', 'light_color', 'light_color_temp', 'switch', 'number', 'select', 'cover', 'climate', 'fan', 'lock', 'alarm_control_panel', 'button'];
     var reportKeys = Object.keys(device.Report).filter(function (key) {
         var role = (device.Report[key].role || '').split('&')[0].trim();
         return cmdRoles.indexOf(role) !== -1;
@@ -4271,7 +4272,12 @@ function sendCmd_showObjPopup(block) {
 // ── Определяем команду по роли (как в виджетах) ──────────────────────────────
 function sendCmd_getCmdForRole(role, classObj) {
     switch (role) {
-        case 'light':   return 'on_off';
+        case 'light':
+        case 'light_onoff':
+        case 'light_level':
+        case 'light_color':
+        case 'light_color_temp':
+            return 'on_off';
         case 'switch':  return 'on_off';
         case 'number':  return 'number';
         case 'select':  return 'select';
@@ -4299,7 +4305,7 @@ function sendCmd_updateValueShadow(block, rep) {
     if (existing && !existing.isShadow()) return; // реальный блок — не трогаем
 
     var shadow;
-    if (role === 'switch' || role === 'light') {
+    if (role === 'switch' || role === 'light' || role === 'light_onoff' || role === 'light_level' || role === 'light_color' || role === 'light_color_temp') {
         // Dropdown: 0=OFF 1=ON 2=Toggle
         shadow = block.workspace.newBlock('math_number');
         shadow.setShadow(true);
@@ -4339,6 +4345,10 @@ Blockly.JavaScript['sendCmd'] = function (block) {
     // Определяем cmd по роли (зеркало sendCmd_getCmdForRole)
     var cmdMap = {
         'light':   'on_off',
+        'light_onoff': 'on_off',
+        'light_level': 'on_off',
+        'light_color': 'on_off',
+        'light_color_temp': 'on_off',
         'switch':  'on_off',
         'number':  'number',
         'select':  'select',
@@ -4350,10 +4360,10 @@ Blockly.JavaScript['sendCmd'] = function (block) {
     };
     var cmd = cmdMap[role] || 'on_off';
 
-    // override cmd based on cluster in objKey (for light role: on_off/level/color)
+    // override cmd based on cluster in objKey (for light role: on_off/level/color/colorT)
     if (objKey && objKey.length >= 6) {
         var mcl = objKey.substr(2, 4);
-        if (mcl === '0300') cmd = 'color';
+        if (mcl === '0300') cmd = objKey.endsWith('0007') ? 'colorT' : 'color';
         else if (mcl === '0008') cmd = 'level';
         else if (mcl === '0006') cmd = 'on_off';
     }

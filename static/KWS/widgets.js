@@ -11,7 +11,8 @@ function getDeviceClass(json) {
     } catch (e) {}
   }
 
-  if ((json.role === "light_onoff" || json.role === "light_level" || json.role === "light_color" || json.role === "light_color_temp") && json.label) {
+  var _rb0 = String(json.role || '').split('&')[0];
+  if ((_rb0 === "light" || json.role === "light_onoff" || json.role === "light_level" || json.role === "light_color" || json.role === "light_color_temp") && json.label) {
     return json.label;
   }
 
@@ -379,15 +380,45 @@ function getWidget(IEEE) {
 		
 		var role = dev.Report[key].role.split("&")[0]
 		try { var attr = JSON.parse(dev.Report[key].role.split("&")[1]) } catch { try{var attr = dev.Report[key].class }catch{var attr =null}}
+		// Single lamp role: legacy light_onoff/light_level/light_color/
+		// light_color_temp fold into "light" + light_part (templateedit
+		// migrates stored templates on first edit; this covers the rest).
+		if (role === 'light_onoff' || role === 'light_level' || role === 'light_color_temp' || role === 'light_color') {
+			var _llp = (role === 'light_onoff') ? 'onoff' : (role === 'light_level') ? 'level' : (role === 'light_color_temp') ? 'color_temp' : 'color';
+			var _lac = {};
+			try { for (var _lk in attr) _lac[_lk] = attr[_lk]; } catch (_le0) {}
+			if (!_lac.light_part) _lac.light_part = _llp;
+			attr = _lac; role = 'light';
+		}
 		var id = dev.IEEE + "#" + key
 		var idh = Date.now()
 		var idw = idh + ""
 		switch (role) {
-			case 'light_onoff':
-				if (dev.DevType === "DIS") {			
+			case 'light': {
+				// Own puzzle part (attr is normalized above; key/label fallback
+				// covers hand-made "light" units without light_part).
+				var ownLightPart = ((attr && attr.light_part) || '');
+				if (!ownLightPart) {
+					if (typeof key === 'string' && key.length >= 10) {
+						var _oc = key.slice(key.length - 8, key.length - 4).toUpperCase();
+						var _oa = key.slice(key.length - 4).toUpperCase();
+						if (_oc === '0006') ownLightPart = 'onoff';
+						else if (_oc === '0008') ownLightPart = 'level';
+						else if (_oc === '0300') ownLightPart = (_oa === '0007') ? 'color_temp' : 'color';
+					}
+					if (!ownLightPart) {
+						var _ol = String((value && value.label) || '');
+						if (_ol === 'On_Off' || _ol === 'on_off') ownLightPart = 'onoff';
+						else if (_ol === 'Level') ownLightPart = 'level';
+						else if (_ol === 'Color_Control' || _ol === 'ColorT' || _ol === 'Color_temp') ownLightPart = 'color_temp';
+						else if (_ol === 'Color') ownLightPart = 'color';
+					}
+					if (!ownLightPart) ownLightPart = 'onoff';
+				}
+				if (dev.DevType === "DIS" && ownLightPart === 'onoff') {			
 						var rval=( parseInt(value.parsed)===true)? 1:0
 						var state = ( rval== 1) ? "checked" : ""
-						tpl += `<div id="z${idw}"  style="margin-bottom: 25px; width: 65px; height: 65px; background:silver; border-radius: 54px; filter: brightness(100%); "><img class="bulbw" src='./static/icons/bulb.png'/></div>`
+						tpl += `<div id="z${idw}"  style="margin:0 auto 25px; width: 65px; height: 65px; background:silver; border-radius: 54px; filter: brightness(100%); display:block; flex-shrink:0; "><img class="bulbw" src='./static/icons/bulb.png'/></div>`
 
 						tpl += `<div class="switch flex">`
 						tpl += `<div class="icon flex">💡</div>`
@@ -434,7 +465,7 @@ function getWidget(IEEE) {
 						tpl += `<span type="label" class="сz${id} сz${id}" style="color:white;" > </span>`				
 				
 				}
-				if (dev.DevType === "HAD") {
+				if (dev.DevType === "HAD" && ownLightPart === 'onoff') {
 					var supportedFeatures = attr.supported_features
 					const SUPPORT_BRIGHTNESS = 1;
 					const SUPPORT_COLOR_TEMP = 2;
@@ -474,7 +505,7 @@ function getWidget(IEEE) {
 					}
 //					if (value.label == "00158D0007503DF3_bulb") {
 						var state = isOnVal(value.parsed) ? "checked" : ""
-						tpl += `<div id="z${idw}"  style="margin-bottom: 25px; width: 65px; height: 65px; background:silver; border-radius: 54px; filter: brightness(100%); "><img class="bulbw" src='./static/icons/bulb.png'/></div>`
+						tpl += `<div id="z${idw}"  style="margin:0 auto 25px; width: 65px; height: 65px; background:silver; border-radius: 54px; filter: brightness(100%); display:block; flex-shrink:0; "><img class="bulbw" src='./static/icons/bulb.png'/></div>`
 
 						tpl += `<div class="switch flex">`
 						tpl += `<div class="icon flex">💡</div>`
@@ -520,67 +551,174 @@ function getWidget(IEEE) {
 				}
 
 
-				// The role already says which widget to draw — no label-based conditions.
-				// Each widget ends with an opening <div> for the shared closing </div> of the iteration.
-				{
-					var state = isOnVal(value.parsed) ? "checked" : ""
-					tpl += `<div id="z${idw}" style="margin-bottom:25px;width:65px;height:65px;background:silver;border-radius:54px;filter:brightness(100%);"><img class="bulbw" src='./static/icons/bulb.png'/></div>`
+			// ── Puzzle assembly (light_part): anchor = onoff ──
+			// Like the climate puzzle: the onoff unit draws the whole lamp
+			// card (toggle + brightness + color_temp + color rows for the parts
+			// the device really has), other parts draw nothing.
+			// Legacy roles fold into "light" above; key/label fallback covers
+			// hand-made units without light_part.
+			{
+				var lightClsOf = function(r) {
+					try {
+						var _lr = String((r && r.role) || '').split('&');
+						if (_lr[1]) return JSON.parse(_lr[1]);
+					} catch (_e) {}
+					try { if (r && r.class && typeof r.class === 'object') return r.class; } catch (_e2) {}
+					return {};
+				};
+				var lightRoleOf = function(r) { return String((r && r.role) || '').split('&')[0]; };
+				var lightLegacyPart = function(rb) {
+					if (rb === 'light_onoff') return 'onoff';
+					if (rb === 'light_level') return 'level';
+					if (rb === 'light_color_temp') return 'color_temp';
+					if (rb === 'light_color') return 'color';
+					return '';
+				};
+				var lightPartByKey = function(k) {
+					if (typeof k !== 'string' || k.length < 10) return '';
+					var cl = k.slice(k.length - 8, k.length - 4).toUpperCase();
+					var at = k.slice(k.length - 4).toUpperCase();
+					if (cl === '0006') return 'onoff';
+					if (cl === '0008') return 'level';
+					if (cl === '0300') return (at === '0007') ? 'color_temp' : 'color';
+					return '';
+				};
+				var lightPartByLabel = function(l) {
+					l = String(l || '');
+					if (l === 'On_Off' || l === 'on_off') return 'onoff';
+					if (l === 'Level') return 'level';
+					if (l === 'Color_Control' || l === 'ColorT' || l === 'Color_temp' || l === 'ColorTemp') return 'color_temp';
+					if (l === 'Color') return 'color';
+					return '';
+				};
+				var lightPuzzle = { onoff: null, level: null, ct: null, color: null };
+				try {
+					Object.keys(dev.Report || {}).forEach(function(k) {
+						var r = dev.Report[k] || {};
+						var rb = lightRoleOf(r);
+						if (rb !== 'light' && !lightLegacyPart(rb)) return;
+						var p = (lightClsOf(r).light_part || lightLegacyPart(rb) || lightPartByKey(k) || lightPartByLabel(r.label) || '');
+						if (p === 'onoff' && !lightPuzzle.onoff) lightPuzzle.onoff = k;
+						else if (p === 'level' && !lightPuzzle.level) lightPuzzle.level = k;
+						else if (p === 'color_temp' && !lightPuzzle.ct) lightPuzzle.ct = k;
+						else if (p === 'color' && !lightPuzzle.color) lightPuzzle.color = k;
+					});
+				} catch (_e3) {}
+				var lightPuzzleOn = !!(lightPuzzle.onoff && (lightPuzzle.level || lightPuzzle.ct || lightPuzzle.color));
+				// Stable bulb preview id per device (not per row): sliders target it.
+				var bulbId = 'bulb_' + String(dev.IEEE || 'dev').replace(/[^a-zA-Z0-9]/g, '');
+				var togId = 'ac-toggle' + String(id).replace(/[^a-zA-Z0-9]/g, '');
+				// Assembled card lives on the anchor only (like climate local_temp).
+				if (lightPuzzleOn && ownLightPart !== 'onoff') { tpl += `<div>`; break; }
+				if (lightPuzzleOn) {
+					var L_on = dev.Report[lightPuzzle.onoff] || {};
+					var L_onId = dev.IEEE + '#' + lightPuzzle.onoff;
+					var L_state = isOnVal(L_on.parsed) ? "checked" : "";
+					tpl += `<div id="${bulbId}" style="margin:0 auto 25px;width:65px;height:65px;background:silver;border-radius:54px;filter:brightness(100%);display:block;flex-shrink:0;"><img class="bulbw" src='./static/icons/bulb.png'/></div>`
 					tpl += `<div class="switch flex">`
 					tpl += `<div class="icon flex">${getIconSvg("light_bulb")}</div>`
-					tpl += `<div class="plus flex" onclick="widgetEvnt('on_off|${id}',2)">Tog</div>`
-					tpl += `<input type="checkbox" class="${id} input toggle-input" id="ac-toggle${id}" ${state}
-						onclick="widgetEvnt('on_off|${id}',this.checked ? 1:0)" />`
-					tpl += `<label for="ac-toggle${id}"><div class="toggle-switch ${id}"><span></span></div></label>`
-					tpl += `<span class="${id}" style="color:white;">${value.parsed||"?"}</span>`
+					tpl += `<div class="plus flex" onclick="widgetEvnt('on_off|${L_onId}',2)">Tog</div>`
+					tpl += `<input type="checkbox" class="${L_onId} input toggle-input" id="${togId}" ${L_state}
+						onclick="widgetEvnt('on_off|${L_onId}',this.checked ? 1:0)" />`
+					tpl += `<label for="${togId}"><div class="toggle-switch ${L_onId}"><span></span></div></label>`
+					tpl += `<span class="${L_onId}" style="color:white;">${L_on.parsed!=null?L_on.parsed:"?"}</span>`
 					tpl += `</div>`
+					if (lightPuzzle.level) {
+						var L_lv = dev.Report[lightPuzzle.level] || {};
+						var L_lvId = dev.IEEE + '#' + lightPuzzle.level;
+						var L_lvl = Math.round((parseFloat(L_lv.parsed)||0)*100/255);
+						tpl += `<div class="switch flex">`
+						tpl += `<div class="icon flex">${getIconSvg("brightness")}</div>`
+						tpl += `<input class="${L_lvId} level" type="range" id="level|${L_lvId}" style="width:66%;"
+						onchange="widgetEvnt(this.id,this.value)"
+						oninput="var el=document.getElementById('${bulbId}');if(el){el.style.webkitFilter='brightness('+this.value+'%)';}"
+						min="0" max="100" value="${L_lvl}" step="2">`
+						tpl += `<span class="${L_lvId}" style="color:white;">${L_lvl}</span>`
+						tpl += `</div>`
+					}
+					if (lightPuzzle.ct) {
+						var L_ct = dev.Report[lightPuzzle.ct] || {};
+						var L_ctId = dev.IEEE + '#' + lightPuzzle.ct;
+						var L_ctv = Math.round(((parseFloat(L_ct.parsed)||153)-153)*100/347);
+						tpl += `<div class="switch flex">`
+						tpl += `<div class="icon flex">${getIconSvg("sun_temp")}</div>`
+						tpl += `<input class="${L_ctId} color-temp" style="width:66%;" type="range" id="colorT|${L_ctId}"
+						onchange="widgetEvnt(this.id,this.value)"
+						oninput="var t=this.value/100,h=t<0.5?185:35,s=Math.round(Math.abs(t-0.5)*2*85),l=Math.round(60+(1-s/85)*28),c=hsl2Hex(h,s,l),el=document.getElementById('${bulbId}');if(el){el.style.background='radial-gradient(circle 150px,'+c+', rgb(82,89,81))';el.style['box-shadow']=c+' 0px 1px 50px 8px'}"
+						min="0" max="100" value="${L_ctv}" step="2">`
+						tpl += `<span type="label" class="${L_ctId}" style="color:white;">${L_ctv}</span>`
+						tpl += `</div>`
+					}
+					if (lightPuzzle.color) {
+						var L_cl = dev.Report[lightPuzzle.color] || {};
+						var L_clId = dev.IEEE + '#' + lightPuzzle.color;
+						tpl += `<div class="switch flex">`
+						tpl += `<div class="icon flex">${getIconSvg("palette")}</div>`
+						tpl += `<input class="color-range" type="range" min="0" max="100" value="75"
+						oninput="var hue=((this.value/100)*360).toFixed(0);var el=document.getElementById('${bulbId}');if(el){el.style.background='radial-gradient(circle 230px,'+hsl2Hex(hue,100,50)+', rgb(82,89,81))';el.style['box-shadow']=hsl2Hex(hue,100,50)+' 0px 1px 50px 8px'}"
+						onchange="var hue=((this.value/100)*360).toFixed(0);widgetEvnt('color|${L_clId}', hsl2Hex(hue,100,50))">`
+						tpl += `<span type="label" class="${L_clId}" style="color:white;font-size:10px;">${L_cl.parsed||"?"}</span>`
+						tpl += `</div>`
+					}
 					tpl += `<div>`
+					break;
 				}
-
-				break;
-			case 'light_level':
-				{
+				// No puzzle: standalone row for the own part (anchor-less device,
+				// e.g. brightness-only). The anchor itself falls through to
+				// the single toggle card below.
+				if (ownLightPart === 'level') {
 					var lvl = Math.round((parseFloat(value.parsed)||0)*100/255);
 					tpl += `<div class="switch flex">`
 					tpl += `<div class="icon flex">${getIconSvg("brightness")}</div>`
 					tpl += `<input class="${id} level" type="range" id="level|${id}" style="width:66%;"
 					onchange="widgetEvnt(this.id,this.value)"
-					oninput="document.getElementById('z${idw}').style.webkitFilter='brightness('+this.value+'%)';"
+					oninput="var el=document.getElementById('${bulbId}');if(el){el.style.webkitFilter='brightness('+this.value+'%)';}"
 					min="0" max="100" value="${lvl}" step="2">`
 					tpl += `<span class="${id}" style="color:white;">${lvl}</span>`
 					tpl += `</div>`
 					tpl += `<div>`
+					break;
 				}
-
-				break;
-			case 'light_color_temp':
-				{
-					var ct = Math.round(((parseFloat(value.parsed)||153)-153)*100/347);
+				if (ownLightPart === 'color_temp') {
+					var ctv = Math.round(((parseFloat(value.parsed)||153)-153)*100/347);
 					tpl += `<div class="switch flex">`
 					tpl += `<div class="icon flex">${getIconSvg("sun_temp")}</div>`
 					tpl += `<input class="${id} color-temp" style="width:66%;" type="range" id="colorT|${id}"
 					onchange="widgetEvnt(this.id,this.value)"
-					oninput="var t=this.value/100,h=t<0.5?185:35,s=Math.round(Math.abs(t-0.5)*2*85),l=Math.round(60+(1-s/85)*28),c=hsl2Hex(h,s,l),el=document.getElementById('z${idw}');if(el){el.style.background='radial-gradient(circle 150px,'+c+', rgb(82,89,81))';el.style['box-shadow']=c+' 0px 1px 50px 8px'}"
-					min="0" max="100" value="${ct}" step="2">`
-					tpl += `<span type="label" class="${id}" style="color:white;">${ct}</span>`
+					oninput="var t=this.value/100,h=t<0.5?185:35,s=Math.round(Math.abs(t-0.5)*2*85),l=Math.round(60+(1-s/85)*28),c=hsl2Hex(h,s,l),el=document.getElementById('${bulbId}');if(el){el.style.background='radial-gradient(circle 150px,'+c+', rgb(82,89,81))';el.style['box-shadow']=c+' 0px 1px 50px 8px'}"
+					min="0" max="100" value="${ctv}" step="2">`
+					tpl += `<span type="label" class="${id}" style="color:white;">${ctv}</span>`
 					tpl += `</div>`
 					tpl += `<div>`
+					break;
 				}
-
-				break;
-			case 'light_color':
-				{
+				if (ownLightPart === 'color') {
 					tpl += `<div class="switch flex">`
 					tpl += `<div class="icon flex">${getIconSvg("palette")}</div>`
 					tpl += `<input class="color-range" type="range" min="0" max="100" value="75"
-					oninput="var hue=((this.value/100)*360).toFixed(0);var el=document.getElementById('z${idw}');if(el){el.style.background='radial-gradient(circle 230px,'+hsl2Hex(hue,100,50)+', rgb(82,89,81))';el.style['box-shadow']=hsl2Hex(hue,100,50)+' 0px 1px 50px 8px'}"
+					oninput="var hue=((this.value/100)*360).toFixed(0);var el=document.getElementById('${bulbId}');if(el){el.style.background='radial-gradient(circle 230px,'+hsl2Hex(hue,100,50)+', rgb(82,89,81))';el.style['box-shadow']=hsl2Hex(hue,100,50)+' 0px 1px 50px 8px'}"
 					onchange="var hue=((this.value/100)*360).toFixed(0);widgetEvnt('color|${id}', hsl2Hex(hue,100,50))">`
 					tpl += `<span type="label" class="${id}" style="color:white;font-size:10px;">${value.parsed||"?"}</span>`
-					//tpl += `<span type="label" class="" style="color:white;"> . </span>`					
 					tpl += `</div>`
 					tpl += `<div>`
+					break;
 				}
+				// Single onoff card (stable bulb id so sliders find it).
+				var state = isOnVal(value.parsed) ? "checked" : ""
+				tpl += `<div id="${bulbId}" style="margin:0 auto 25px;width:65px;height:65px;background:silver;border-radius:54px;filter:brightness(100%);display:block;flex-shrink:0;"><img class="bulbw" src='./static/icons/bulb.png'/></div>`
+				tpl += `<div class="switch flex">`
+				tpl += `<div class="icon flex">${getIconSvg("light_bulb")}</div>`
+				tpl += `<div class="plus flex" onclick="widgetEvnt('on_off|${id}',2)">Tog</div>`
+				tpl += `<input type="checkbox" class="${id} input toggle-input" id="${togId}" ${state}
+					onclick="widgetEvnt('on_off|${id}',this.checked ? 1:0)" />`
+				tpl += `<label for="${togId}"><div class="toggle-switch ${id}"><span></span></div></label>`
+				tpl += `<span class="${id}" style="color:white;">${value.parsed||"?"}</span>`
+				tpl += `</div>`
+				tpl += `<div>`
+			}
 
-				break;
+			break;
+			}
 			case "switch":
 				state = isOnVal(value.parsed) ? "checked" : "";
 									
@@ -707,7 +845,7 @@ function getWidget(IEEE) {
 					if (typeof m === 'string') return m.split(',').map(function(s){ return s.toLowerCase().trim(); }).filter(function(s){ return !!s; });
 					return [];
 				};
-				let hvacModes = (attr && attr.modes) ? normHvacModes(attr.modes) : [];
+				let hvacModes = parseModePairs(attr && attr.modes).names;
 				if (!hvacModes.length) hvacModes = ['off','auto','heat','cool','dry','fan_only','eco'];
 				const minTemp   = (attr && attr.min_temp) ? Number(attr.min_temp) : 5;
 				const maxTemp   = (attr && attr.max_temp) ? Number(attr.max_temp) : 35;
@@ -747,9 +885,187 @@ function getWidget(IEEE) {
 			var showModes = ownIsMode;
 			var showHeat = ownIsHeat;
 			var showCool = ownIsCool;
-				const modeColor  = modeColors[hvacMode] || '#888';
+			const modeColor  = modeColors[hvacMode] || '#888';
 
-				// Current temperature
+			// ── Puzzle assembly (climate_part): anchor = local_temp ──
+			// Each unit declares its part in class.climate_part; the local_temp
+			// record draws the whole thermostat, other parts draw nothing.
+			// No parts at all = legacy template, fall through to the code below.
+			var clsOf = function(r) {
+				try {
+					var _rr = String((r && r.role) || '').split('&');
+					if (_rr[1]) return JSON.parse(_rr[1]);
+				} catch (_e) {}
+				try { if (r && r.class && typeof r.class === 'object') return r.class; } catch (_e2) {}
+				return {};
+			};
+			var puzzle = { temp: null, heat: null, cool: null, mode: null, fan: null, hum: null, humSet: null };
+			try {
+				Object.keys(dev.Report || {}).forEach(function(k) {
+					var r = dev.Report[k] || {};
+					if (String(r.role || '').split('&')[0] !== 'climate') return;
+					var p = (clsOf(r).climate_part || '');
+					if (p === 'local_temp' && !puzzle.temp) puzzle.temp = k;
+					else if (p === 'occupied_heating_setpoint' && !puzzle.heat) puzzle.heat = k;
+					else if (p === 'occupied_cooling_setpoint' && !puzzle.cool) puzzle.cool = k;
+					else if (p === 'system_mode' && !puzzle.mode) puzzle.mode = k;
+					else if (p === 'fan_mode' && !puzzle.fan) puzzle.fan = k;
+					else if (p === 'relative_humidity' && !puzzle.hum) puzzle.hum = k;
+					else if (p === 'humidity_setpoint' && !puzzle.humSet) puzzle.humSet = k;
+				});
+			} catch (_e3) {}
+			var puzzleOn = !!(puzzle.temp || puzzle.heat || puzzle.cool || puzzle.mode || puzzle.fan || puzzle.hum || puzzle.humSet);
+			if (puzzleOn) {
+				var P_H = puzzle.heat ? dev.Report[puzzle.heat] : null;
+				var P_C = puzzle.cool ? dev.Report[puzzle.cool] : null;
+				var P_M = puzzle.mode ? dev.Report[puzzle.mode] : null;
+				var P_F = puzzle.fan ? dev.Report[puzzle.fan] : null;
+				var P_HU = puzzle.hum ? dev.Report[puzzle.hum] : null;
+				var P_HS = puzzle.humSet ? dev.Report[puzzle.humSet] : null;
+				// humidity rows: shared by the full card and the standalone fallback
+				var humHtml = '';
+				if (P_HU) {
+					var huCls = clsOf(P_HU);
+					var huUnit = (huCls.unit_of_measurement || '%');
+					var huVal = (P_HU.parsed !== undefined && P_HU.parsed !== null && P_HU.parsed !== '') ? P_HU.parsed : '—';
+					var huId = dev.IEEE + '#' + puzzle.hum;
+					humHtml += `<div class="switch flex"><div class="icon flex">💧</div><div class="labelObj">${P_HU.label || 'Humidity'}</div><span class="${huId}" style="color:#29b6f6;">${huVal}</span><span style="color:#888;font-size:11px;">${huVal === '—' ? '' : huUnit}</span></div>`;
+				}
+				if (P_HS) {
+					var hsCls = clsOf(P_HS);
+					var hsMin = (hsCls.min_humidity != null && hsCls.min_humidity !== '') ? Number(hsCls.min_humidity) : 0;
+					var hsMax = (hsCls.max_humidity != null && hsCls.max_humidity !== '') ? Number(hsCls.max_humidity) : 100;
+					var hsStep = (hsCls.humidity_step != null && hsCls.humidity_step !== '') ? Number(hsCls.humidity_step) : 1;
+					var hsVal = (P_HS.parsed !== undefined && P_HS.parsed !== null && P_HS.parsed !== '') ? P_HS.parsed : hsMin;
+					var hsId = dev.IEEE + '#' + puzzle.humSet;
+					var hsSpan = hsId.replace(/[^a-zA-Z0-9]/g, '');
+					var hsUnit = (hsCls.unit_of_measurement || '%');
+					humHtml += `<div class="switch flex"><span style="color:#aaa;font-size:12px;">💧🎯</span><input class="${hsId} level" type="range" style="width:60%;margin:0 6px;" id="number|${hsId}" min="${hsMin}" max="${hsMax}" step="${hsStep}" value="${hsVal}" onchange="widgetEvnt(this.id,this.value)" oninput="document.getElementById('hs_${hsSpan}').textContent=this.value"><span id="hs_${hsSpan}" class="${hsId}" style="color:#29b6f6;font-size:14px;min-width:36px;text-align:right;">${hsVal}</span><span style="color:#888;font-size:11px;">${hsUnit}</span></div>`;
+				}
+				var ownPart = ((attr && attr.climate_part) || '');
+				if (!puzzle.temp) {
+					// no anchor: humidity parts draw their own rows, the rest draw nothing
+					if ((ownPart === 'relative_humidity' || ownPart === 'humidity_setpoint') && humHtml) { tpl += humHtml; }
+					tpl += `<div>`; break;
+				}
+				if (ownPart !== 'local_temp') { tpl += `<div>`; break; }
+				var P_T = dev.Report[puzzle.temp] || {};
+				var pCur = (P_T.parsed !== undefined && P_T.parsed !== null && P_T.parsed !== '') ? P_T.parsed : '—';
+				// mode state: pairs имя:HEX win over the legacy numeric table
+				var pMCls = clsOf(P_M);
+				var pMP = parseModePairs(pMCls.modes);
+				var pModes = pMP.names.length ? pMP.names : ['off','auto','heat','cool','dry','fan_only','eco'];
+				var pMRaw = (P_M && P_M.parsed !== undefined && P_M.parsed !== null) ? P_M.parsed : 'off';
+				var pMNum = (typeof pMRaw === 'number') ? pMRaw : (/^[0-9]+$/.test(String(pMRaw).trim()) ? parseInt(String(pMRaw).trim(), 10) : null);
+				var pMVal = 'off';
+				if (pMNum !== null && isFinite(pMNum)) {
+					var pFound = null;
+					Object.keys(pMP.codeOf).forEach(function(n){ if (pMP.codeOf[n] === pMNum) pFound = n; });
+					var pSysMap = {0:'off', 1:'auto', 2:'auto', 3:'cool', 4:'heat', 5:'heat', 6:'cool', 7:'fan_only', 8:'dry', 9:'auto'};
+					pMVal = pFound || pSysMap[pMNum] || String(pMRaw).toLowerCase().trim();
+				} else {
+					pMVal = String(pMRaw).toLowerCase().trim();
+				}
+				var pMColor = modeColors[pMVal] || '#888';
+				var P_D = P_H || P_C; // dial setpoint source; null = thermometer (current only)
+				{
+					var dKey2 = puzzle.heat || puzzle.cool;
+					var dCls = clsOf(P_D);
+					var dMin = (dCls.min_temp != null && dCls.min_temp !== '') ? Number(dCls.min_temp) : 5;
+					var dMax = (dCls.max_temp != null && dCls.max_temp !== '') ? Number(dCls.max_temp) : 35;
+					var dStep = (dCls.temp_step != null && dCls.temp_step !== '') ? Number(dCls.temp_step) : 0.5;
+					var dValRaw = (P_D && P_D.parsed !== undefined && P_D.parsed !== null && P_D.parsed !== '') ? parseFloat(P_D.parsed) : NaN;
+					var dVal = isFinite(dValRaw) ? dValRaw : 20;
+					var dId = dev.IEEE + '#' + dKey2;
+					var dCool = !P_H && !!P_C;
+					var dModeNames = {heat:'Heating',cool:'Cooling',auto:'Auto',fan_only:'Fan',dry:'Dry',eco:'Eco',off:'Off'};
+					var dModeLabel = P_M ? (dModeNames[pMVal] || pMVal) : (P_T.label || 'Термостат');
+					var dCurNum = parseFloat(pCur);
+					var dCurA = isFinite(dCurNum) ? (135 + 270 * Math.min(1, Math.max(0, (dCurNum - dMin) / (dMax - dMin)))) : 135;
+					var dTgtA = 135 + 270 * Math.min(1, Math.max(0, (dVal - dMin) / (dMax - dMin)));
+					var dArcA = P_D ? dTgtA : dCurA; // thermometer: arc follows current temp
+					var dUid = 'td' + idw;
+					var dStops = dCool
+						? '<stop offset="0" stop-color="#29b6f6"/><stop offset="1" stop-color="#1565c0"/>'
+						: '<stop offset="0" stop-color="#29b6f6"/><stop offset="0.5" stop-color="#ffeb3b"/><stop offset="1" stop-color="#ff1744"/>';
+					var dSvg = '<defs><linearGradient id="' + dUid + 'g" x1="0" y1="1" x2="1" y2="0">' + dStops + '</linearGradient></defs>';
+					dSvg += '<path d="' + tstatArcD(120, 128, 92, 135, 405) + '" fill="none" stroke="#3a423f" stroke-width="15" stroke-linecap="round"/>';
+					for (var ti = 0; ti <= 60; ti++) {
+						var ta = 135 + 270 * ti / 60, tmaj = (ti % 5 === 0);
+						var tp1 = tstatPol(120, 128, 76, ta), tp2 = tstatPol(120, 128, tmaj ? 66 : 71, ta);
+						dSvg += '<line x1="' + tp1[0].toFixed(1) + '" y1="' + tp1[1].toFixed(1) + '" x2="' + tp2[0].toFixed(1) + '" y2="' + tp2[1].toFixed(1) + '" stroke="hsl(' + (195 + 120 * ti / 60).toFixed(0) + ',85%,55%)" stroke-width="' + (tmaj ? 2.4 : 1.2) + '"/>';
+					}
+					[0, 0.25, 0.5, 0.75, 1].forEach(function(f) {
+						var lv = Math.round(dMin + f * (dMax - dMin)), lp = tstatPol(120, 128, 56, 135 + 270 * f);
+						dSvg += '<text x="' + lp[0].toFixed(1) + '" y="' + (lp[1] + 3).toFixed(1) + '" font-size="9" fill="#5f7269" text-anchor="middle">' + lv + '</text>';
+					});
+					dSvg += '<path class="td-active" d="' + tstatArcD(120, 128, 92, 135, Math.max(dTgtA, 135.5)) + '" fill="none" stroke="url(#' + dUid + 'g)" stroke-width="15" stroke-linecap="round"/>';
+					var dPc = tstatPol(120, 128, 92, dCurA), dPt = tstatPol(120, 128, 92, dTgtA);
+					dSvg += '<circle class="td-cur" cx="' + dPc[0].toFixed(1) + '" cy="' + dPc[1].toFixed(1) + '" r="6.5" fill="#f5f5f5"/>';
+					if (P_D) {
+					dSvg += '<circle class="td-halo" cx="' + dPt[0].toFixed(1) + '" cy="' + dPt[1].toFixed(1) + '" r="11" fill="#ffa000" opacity="0.35"/>';
+					dSvg += '<circle class="td-knob" cx="' + dPt[0].toFixed(1) + '" cy="' + dPt[1].toFixed(1) + '" r="7.5" fill="#ffa000"/>';
+					}
+					var dInt = isFinite(dCurNum) ? Math.trunc(dCurNum) : '—';
+					var dFrac = isFinite(dCurNum) ? ('.' + Math.abs(Math.round((dCurNum - Math.trunc(dCurNum)) * 10))) : '';
+					tpl += `<div class="tstat-dial" style="position:relative;width:100%;max-width:250px;margin:0 auto;" data-temp="${id}" data-min="${dMin}" data-max="${dMax}" data-step="${dStep}"${P_D ? ` data-tgt="${dVal}" data-cmd="climate_temp|${dId}"` : ''}>`;
+					tpl += `<div style="position:relative;"><svg viewBox="0 20 240 188" style="display:block;width:100%;">${dSvg}</svg>`;
+					tpl += `<div style="position:absolute;top:57%;transform:translateY(-50%);left:0;right:0;text-align:center;pointer-events:none;">`;
+					tpl += `<div style="font-size:15px;font-weight:700;color:${pMColor};">${dModeLabel}</div>`;
+					tpl += `<div style="font-weight:800;line-height:1;color:#fff;"><span class="td-int" style="font-size:46px;">${dInt}</span><span class="td-frac" style="font-size:22px;">${dFrac}</span><span style="font-size:16px;font-weight:600;">°C</span></div>`;
+					if (P_D) { tpl += `<div style="font-size:14px;font-weight:700;color:${pMColor};">${dCool ? '❄️' : '🔥'} <span class="td-tgt-v">${(Math.round(dVal * 10) / 10).toFixed(1)}°C</span></div>`; }
+					tpl += `</div>`;
+					tpl += `</div>`;
+					if (P_D) { tpl += `<div style="display:flex;justify-content:center;gap:26px;margin-top:0;">`;
+					tpl += `<button onclick="tstatDialStep(this,-1)" style="width:44px;height:44px;border-radius:50%;border:2px solid #5a6b62;background:transparent;color:#cfd8d3;font-size:24px;cursor:pointer;">−</button>`;
+					tpl += `<button onclick="tstatDialStep(this,1)" style="width:44px;height:44px;border-radius:50%;border:2px solid #5a6b62;background:transparent;color:#cfd8d3;font-size:24px;cursor:pointer;">+</button>`;
+					tpl += `</div>`;
+					}
+					tpl += `</div>`;
+				}
+				// (heating slider replaced by the dial above; limits live in its class)
+				// (cooling slider replaced by the dial above)
+				// mode buttons
+				if (P_M) {
+					var pMId = dev.IEEE + '#' + puzzle.mode;
+					tpl += `<div class="switch flex" style="gap:2px;flex-wrap:wrap;justify-content:center;margin-bottom:4px;">`;
+					pModes.forEach(function(m) {
+						var act = (m === pMVal);
+						var sendV = (pMP.codeOf[m] === null || pMP.codeOf[m] === undefined) ? ("'" + m + "'") : pMP.codeOf[m];
+						tpl += `<span onclick="widgetEvnt('climate_mode|${pMId}',${sendV})" style="cursor:pointer;border-radius:10px;padding:2px 7px;font-size:11px;color:#fff;background:${act ? (modeColors[m]||'#888') : '#444'};border:${act?'2px':'1px'} solid ${modeColors[m]||'#888'};">${modeIcons[m]||''}${m}</span>`;
+					});
+					tpl += `</div>`;
+				}
+				// fan presets
+				if (P_F) {
+					var pFCls = clsOf(P_F);
+					var pFRaw = pFCls.preset_modes;
+					var pFP = Array.isArray(pFRaw) ? pFRaw.map(function(x){ return String(x).toLowerCase().trim(); }) : String(pFRaw || '').split(',').map(function(s){ return s.toLowerCase().trim(); });
+					pFP = pFP.filter(function(s){ return !!s; });
+					if (!pFP.length) pFP = ['auto','low','medium','high'];
+					var pFId = dev.IEEE + '#' + puzzle.fan;
+					var pFCur = String((P_F && P_F.parsed !== undefined && P_F.parsed !== null) ? P_F.parsed : '').toLowerCase().trim();
+					var pFFanMap = {0:'off',1:'low',2:'medium',3:'high',4:'on',5:'auto',6:'smart'};
+					if (/^[0-9]+$/.test(pFCur) && pFFanMap[parseInt(pFCur, 10)]) pFCur = pFFanMap[parseInt(pFCur, 10)];
+					var pFShow = (P_F && P_F.parsed !== undefined && P_F.parsed !== null && P_F.parsed !== '') ? P_F.parsed : '—';
+					tpl += `<div class="switch flex">`;
+					tpl += `<div class="icon flex">💨</div>`;
+					tpl += `<div class="labelObj">${P_F.label || 'Fan'}</div>`;
+					tpl += `<span class="${pFId}" style="color:#29b6f6;">${pFShow}</span>`;
+					tpl += `</div>`;
+					tpl += `<div class="switch flex" style="gap:2px;flex-wrap:wrap;justify-content:center;margin-bottom:2px;">`;
+					pFP.forEach(function(fp) {
+						var fa = (fp === pFCur);
+						tpl += `<span onclick="widgetEvnt('fan_speed|${pFId}','${fp}')" style="cursor:pointer;border-radius:10px;padding:2px 7px;font-size:11px;color:#fff;background:${fa?'#29b6f6':'#444'};border:${fa?'2px':'1px'} solid #29b6f6;">${fp}</span>`;
+					});
+					tpl += `</div>`;
+				}
+				if (humHtml) { tpl += humHtml; }
+				tpl += `<div>`;
+				break;
+			}
+
+			// Current temperature
 				tpl += `<div class="switch flex" style="margin-bottom:4px;">`;
 				tpl += `<div class="icon flex">${getIconSvg('climate', 28, modeColor)}</div>`;
 				tpl += `<div class="labelObj">${value.label}</div>`;
@@ -833,13 +1149,17 @@ function getWidget(IEEE) {
 			case 'climate_mode': {
 				// Standalone mode entity (table row 3): SystemMode 0x001C as buttons.
 				var cmRaw = (attr && attr.modes) || '';
-				var cmModes = Array.isArray(cmRaw) ? cmRaw.map(function(x){ return String((x && x.value) || x).toLowerCase().trim(); }) : String(cmRaw).split(',').map(function(s){ return s.toLowerCase().trim(); });
-				cmModes = cmModes.filter(function(s){ return !!s; });
+				var cmP = parseModePairs(cmRaw);
+				var cmModes = cmP.names.filter(function(s){ return !!s; });
 				if (!cmModes.length) cmModes = ['off','auto','heat','cool','dry','fan_only','eco'];
 				var cmVal = value.parsed;
-				if (/^[0-9]+$/.test(String(cmVal))) {
+				var cmNum = /^[0-9]+$/.test(String(cmVal)) ? parseInt(String(cmVal), 10) : null;
+				var cmFound = null;
+				if (cmNum !== null) { Object.keys(cmP.codeOf).forEach(function(n){ if (cmP.codeOf[n] === cmNum) cmFound = n; }); }
+				if (cmFound) { cmVal = cmFound; }
+				else if (cmNum !== null) {
 					var cmMap = {0:'off', 1:'auto', 2:'auto', 3:'cool', 4:'heat', 5:'heat', 6:'cool', 7:'fan_only', 8:'dry', 9:'auto'};
-					cmVal = cmMap[parseInt(cmVal, 10)] || String(cmVal);
+					cmVal = cmMap[cmNum] || String(cmVal);
 				}
 				cmVal = String(cmVal || 'off').toLowerCase().trim();
 				var cmColors = {heat:'#ff7043', cool:'#42a5f5', auto:'#ab47bc', 'fan_only':'#29b6f6', dry:'#ffca28', eco:'#66bb6a', off:'#616161'};
@@ -852,7 +1172,8 @@ function getWidget(IEEE) {
 				tpl += `<div class="switch flex" style="gap:2px;flex-wrap:wrap;justify-content:center;margin-bottom:4px;">`;
 				cmModes.forEach(function(m) {
 					var mActive = m === cmVal;
-					tpl += `<span onclick="widgetEvnt('climate_mode|${id}','${m}')"
+					var mSend = (cmP.codeOf[m] === null || cmP.codeOf[m] === undefined) ? ("'" + m + "'") : cmP.codeOf[m];
+					tpl += `<span onclick="widgetEvnt('climate_mode|${id}',${mSend})"
 						style="cursor:pointer;border-radius:10px;padding:2px 7px;font-size:11px;color:#fff;background:${mActive ? (cmColors[m]||'#888') : '#444'};border:${mActive?'2px':'1px'} solid ${cmColors[m]||'#888'};">
 						${cmIcons[m]||''}${m}</span>`;
 				});
@@ -1038,6 +1359,32 @@ function jsEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').rep
 // isOnVal — normalized on/off comparison for Parsed:
 // the backend sends Parsed as a string ("true"/"ON"/"1"), case and type vary
 // (especially for HAD import from a foreign broker).
+// modes entries "name" or "name:HEX" (class.modes) → names + numeric codes.
+// Clicking a coded mode sends the CODE (backend numeric path), not the name.
+function parseModePairs(modes) {
+	var list = [];
+	if (Array.isArray(modes)) {
+		list = modes.map(function(x){ return (x && typeof x === 'object') ? (x.value || x.name || x.mode || '') : String(x); });
+	} else if (typeof modes === 'string') {
+		list = modes.split(',');
+	}
+	var names = [], codeOf = {};
+	list.forEach(function(s) {
+		s = String(s == null ? '' : s).trim();
+		if (!s) return;
+		var name = s, code = null, ci = s.lastIndexOf(':');
+		if (ci > 0 && ci < s.length - 1) {
+			name = s.slice(0, ci).trim().toLowerCase();
+			var hex = s.slice(ci + 1).trim();
+			if (/^[0-9a-fA-F]+$/.test(hex)) code = parseInt(hex, 16);
+		} else {
+			name = s.toLowerCase();
+		}
+		if (!name) return;
+		names.push(name); codeOf[name] = code;
+	});
+	return { names: names, codeOf: codeOf };
+}
 function isOnVal(v) { var s = String(v == null ? '' : v).toLowerCase().trim(); return s === '1' || s === 'true' || s === 'on' || s === 'вкл'; }
 
 // Merged select: several role=select records with one unitname → one dropdown.
@@ -1097,6 +1444,91 @@ function setupViewToggle(el, e) {
 	} catch(e) {}
 }
 
+
+// Thermostat dial (climate puzzle): SVG geometry + -/+ stepper.
+// The dial drives the heating (else cooling) setpoint part.
+function tstatPol(cx, cy, r, deg) {
+	var a = deg * Math.PI / 180;
+	return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+}
+function tstatArcD(cx, cy, r, a0, a1) {
+	var p0 = tstatPol(cx, cy, r, a0), p1 = tstatPol(cx, cy, r, a1);
+	return 'M' + p0[0].toFixed(1) + ' ' + p0[1].toFixed(1) + ' A' + r + ' ' + r +
+		' 0 ' + (((a1 - a0) > 180) ? 1 : 0) + ' 1 ' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1);
+}
+function tstatDialSet(root, v) {
+	// Move knob + active arc + target label to value v (already rounded).
+	var dmin = parseFloat(root.dataset.min), dmax = parseFloat(root.dataset.max);
+	v = Math.min(dmax, Math.max(dmin, v));
+	root.dataset.tgt = v;
+	var ang = 135 + 270 * Math.min(1, Math.max(0, (v - dmin) / (dmax - dmin)));
+	var pp = tstatPol(120, 128, 92, ang);
+	var knob = root.querySelector('.td-knob'), halo = root.querySelector('.td-halo'), arc = root.querySelector('.td-active');
+	if (knob) { knob.setAttribute('cx', pp[0].toFixed(1)); knob.setAttribute('cy', pp[1].toFixed(1)); }
+	if (halo) { halo.setAttribute('cx', pp[0].toFixed(1)); halo.setAttribute('cy', pp[1].toFixed(1)); }
+	if (arc) arc.setAttribute('d', tstatArcD(120, 128, 92, 135, Math.max(ang, 135.5)));
+	var lab = root.querySelector('.td-tgt-v');
+	if (lab) lab.textContent = (Math.round(v * 10) / 10).toFixed(1) + '°C';
+}
+function tstatDialStep(btn, dir) {
+	try {
+		var root = btn.closest('.tstat-dial');
+		if (!root) return;
+		var dst = parseFloat(root.dataset.step) || 0.5;
+		var dmin = parseFloat(root.dataset.min), dmax = parseFloat(root.dataset.max);
+		var v = parseFloat(root.dataset.tgt);
+		if (!isFinite(v)) v = (dmin + dmax) / 2;
+		v = Math.min(dmax, Math.max(dmin, v + dir * dst));
+		v = Math.round(v / dst) * dst;
+		v = Math.round(v * 10) / 10;
+		tstatDialSet(root, v);
+		if (root.dataset.cmd) widgetEvnt(root.dataset.cmd, v);
+	} catch (e) { console.warn('tstatDialStep:', e); }
+}
+// Live refresh for the dial. widgetReport (socket.js) writes the full parsed
+// into every SPAN carrying the IEEE#key class — that would corrupt the split
+// int/frac digits, so the dial carries no such classes and refreshes here.
+// socket.js itself is NOT touched: we wrap its global instead.
+function tstatLive(rep) {
+	if (!rep) return;
+	var key = rep.Obj || rep.Object || ('' + (rep.EndPoint || '') + (rep.ClusterId || '') + (rep.AttribId || ''));
+	var ieee = rep.IEEE || '';
+	if (!key || !ieee) return;
+	var pair = ieee + '#' + key;
+	// current temperature → big digits + white dot
+	document.querySelectorAll('.tstat-dial[data-temp="' + pair + '"]').forEach(function(root) {
+		var v = parseFloat(rep.parsed);
+		if (!isFinite(v)) return;
+		var iEl = root.querySelector('.td-int'), fEl = root.querySelector('.td-frac');
+		if (iEl) iEl.textContent = Math.trunc(v);
+		if (fEl) fEl.textContent = '.' + Math.abs(Math.round((v - Math.trunc(v)) * 10));
+		try {
+			var dmin = parseFloat(root.dataset.min), dmax = parseFloat(root.dataset.max);
+			var a = 135 + 270 * Math.min(1, Math.max(0, (v - dmin) / (dmax - dmin)));
+			var p = tstatPol(120, 128, 92, a);
+			var dot = root.querySelector('.td-cur');
+			if (dot) { dot.setAttribute('cx', p[0].toFixed(1)); dot.setAttribute('cy', p[1].toFixed(1)); }
+		} catch (e) {}
+	});
+	// setpoint → knob + arc + label (same path as the -/+ buttons, no resend)
+	document.querySelectorAll('.tstat-dial').forEach(function(root) {
+		if ((root.dataset.cmd || '') !== ('climate_temp|' + pair)) return;
+		var v = parseFloat(rep.parsed);
+		if (!isFinite(v)) return;
+		var dst = parseFloat(root.dataset.step) || 0.5;
+		tstatDialSet(root, Math.round(v * 10) / 10);
+	});
+}
+try {
+	if (typeof widgetReport === 'function' && !widgetReport.__tstatWrapped) {
+		var _wrTstat = widgetReport;
+		widgetReport = function(rep) {
+			try { _wrTstat(rep); } catch (e) {}
+			try { tstatLive(rep); } catch (e) {}
+		};
+		widgetReport.__tstatWrapped = true;
+	}
+} catch (e) {}
 
 //https://codepen.io/rogie/pen/dqwJaE
 function hsl(hue) { return "hsl(" + hue + ", 100%, 50%)" }

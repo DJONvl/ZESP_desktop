@@ -1101,11 +1101,11 @@ te_wMain_about=function()
         '0004': { label: 'Groups', role: 'system' },
         '0005': { label: 'Scenes', role: 'system' },
         '0006': { label: 'On_Off', role: 'switch' },
-        '0008': { label: 'Level', role: 'light_level' },
+        '0008': { label: 'Level', role: 'light' },
         '000A': { label: 'Time', role: 'system' },
         '0013': { label: 'Multistate', role: 'sensor' },
         '0021': { label: 'Diagnostics', role: 'system' },
-        '0300': { label: 'Color', role: 'light_color' },
+        '0300': { label: 'Color', role: 'light' },
         '0402': { label: 'Temperature', role: 'sensor' },
         '0403': { label: 'Pressure', role: 'sensor' },
         '0405': { label: 'Humidity', role: 'sensor' },
@@ -1113,7 +1113,8 @@ te_wMain_about=function()
         'E000': { label: 'Custom1', role: 'sensor' },
         'E001': { label: 'Custom2', role: 'sensor' },
         '0201': { label: 'Thermostat', role: 'climate' },
-        '0202': { label: 'Fan', role: 'fan' }
+        '0202': { label: 'Fan', role: 'fan' },
+        '0203': { label: 'Humidity', role: 'sensor' }
     };
 
     // ZCL lamp attributes (ch.3 General: 0006/0008; ch.5 Lighting: 0300/0301)
@@ -1123,14 +1124,17 @@ te_wMain_about=function()
     // labels — otherwise widgets break. Service attributes immediately get role sensor
     // (data, not control): a text sensor instead of an invisible in the light branch.
     // Used in te_Add_obj: overrides the cluster label/role from te_clusterMappings.
+    // Light puzzle (like climate_part): one role "light", the unit's job is
+    // class.light_part (anchor = onoff). Legacy roles light_onoff/... are
+    // accepted everywhere as aliases and migrated to light on first edit.
     const te_lampAttrLabels = {
-        '00060000': { label: 'On_Off' },
-        '00080000': { label: 'Level', role: 'light_level' },
-        '03000000': { label: 'Color', role: 'light_color' },
+        '00060000': { label: 'On_Off', role: 'light', cls: { light_part: 'onoff' } },
+        '00080000': { label: 'Level', role: 'light', cls: { light_part: 'level' } },
+        '03000000': { label: 'Color', role: 'light', cls: { light_part: 'color' } },
         '03000001': { label: 'Saturation', role: 'sensor' },
         '03000003': { label: 'X', role: 'sensor' },
         '03000004': { label: 'Y', role: 'sensor' },
-        '03000007': { label: 'Color_Control', role: 'light_color_temp' },
+        '03000007': { label: 'Color_Control', role: 'light', cls: { light_part: 'color_temp' } },
         '03000008': { label: 'ColorMode', role: 'sensor' },
         '0300400A': { label: 'ColorCapabilities', role: 'sensor' },
         '0300400B': { label: 'PhysicalMinMireds', role: 'sensor' },
@@ -1139,32 +1143,34 @@ te_wMain_about=function()
         '03010000': { label: 'MaxLevel', role: 'sensor' },
         '03010001': { label: 'MinLevel', role: 'sensor' }
     };
-    // ZCL Thermostat (0201) / Fan Control (0202) attributes → standalone climate entities (one table row each).
+    // ZCL Thermostat (0201) / Fan Control (0202) attributes → climate puzzle units.
+    // role=climate + class.climate_part, so a standard thermostat assembles itself.
     // Wins over the cluster mapping in te_Add_obj, same as te_lampAttrLabels.
+    // Tuya datapoints (EF00) have no cluster hints — those stay manual.
     const te_thermostatAttrLabels = {
-        '02010000': { label: 'Temperature', role: 'sensor' },
-        '02010011': { label: 'CoolingSetpoint', role: 'climate_temp' },
-        '02010012': { label: 'HeatingSetpoint', role: 'climate_temp' },
-        '0201001C': { label: 'SystemMode', role: 'climate_mode' },
-        '02020000': { label: 'FanMode', role: 'fan' }
+        '02010000': { label: 'Temperature', role: 'climate', cls: { climate_part: 'local_temp' } },
+        '02010011': { label: 'CoolingSetpoint', role: 'climate', cls: { climate_part: 'occupied_cooling_setpoint', min_temp: 5, max_temp: 35, temp_step: 0.5 } },
+        '02010012': { label: 'HeatingSetpoint', role: 'climate', cls: { climate_part: 'occupied_heating_setpoint', min_temp: 5, max_temp: 35, temp_step: 0.5 } },
+        '0201001C': { label: 'SystemMode', role: 'climate', cls: { climate_part: 'system_mode', modes: 'off,auto,heat,cool,dry,fan_only,eco' } },
+        '02020000': { label: 'FanMode', role: 'climate', cls: { climate_part: 'fan_mode', preset_modes: 'auto,low,medium,high' } },
+        '02030000': { label: 'Humidity', role: 'climate', cls: { climate_part: 'relative_humidity', unit_of_measurement: '%' } }
     };
 function generateReportsFromEP(epData) {
     const reports = {};
     
 
 
-    // Data type mapping for reporting configuration
+    // Data type mapping for reporting configuration.
+    // Light puzzle: one role "light", the ZCL type comes from the part.
     const dataTypeMappings = {
         'switch': '10',    // Boolean
-        'light_onoff': '10',      // Boolean (On_Off)
-        'light_level': '20',      // 8-bit unsigned (Level)
-        'light_color': '20',      // 8-bit unsigned (Color)
-        'light_color_temp': '21', // 16-bit unsigned (mireds)
+        'light': '20',     // default lamp part (Level 8-bit; refined below)
         'color': '19',     // Structure for Color
         'temperature': '29', // 16-bit signed
         'humidity': '21',  // 16-bit unsigned
         'default': '20'    // Default
     };
+    const lightPartDataType = { onoff: '10', level: '20', color: '20', color_temp: '21' };
 
     // Iterate all EndPoints
     for (const [endpoint, epConfig] of Object.entries(epData.EP)) {
@@ -1172,13 +1178,14 @@ function generateReportsFromEP(epData) {
         for (const cluster of epConfig.ClI) {
             const mapping = te_clusterMappings[cluster] || { label: `Cluster_${cluster}`, role: 'sensor' };
             const reportKey = `${endpoint}${cluster}0000`;
-            
+
             // Determine the data type for cfg_report
             let dataType = dataTypeMappings[mapping.role] || dataTypeMappings['default'];
+            if (cluster === '0008') dataType = lightPartDataType['level'];
             if (cluster === '0300') dataType = dataTypeMappings['color'];
             if (cluster === '0402') dataType = dataTypeMappings['temperature'];
             if (cluster === '0405') dataType = dataTypeMappings['humidity'];
-            
+
             reports[reportKey] = {
                 label: mapping.label,
                 val: "",
@@ -1197,6 +1204,24 @@ function generateReportsFromEP(epData) {
                 retain: "0",
                 ya_rep: "none"
             };
+            // Thermostat cluster attr 0000 is the local temperature — anchor of the puzzle.
+            if (cluster === '0201') {
+                reports[reportKey].class = { climate_part: 'local_temp' };
+            }
+            // Lamp: On_Off belongs to the light puzzle when the endpoint
+            // has lighting clusters (anchor = onoff, like local_temp).
+            if (cluster === '0006' && (epConfig.ClI.indexOf('0008') !== -1 || epConfig.ClI.indexOf('0300') !== -1)) {
+                reports[reportKey].role = 'light';
+                reports[reportKey].class = { light_part: 'onoff' };
+                reports[reportKey].cfg_report.DataType = lightPartDataType['onoff'];
+            }
+            // Lamp cluster attr 0000 presets the puzzle part (anchor = onoff).
+            if (cluster === '0008') {
+                reports[reportKey].class = { light_part: 'level' };
+            }
+            if (cluster === '0300') {
+                reports[reportKey].class = { light_part: 'color' };
+            }
         }
     }
 
@@ -1217,20 +1242,23 @@ if (te_file.Report[id]) {alert("Уже существует");return}//objEnbl
 	const lampAttrRole = lampAttr ? lampAttr.role : (thermoAttr ? thermoAttr.role : null);
     const dataTypeMappings = {
         'switch': '10',    // Boolean
-        'light_onoff': '10',      // Boolean (On_Off)
-        'light_level': '20',      // 8-bit unsigned (Level)
-        'light_color': '20',      // 8-bit unsigned (Color)
-        'light_color_temp': '21', // 16-bit unsigned (mireds)
+        'light': '20',     // default lamp part (refined by light_part below)
         'color': '19',     // Structure for Color
         'temperature': '29', // 16-bit signed
         'humidity': '21',  // 16-bit unsigned
         'default': '20'    // Default
-    };	
+    };
             // Determine the data type for cfg_report
             let dataType = dataTypeMappings[mapping.role] || dataTypeMappings['default'];
+            if (cluster === '0008') dataType = '20'; // Level, 8-bit unsigned
             if (cluster === '0300') dataType = dataTypeMappings['color'];
             if (cluster === '0402') dataType = dataTypeMappings['temperature'];
             if (cluster === '0405') dataType = dataTypeMappings['humidity'];
+            // Lamp attr mapping wins: ZCL type by puzzle part.
+            if (lampAttr && lampAttr.cls && lampAttr.cls.light_part) {
+                const byPart = { onoff: '10', level: '20', color: '20', color_temp: '21' };
+                if (byPart[lampAttr.cls.light_part]) dataType = byPart[lampAttr.cls.light_part];
+            }
 
 	// Real ZCL attribute type from the cluster descriptor (cl.js), hex string ("21").
 	// Stored on the object so writes/widgets take the type from here instead of guessing.
@@ -1268,6 +1296,10 @@ if (te_file.Report[id]) {alert("Уже существует");return}//objEnbl
                 retain: "0",
                 ya_rep: "none"
             };
+	// Thermostat puzzle: preset class (part + defaults) from the attr mapping.
+	if (thermoAttr && thermoAttr.cls) te_file.Report[id].class = Object.assign({}, thermoAttr.cls);
+	// Light puzzle: same, from the lamp attr mapping (wins like thermoAttr).
+	if (lampAttr && lampAttr.cls) te_file.Report[id].class = Object.assign({}, lampAttr.cls);
 	te_syncLive(true);
 
 const rows = document.querySelectorAll('.te_edAttr.show table tbody tr');	
@@ -1829,7 +1861,7 @@ te_HA_CLASSES = {
       "ozone","ph","pm1","pm10","pm25","power","power_factor","precipitation",
       "precipitation_intensity","pressure","reactive_power","signal_strength",
       "sound_pressure","speed","sulphur_dioxide","temperature","timestamp",
-      "uv","volatile_organic_compounds","volatile_organic_compounds_parts",
+      "volatile_organic_compounds","volatile_organic_compounds_parts",
       "voltage","volume","volume_flow_rate","volume_storage","water","weight",
       "wind_speed","enum"
     ],
@@ -1866,41 +1898,24 @@ te_HA_CLASSES = {
       "entity_category": {"type":"select","options":["config","diagnostic"]}
     }
   },
-  light_onoff: {
+  // Single role for the whole lamp (like climate): the unit's job is
+  // class.light_part (anchor = onoff). Props are gated by only_part,
+  // exactly like the climate puzzle. Legacy roles light_onoff/... are
+  // migrated to light on first edit (te_migrateLightRole) and understood
+  // everywhere else as aliases.
+  light: {
     device_classes: [],
     props: {
-      "optimistic":      {"type":"bool","hint":"не откатывать состояние без отчёта"},
-      "icon":                {"type":"text","hint":"mdi:lightbulb"},
-      "entity_category":     {"type":"select","options":["config","diagnostic"]}
-    }
-  },
-  light_level: {
-    device_classes: [],
-    props: {
-      "brightness_min": {"type":"number","hint":"0"},
-      "brightness_max": {"type":"number","hint":"254 (шкала лампы: Zigbee 0–254)"},
-      "transition":     {"type":"number","hint":"десятые сек (10 = 1с, пусто = 10)"},
-      "with_onoff":     {"type":"bool","hint":"команды яркости включают лампу"},
-      "icon":           {"type":"text","hint":"mdi:brightness-6"},
-      "entity_category": {"type":"select","options":["config","diagnostic"]}
-    }
-  },
-  light_color: {
-    device_classes: [],
-    props: {
-      "color_modes":    {"type":"select","options":["rgb","hs","xy","white"],"hint":"режимы HA"},
-      "transition":     {"type":"number","hint":"десятые сек (10 = 1с, пусто = 10)"},
-      "icon":           {"type":"text","hint":"mdi:palette"},
-      "entity_category": {"type":"select","options":["config","diagnostic"]}
-    }
-  },
-  light_color_temp: {
-    device_classes: [],
-    props: {
-      "min_mireds":     {"type":"number","hint":"153 (пусто = из PhysicalMinMireds)"},
-      "max_mireds":     {"type":"number","hint":"500 (пусто = из PhysicalMaxMireds)"},
-      "transition":     {"type":"number","hint":"десятые сек (10 = 1с, пусто = 10)"},
-      "icon":           {"type":"text","hint":"mdi:thermometer"},
+      "light_part":     {"type":"select","options":["onoff","level","color_temp","color"],"hint":"что этот юнит значит в лампе (якорь — onoff)"},
+      "optimistic":     {"type":"bool","hint":"не откатывать состояние без отчёта","only_part":["onoff"]},
+      "brightness_min": {"type":"number","hint":"0","only_part":["level"]},
+      "brightness_max": {"type":"number","hint":"254 (шкала лампы: Zigbee 0–254)","only_part":["level"]},
+      "with_onoff":     {"type":"bool","hint":"команды яркости включают лампу","only_part":["level"]},
+      "min_mireds":     {"type":"number","hint":"153 (пусто = из PhysicalMinMireds)","only_part":["color_temp"]},
+      "max_mireds":     {"type":"number","hint":"500 (пусто = из PhysicalMaxMireds)","only_part":["color_temp"]},
+      "color_modes":    {"type":"select","options":["rgb","hs","xy","white"],"hint":"режимы HA","only_part":["color"]},
+      "transition":     {"type":"number","hint":"десятые сек (10 = 1с, пусто = 10)","only_part":["level","color_temp","color"]},
+      "icon":           {"type":"text","hint":"mdi:lightbulb"},
       "entity_category": {"type":"select","options":["config","diagnostic"]}
     }
   },
@@ -1947,10 +1962,18 @@ te_HA_CLASSES = {
   climate: {
     device_classes: [],
     props: {
-      "min_temp":   {"type":"number","hint":"5"},
-      "max_temp":   {"type":"number","hint":"35"},
-      "temp_step":  {"type":"number","hint":"0.5"},
-      "modes":      {"type":"text","hint":"off,auto,heat,cool,dry,fan_only,eco"},
+      "climate_part": {"type":"select","options":["local_temp","occupied_heating_setpoint","occupied_cooling_setpoint","system_mode","fan_mode","relative_humidity","humidity_setpoint"],"hint":"что этот юнит значит в термостате"},
+      "min_temp":   {"type":"number","hint":"5","only_part":["occupied_heating_setpoint","occupied_cooling_setpoint"]},
+      "max_temp":   {"type":"number","hint":"35","only_part":["occupied_heating_setpoint","occupied_cooling_setpoint"]},
+      "temp_step":  {"type":"number","hint":"0.5","only_part":["occupied_heating_setpoint","occupied_cooling_setpoint"]},
+      "modes":      {"type":"text","hint":"off,auto,heat или имя:HEX off:00,heat:04","only_part":["system_mode"]},
+      "preset_modes":   {"type":"text","hint":"auto,low,medium,high","only_part":["fan_mode"]},
+      "speed_range_min":{"type":"number","hint":"1","only_part":["fan_mode"]},
+      "speed_range_max":{"type":"number","hint":"100","only_part":["fan_mode"]},
+      "min_humidity":  {"type":"number","hint":"0","only_part":["humidity_setpoint"]},
+      "max_humidity":  {"type":"number","hint":"100","only_part":["humidity_setpoint"]},
+      "humidity_step":{"type":"number","hint":"1","only_part":["humidity_setpoint"]},
+      "unit_of_measurement": {"type":"text","hint":"%","only_part":["relative_humidity","humidity_setpoint"]},
       "icon":       {"type":"text","hint":"mdi:thermostat"}
     }
   },
@@ -1975,9 +1998,41 @@ te_HA_CLASSES = {
 
 te_currentEditObj = null;
 
+// Legacy lamp roles (light_onoff/light_level/light_color/light_color_temp)
+// migrate to the single "light" role + class.light_part on first edit,
+// so the Role dropdown stays clean (one light, like one climate).
+// The part comes from class.light_part → role&{...} → old role name → key suffix.
+te_migrateLightRole = function(ro, objKey) {
+  const base = String((ro.role || '').split('&')[0]).trim();
+  const legacyPart = { light_onoff: 'onoff', light_level: 'level', light_color_temp: 'color_temp', light_color: 'color' }[base];
+  if (!legacyPart) return;
+  let cls = (ro.class && typeof ro.class === 'object') ? Object.assign({}, ro.class) : {};
+  try {
+    const tail = String(ro.role || '').split('&')[1];
+    if (tail) cls = Object.assign(JSON.parse(tail), cls);
+  } catch (e) {}
+  if (!cls.light_part) {
+    // Key suffix (EP+cluster+attribute) wins over the old role name;
+    // the role name is the final fallback.
+    cls.light_part = legacyPart;
+    const k = String(objKey || '');
+    if (k.length >= 10) {
+      const cl = k.slice(k.length - 8, k.length - 4).toUpperCase();
+      const at = k.slice(k.length - 4).toUpperCase();
+      if (cl === '0006') cls.light_part = 'onoff';
+      else if (cl === '0008') cls.light_part = 'level';
+      else if (cl === '0300') cls.light_part = (at === '0007') ? 'color_temp' : 'color';
+    }
+  }
+  ro.class = cls;
+  ro.role = Object.keys(cls).length ? ('light&' + JSON.stringify(cls)) : 'light';
+  if (typeof te_syncLive === 'function') { try { te_syncLive(true); } catch (e2) {} }
+};
+
 te_openClassEditor = function(obj) {
   te_currentEditObj = obj;
   const ro = te_file.Report[obj];
+  te_migrateLightRole(ro, obj);
   const role = (ro.role||'sensor').split('&')[0];
   const currentClass = ro.class || {};
 
@@ -2008,16 +2063,21 @@ te_renderClassEditor = function(role, currentClass, label) {
 
   // props fields (except device_class — it is already separate).
   // only_for: show the field only for keys with these labels (ZCL attribute context).
+  // only_part (climate): show the field only for this climate_part.
+  // Part not chosen = legacy template: show everything, as before.
   let propsHtml = '';
   const props = schema.props || {};
+  const curPart = (currentClass) ? (currentClass.climate_part || currentClass.light_part || '') : '';
   for (const [key, cfg] of Object.entries(props)) {
     if (key === 'device_class') continue;
     if (cfg.only_for && (!label || cfg.only_for.indexOf(label) === -1)) continue;
+    if (cfg.only_part && curPart && cfg.only_part.indexOf(curPart) === -1) continue;
     const val = currentClass[key] !== undefined ? currentClass[key] : '';
     if (cfg.type === 'select') {
+      const partHook = (key === 'climate_part' || key === 'light_part') ? ` onchange="te_onCePartChange()"` : '';
       propsHtml += `<div class="ce-row">
         <label class="ce-label">${key}</label>
-        <select class="ce-select" id="ce_${key}" data-key="${key}">
+        <select class="ce-select" id="ce_${key}" data-key="${key}"${partHook} title="${cfg.hint||''}">
           <option value="">—</option>
           ${cfg.options.map(o=>`<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}
         </select>
@@ -2060,6 +2120,37 @@ te_onCeRoleChange = function(val) {
   const ro = te_file.Report[obj];
   const currentClass = ro.class || {};
   te_renderClassEditor(val, currentClass, ro.label);
+};
+
+// Climate/light puzzle: changing climate_part/light_part re-renders the props.
+// Unsaved inputs are kept; props of the previous part are pruned.
+te_collectClassInputs = function() {
+  const out = {};
+  const dcEl = document.getElementById('ce_dc');
+  if (dcEl && dcEl.value) out.device_class = dcEl.value;
+  document.querySelectorAll('#ce_props [data-key]').forEach(el => {
+    const key = el.dataset.key;
+    if (el.type === 'checkbox') { out[key] = !!el.checked; }
+    else if (el.value !== '') { out[key] = el.value; }
+  });
+  return out;
+};
+
+te_onCePartChange = function() {
+  const obj = te_currentEditObj;
+  if (!obj) return;
+  const ro = te_file.Report[obj];
+  const roleEl = document.getElementById('ce_role_sel');
+  const role = roleEl ? roleEl.value : 'climate';
+  const merged = Object.assign({}, ro.class || {}, te_collectClassInputs());
+  const schema = te_HA_CLASSES[role] || {};
+  const props = schema.props || {};
+  const part = merged.climate_part || merged.light_part || '';
+  Object.keys(props).forEach(k => {
+    const cfg = props[k];
+    if (cfg && cfg.only_part && part && cfg.only_part.indexOf(part) === -1) delete merged[k];
+  });
+  te_renderClassEditor(role, merged, ro.label);
 };
 
 te_applyClassEditor = function() {
