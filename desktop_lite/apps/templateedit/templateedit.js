@@ -48,7 +48,7 @@ let obj=""
 	  te_drawJson(te_file,obj)
 }
 
-te_wMain_cbResizeEnd=function(){ if(!window.te_body){return;} var t=window.te_body; var w=t.clientWidth; var h=t.clientHeight; t.style.width="100%"; t.style.height="100%"; var widget=document.getElementById("te_DeviceWidget"); var widgetW=(widget&&widget.offsetWidth)||258; var json=document.getElementById("te_DeviceJson"); if(json){json.style.width=(w-widgetW-6)+"px"; json.style.height=(h)+"px";} var leftCol=document.getElementById("te_leftCol"); if(leftCol){leftCol.style.maxHeight=(h)+"px";} }
+te_wMain_cbResizeEnd=function(){ if(!window.te_body){return;} var t=window.te_body; var w=t.clientWidth; var h=t.clientHeight; var widget=document.getElementById("te_DeviceWidget"); var widgetW=(widget&&widget.offsetWidth)||258; if(w===window.te_rbW&&h===window.te_rbH&&widgetW===window.te_rbWW){return;} window.te_rbW=w; window.te_rbH=h; window.te_rbWW=widgetW; t.style.width="100%"; t.style.height="100%"; var json=document.getElementById("te_DeviceJson"); if(json){json.style.width=(w-widgetW-6)+"px"; json.style.height=(h)+"px";} var leftCol=document.getElementById("te_leftCol"); if(leftCol){leftCol.style.maxHeight=(h)+"px";} }
 
 te_wMain_onDrop=function(dsktp,files,dsktpRcvr)
 {
@@ -62,6 +62,9 @@ te_wMain_onDrop=function(dsktp,files,dsktpRcvr)
 
 te_parseFile=function(file)
 {
+	// Новое содержимое — старые замеры ширины невалидны: сбрасываем кэш
+	// guard пересчёта, иначе первая отрисовка может взять кривую ширину.
+	window.te_rbW=window.te_rbH=window.te_rbWW=-1;
 	var src = deviceList.find(function (dev) { return dev.IEEE === file; });
 	if (!src) {
 		console.log("te: ожидание deviceList…");
@@ -123,6 +126,7 @@ te_parseFile=function(file)
 
 
 	te_drawJson(te_file)
+	try{te_afterLoad();}catch(e){}
 }
 
 
@@ -596,6 +600,10 @@ te_drawJson = function(js, obj) {
             console.error('typePickerCell не найден в DOM');
         }
     }, 50); // Small delay to guarantee
+    // Ширину правой части считаем от актуального виджета после каждой
+    // отрисовки (guard внутри отсечёт дубли). Без этого при зафиксированном
+    // guard правая часть могла остаться узкой с пустотой справа.
+    try{te_wMain_cbResizeEnd();}catch(e){}
 }
 // Drag handling functions
 te_startDrag = function(e) {
@@ -3484,8 +3492,199 @@ var TE_CSS="\n\
     font-family: monospace;\n\
     word-break: break-all;\n\
 }\n\
+/* FIX RO-loop: #te_d — absolute без явных offsets. Его static position и\n\
+   shrink-to-fit ширина зависят от containing block — геометрия уехала на\n\
+   пару px, скроллбары заморгали, ResizeObserver закрутился (236 раз/сек).\n\
+   Жёсткая привязка к краям body делает геометрию детерминированной. */\n\
+#te_d{top:0;left:0;right:0;bottom:0;}\n\
 ";
 var TE_BODY="\n\n\n<div style='position:absolute;display:flex; align-items: flex-start;' id='te_d'>\n<div id=\"te_leftCol\" style=\"flex-shrink:0; display:flex; flex-direction:column; overflow-y:auto;\">\n  <div id=\"te_DeviceWidget\" style=\"flex-shrink:0;\"></div>\n  <!-- SNIFF PANEL — постоянная левая колонка, не пропадает при навигации -->\n  <div id=\"te_sniffPanel\" style=\"display:none; flex-shrink:0;\">\n    <div class=\"sniff-header\">\n      <span>🎧 Sniff</span>\n      <div style=\"display:flex;gap:5px;align-items:center;\">\n        <span id=\"te_sniffCount\" class=\"sniff-count\">0</span>\n        <button class=\"sniff-add-all-btn\" onclick=\"te_sniffAddAll()\" title=\"Добавить все объекты\">+ All</button>\n        <button class=\"sniff-clear-btn\" onclick=\"te_clearSniff()\" title=\"Очистить\">🗑</button>\n      </div>\n    </div>\n    <div id=\"te_sniffList\" class=\"sniff-list\"></div>\n  </div>\n</div>\n<div id=\"te_DeviceJson\"></div>\t\n</div>\n\n<!-- CFG REPORT EDITOR MODAL -->\n<div id=\"te_cfgReportEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal cre-modal\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>⚙️ Конфигурация репорта</span>\n      <button class=\"ce-close\" onclick=\"te_closeCfgReportEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body cre-body\">\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">DataType</label>\n        <select class=\"cre-select\" id=\"te_cre_DataType\" onchange=\"te_cre_syncType()\">\n          <option value=\"\">— выбрать —</option>\n          <option value=\"10\">10h · BOOLEAN</option>\n          <option value=\"18\">18h · BITMAP8</option>\n          <option value=\"19\">19h · BITMAP16</option>\n          <option value=\"20\">20h · UINT8</option>\n          <option value=\"21\">21h · UINT16</option>\n          <option value=\"22\">22h · UINT24</option>\n          <option value=\"23\">23h · UINT32</option>\n          <option value=\"28\">28h · INT8</option>\n          <option value=\"29\">29h · INT16</option>\n          <option value=\"2a\">2Ah · INT24</option>\n          <option value=\"30\">30h · ENUM8</option>\n          <option value=\"31\">31h · ENUM16</option>\n          <option value=\"41\">41h · OCTSTR</option>\n          <option value=\"42\">42h · STRING</option>\n        </select>\n        <input class=\"cre-input cre-hex\" id=\"te_cre_DataType_hex\" placeholder=\"hex\" maxlength=\"4\" title=\"hex вручную\" oninput=\"te_cre_syncSel()\">\n      </div>\n      <div class=\"cre-divider\"></div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">MinInterval</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_MinInterval\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"1\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_MinInterval_hex\">0001</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">MaxInterval</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_MaxInterval\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"300\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_MaxInterval_hex\">012C</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">TimeOut</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_TimeOut\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"0\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_TimeOut_hex\">0000</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Change</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_Change\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"порог (дес)\" value=\"1\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_Change_hex\">0001</span>\n      </div>\n      <div class=\"cre-hint\">Ввод в десятичных · hex рассчитывается автоматически</div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeCfgReportEditor()\">Отмена</button>\n      <button class=\"ce-btn-cancel\" onclick=\"te_clearCfgReport(te_currentCfgObj);te_closeCfgReportEditor();\" style=\"background:#f8d8d8;border-color:var(--red);\">✖ Очистить</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyCfgReportEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- BIND EDITOR MODAL -->\n<div id=\"te_bindEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal cre-modal\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>🔗 Бинд кластера</span>\n      <button class=\"ce-close\" onclick=\"te_closeBindEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body cre-body\">\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Объект</label>\n        <span class=\"cre-hex-preview\" id=\"te_be_obj\" style=\"min-width:90px\">—</span>\n      </div>\n      <div class=\"cre-divider\"></div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Получатель</label>\n        <select class=\"cre-select\" id=\"te_be_dst\" onchange=\"te_be_syncEp()\"></select>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Dst EP</label>\n        <input class=\"cre-input cre-dec\" id=\"te_be_dstep\" placeholder=\"01\" maxlength=\"2\">\n      </div>\n      <div class=\"cre-hint\">Координатор / устройство / группа (GROUP:0001). Пустой Dst EP = бинд на группу. Сохраняется в поле bind записи</div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeBindEditor()\">Отмена</button>\n      <button class=\"ce-btn-cancel\" onclick=\"te_clearBind(te_currentBindObj);te_closeBindEditor();\" style=\"background:#f8d8d8;border-color:var(--red);\">✖ Очистить</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyBindEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- YA REP EDITOR MODAL -->\n<div id=\"te_yaRepEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal\" style=\"width:500px;max-height:85vh;\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>🏠 Редактор Яндекс</span>\n      <button class=\"ce-close\" onclick=\"te_closeYaRepEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body\" style=\"padding:0;display:flex;flex-direction:column;gap:0;\">\n\n      <!-- Список шаблонов -->\n      <div style=\"display:flex;height:260px;border-bottom:1px solid var(--border);\">\n        <!-- Левая панель: категории + элементы -->\n        <div id=\"te_yre_list\" style=\"width:200px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--border);padding:4px 0;font-size:12px;\"></div>\n        <!-- Правая панель: описание выбранного -->\n        <div style=\"flex:1;padding:8px;overflow-y:auto;font-size:11px;color:var(--muted);\">\n          <div class=\"ce-section-title\">Предпросмотр</div>\n          <pre id=\"te_yre_preview\" style=\"font-size:10px;color:var(--text);white-space:pre-wrap;word-break:break-all;margin:0;background:var(--bg2);border-radius:4px;padding:6px;min-height:60px;\"></pre>\n          <div class=\"ce-divider\"></div>\n          <div class=\"ce-section-title\">Опции</div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Retrievable</label>\n            <input type=\"checkbox\" id=\"te_yre_retrievable\" class=\"ce-check\" onchange=\"te_yre_updateFlags()\">\n          </div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Reportable</label>\n            <input type=\"checkbox\" id=\"te_yre_reportable\" class=\"ce-check\" onchange=\"te_yre_updateFlags()\">\n          </div>\n          <div class=\"ce-divider\"></div>\n          <div class=\"ce-section-title\">Multi-device</div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Включить</label>\n            <input type=\"checkbox\" id=\"te_yre_multi\" class=\"ce-check\" onchange=\"te_yre_toggleMulti()\">\n          </div>\n          <div id=\"te_yre_multi_fields\" style=\"display:none;\">\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Name</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mname\" oninput=\"te_yre_updateMulti()\">\n            </div>\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Room</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mroom\" oninput=\"te_yre_updateMulti()\">\n            </div>\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Type</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mtype\" list=\"te_yre_types\" oninput=\"te_yre_updateMulti()\">\n              <datalist id=\"te_yre_types\">\n                <option value=\"devices.types.light\">\n                <option value=\"devices.types.socket\">\n                <option value=\"devices.types.switch\">\n                <option value=\"devices.types.thermostat\">\n                <option value=\"devices.types.thermostat.ac\">\n                <option value=\"devices.types.media_device\">\n                <option value=\"devices.types.media_device.tv\">\n                <option value=\"devices.types.media_device.tv_box\">\n                <option value=\"devices.types.media_device.receiver\">\n                <option value=\"devices.types.openable\">\n                <option value=\"devices.types.openable.curtain\">\n                <option value=\"devices.types.humidifier\">\n                <option value=\"devices.types.purifier\">\n                <option value=\"devices.types.vacuum_cleaner\">\n                <option value=\"devices.types.cooking.kettle\">\n                <option value=\"devices.types.cooking.coffee_maker\">\n                <option value=\"devices.types.cooking.multicooker\">\n                <option value=\"devices.types.sensor\">\n                <option value=\"devices.types.sensor.motion\">\n                <option value=\"devices.types.sensor.door\">\n                <option value=\"devices.types.sensor.water_leak\">\n                <option value=\"devices.types.sensor.smoke\">\n                <option value=\"devices.types.sensor.gas\">\n                <option value=\"devices.types.sensor.vibration\">\n                <option value=\"devices.types.sensor.button\">\n                <option value=\"devices.types.other\">\n              </datalist>\n            </div>\n          </div>\n        </div>\n      </div>\n\n      <!-- none режим -->\n      <div style=\"padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;\">\n        <span style=\"font-size:11px;color:var(--muted);\">Установить none (отключить репортинг):</span>\n        <button class=\"ce-btn-cancel\" style=\"font-size:11px;padding:2px 10px;\" onclick=\"te_setYaRepNone()\">none</button>\n      </div>\n\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeYaRepEditor()\">Отмена</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyYaRepEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- CLASS EDITOR MODAL -->\n<div id=\"te_classEditorWnd\" style=\"display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:9999; align-items:center; justify-content:center; background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal\">\n    <div class=\"ce-header\">\n      <span>🏷️ Редактор класса</span>\n      <button class=\"ce-close\" onclick=\"te_closeClassEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body\">\n      <div class=\"ce-row\">\n        <label class=\"ce-label\">Role</label>\n        <select class=\"ce-select ce-select-role\" id=\"ce_role_sel\" onchange=\"te_onCeRoleChange(this.value)\"></select>\n      </div>\n      <div class=\"ce-divider\"></div>\n      <div id=\"ce_dc_wrap\"></div>\n      <div class=\"ce-section-title\">Свойства</div>\n      <div id=\"ce_props\"></div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeClassEditor()\">Отмена</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyClassEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n";
+
+// ── Template server request (moved here from the join window) ──
+// No-template devices arrive via window.tePendingGen = {ieee, model, manuf}
+// set by the join window button "Открыть в редакторе". Generation command
+// stays backend-side: genTemplate|IEEE|[model]|[vendor]; progress comes as
+// teGenLog + genTemplateResult/genTemplateCandidates events.
+// Requests are manual only (panel «Запросить» button / candidate pick),
+// guarded by te_genBusy against double-clicks.
+var TE_GENBAR = "<div id=\"te_genBar\" style=\"display:none;position:absolute;top:0;left:0;right:0;z-index:60;" +
+  "border-bottom:1px solid var(--border);padding:6px 8px;font-size:12px;max-height:150px;overflow-y:auto;" +
+  "background:var(--panel,#f8fafc);\">" +
+  "<div style=\"display:flex;align-items:center;gap:8px;\"><b id=\"te_genTitle\">📦 Шаблон с сервера</b>" +
+  "<span style=\"flex:1\"></span><button class=\"cbtn\" onclick=\"te_genHide()\" title=\"Скрыть\">✕</button></div>" +
+  "<div style=\"display:flex;align-items:center;gap:6px;margin-top:4px;\"><span>Model</span>" +
+  "<input id=\"te_genModel\" style=\"flex:2;min-width:80px;\" title=\"Имя определения с сервера (напр. TS0601_dimmer_1_gang_1). Сырые значения интервью сюда слать не надо — без изменений едет только интервью\">" +
+  "<span>Vendor</span>" +
+  "<input id=\"te_genVendor\" style=\"flex:2;min-width:80px;\" title=\"Вендор определения (напр. Tuya). Сырые значения интервью сюда слать не надо\">" +
+  "<button class=\"cbtn\" id=\"te_genBtn\" onclick=\"te_genServer_click()\" title=\"Запросить шаблон с сервера\">Запросить</button></div>" +
+  "<div id=\"te_genLog\" style=\"margin-top:4px;opacity:.85;\"></div>" +
+  "<div id=\"te_genCands\" style=\"margin-top:4px;\"></div></div>";
+// Предзаполнить инпуты Model/Vendor: из интервью устройства, поверх —
+// явные значения (pending из джойна / выбранный кандидат).
+function te_genFillInputs(model, manuf){
+  try{
+    var m=model||(te_file&&te_file.ModelId)||"";
+    var v=manuf||(te_file&&te_file.ManufName)||"";
+    var mi=document.getElementById("te_genModel"), vi=document.getElementById("te_genVendor");
+    if(mi) mi.value=m||"";
+    if(vi) vi.value=v||"";
+  }catch(e){}
+}
+
+function te_genCurIEEE(){ try{ if(te_file && te_file.IEEE) return te_file.IEEE; }catch(e){} return te_fileName||""; }
+// Человекочитаемая подпись устройства для панели: ModelId + ManufName.
+// IEEE здесь не показываем осознанно: человеку он ничего не говорит,
+// а серверу он всё равно не едет — туда уходит интервью (EP/ModelId/Manuf
+// из локальной базы по IEEE-ключу). Фолбэк «…» — на долю секунды, пока
+// интервью ещё не подтянулось из deviceList.
+function te_genDevLabel(over){
+  var m="", mf="";
+  try{
+    if(over){ m=over.model||""; mf=over.manuf||""; }
+    if(!m && te_file) m=te_file.ModelId||"";
+    if(!mf && te_file) mf=te_file.ManufName||"";
+  }catch(e){}
+  var s=(String(m||"")+(mf?" "+mf:"")).trim();
+  return s||"…";
+}
+function te_genShow(title){
+  var bar=document.getElementById("te_genBar"); if(!bar) return;
+  bar.style.display="";
+  if(title){ var t=document.getElementById("te_genTitle"); if(t) t.textContent=title; }
+}
+function te_genHide(){ var bar=document.getElementById("te_genBar"); if(bar) bar.style.display="none"; }
+function te_genSay(html){
+  te_genShow();
+  var log=document.getElementById("te_genLog"); if(!log) return;
+  var d=document.createElement("div"); d.innerHTML=html; log.appendChild(d);
+}
+function te_genServer_click(){
+  // Запрос уходит ТОЛЬКО по явной кнопке «Запросить» внутри панели.
+  // Кнопка в шапке (te_genOpen_click) лишь открывает панель.
+  // Guard от даблклика: пока висит запрос — повтор не шлём, иначе
+  // случайный второй клик перезапишет устройство свежим ответом сервера.
+  if(window.te_genBusy) return;
+  var ieee=te_genCurIEEE(); if(!ieee||!window.WSsend) return;
+  // Кастомный запрос: Model/Vendor из инпутов (предзаполнены интервью,
+  // можно править руками — напр. взять пару похожего устройства).
+  // ВАЖНО: нетронутые инпуты в запрос НЕ идут — сервер ищет по паре строго
+  // и отвечает 404, если её нет; рабочее поведение — только интервью.
+  // Пара едет лишь если значения отличаются от интервью.
+  var mi=document.getElementById("te_genModel"), vi=document.getElementById("te_genVendor");
+  var model=mi?String(mi.value||"").trim():"", vendor=vi?String(vi.value||"").trim():"";
+  var im="", iv="";
+  try{ im=te_file?(te_file.ModelId||""):""; iv=te_file?(te_file.ManufName||""):""; }catch(e){}
+  var custom=(model!==im||vendor!==iv);
+  te_genSetBusy(true);
+  te_genShow("📦 Шаблон с сервера ("+te_genDevLabel()+")");
+  if((model||vendor)&&custom&&model&&vendor){
+    te_genSay("<div>Запрашиваем шаблон: "+String(vendor)+" — "+String(model)+"…</div>");
+    WSsend("genTemplate|"+ieee+"|"+model+"|"+vendor);
+  } else {
+    te_genSay("<div>Запрашиваем шаблон с сервера…</div>");
+    WSsend("genTemplate|"+ieee);
+  }
+}
+// Кнопка в шапке окна: только открыть ЧИСТЫЙ диалог, запрос НЕ отправляем.
+// Старые строки прошлого запроса стираем — иначе они встречают пользователя
+// при каждом открытии (как на скриншоте). Пока идёт запрос — показываем как есть.
+function te_genOpen_click(){
+  if(window.te_genBusy){ te_genShow(); return; }
+  te_genShow("📦 Шаблон с сервера ("+te_genDevLabel()+") — правь Model/Vendor и жми «Запросить»");
+  te_genFillInputs();
+  var log=document.getElementById("te_genLog"); if(log) log.innerHTML="";
+  var box=document.getElementById("te_genCands"); if(box) box.innerHTML="";
+}
+function te_genSetBusy(on){
+  window.te_genBusy=!!on;
+  var b=document.getElementById("te_genBtn"); if(!b) return;
+  b.disabled=!!on;
+  b.textContent=on?"Запрашиваем…":"Запросить";
+  if(on){
+    // Страховка: если ответ потерялся — разблокировать через 35с.
+    if(window.te_genBusyT) clearTimeout(window.te_genBusyT);
+    window.te_genBusyT=setTimeout(function(){ te_genSetBusy(false); }, 35000);
+  } else if(window.te_genBusyT){ clearTimeout(window.te_genBusyT); window.te_genBusyT=null; }
+}
+function te_genServer2(ieee, model, vendor){
+  if(!ieee||!window.WSsend||window.te_genBusy) return;
+  te_genSetBusy(true);
+  te_genFillInputs(model, vendor);
+  te_genSay("<div>Уточняем: "+String(vendor||"")+" — "+String(model||"")+"…</div>");
+  WSsend("genTemplate|"+ieee+"|"+model+"|"+vendor);
+}
+function te_onGenLog(d){
+  try{
+    if(!d || d.ieee!==te_genCurIEEE()) return;
+    te_genSay(d.html);
+    // Ошибка сервера (not_found/HTTP/таймаут) — результата не будет, разблокируем сразу.
+    if(/Ошибка/i.test(String(d.html||""))) te_genSetBusy(false);
+  }catch(e){}
+}
+// Full JSON from the server: pour IEEE/address from the interview, save
+// to Devices/IEEE (lands in Devtemplates only via the explicit Tpl button),
+// then reload the editor view from the updated deviceList.
+function te_onGenResult(d){
+  try{
+    if(!d || d.ieee!==te_genCurIEEE()) return;
+    var obj=d.json||{};
+    var cur=(window.deviceList||[]).find(function(x){ return x.IEEE===d.ieee; });
+    obj.IEEE=d.ieee;
+    if(cur){
+      if(cur.Device) obj.Device=cur.Device;
+      if(cur.Name) obj.Name=cur.Name;
+      if(cur.Location) obj.Location=cur.Location;
+      if(cur.DevType) obj.DevType=cur.DevType;
+      // EP — только из интервью: серверный профиль может не совпадать
+      // с реальным железом, а по EP идут Bind/репорты/настройки из записей.
+      if(cur.EP && Object.keys(cur.EP).length) obj.EP=cur.EP;
+    }
+    te_genSay("<div>Ответ получен, сохраняем…</div>");
+    WSsend("SaveJson|/Devices/"+d.ieee+"|"+JSON.stringify(obj));
+    if(window.eventE) eventE.once("updateDeviceList", function(){
+      try{ te_parseFile(d.ieee); te_genSay("<div>Готово — проверьте в редакторе и сохраните в шаблон (Tpl).</div>"); }catch(e){}
+    });
+    te_genSetBusy(false);
+  }catch(e){}
+}
+function te_onGenCandidates(d){
+  try{
+    if(!d || d.ieee!==te_genCurIEEE()) return;
+    te_genSetBusy(false);
+    te_genShow();
+    var box=document.getElementById("te_genCands"); if(!box) return;
+    box.innerHTML="";
+    // Заголовок не пишем: сервер уже положил «Несколько вариантов — выбери:»
+    // в лог строкой выше — иначе двоится. Только кнопки.
+    (d.candidates||[]).forEach(function(c){
+      var b=document.createElement("button"); b.className="cbtn"; b.style.margin="2px 4px 2px 0";
+      b.textContent=(c.vendor||"")+" — "+(c.model||"");
+      (function(cc){ b.onclick=function(){ te_genServer2(d.ieee, cc.model, cc.vendor); }; })(c);
+      box.appendChild(b);
+    });
+  }catch(e){}
+}
+// After load: show the server bar when there is no template content yet,
+// or consume the pending data passed by the join window (model/manuf for
+// the title). No auto-request: genTemplate is sent only by the explicit
+// «Запросить» button inside the panel (te_genServer_click).
+function te_afterLoad(){
+  try{
+    var pend=window.tePendingGen;
+    if(pend && pend.ieee && pend.ieee===te_genCurIEEE()){
+      window.tePendingGen=null;
+      var title="📦 Нет шаблона ("+te_genDevLabel(pend)+") — правь Model/Vendor и жми «Запросить»";
+      te_genShow(title);
+      te_genFillInputs(pend.model||(te_file&&te_file.ModelId)||"", pend.manuf||(te_file&&te_file.ManufName)||"");
+      var box=document.getElementById("te_genCands"); if(box) box.innerHTML="";
+      var log=document.getElementById("te_genLog"); if(log) log.innerHTML="";
+      return;
+    }
+    if(te_file && te_file.ModelId && (!te_file.Report || !Object.keys(te_file.Report).length)){
+      te_genShow("📦 Нет шаблона ("+te_genDevLabel()+") — запросить с сервера?");
+    }
+  }catch(e){}
+}
 
 window.WinEngine && window.WinEngine.register({
   id:"templateedit",
@@ -3499,30 +3698,52 @@ window.WinEngine && window.WinEngine.register({
     "<div class=\"c-tools\">" +
       "<button class=\"cbtn\" onclick=\"te_cmSave_click()\" title=\"Сохранить\">💾 Save</button>" +
       "<button class=\"cbtn\" onclick=\"te_cmSaveTmpl_click()\" title=\"Сохранить как шаблон\">📦 Tpl</button>" +
+      "<button class=\"cbtn\" onclick=\"te_genOpen_click()\" title=\"Открыть панель запроса шаблона с сервера\">☁️ С сервера</button>" +
     "</div>" +
     "<div class=\"wbtns\"><button class=\"wbtn min\" data-waction=\"min\">–</button>" +
     "<button class=\"wbtn max\" data-waction=\"max\">▢</button>" +
     "<button class=\"wbtn\" data-waction=\"close\">✕</button></div></div>" +
-    "<div class=\"window-body\" style=\"padding:0\">"+TE_BODY+"</div>" +
+    "<div class=\"window-body\" style=\"padding:0;position:relative\">"+TE_GENBAR+TE_BODY+"</div>" +
   "</div>",
   setup:function(node,opts){
     te_node=node; window.te_body=node.querySelector(".window-body");
     node._state={};
     te_file=null; te_docChanged=false; te_fileName="";
+    if(window.eventE){
+      eventE.on("genTemplateResult", te_onGenResult);
+      eventE.on("genTemplateCandidates", te_onGenCandidates);
+      eventE.on("teGenLog", te_onGenLog);
+    }
     var p=(opts&&opts.params)||"";
     var parts=p.split("#");
     var IEEE = parts.length>1 ? parts[1] : "";
-    if(IEEE){ te_fileName=IEEE; window.te_fileLoaded=false; window.te_retryOnce=false; try{te_parseFile(IEEE);}catch(e){console.log("te parse",e);} if(window.WSsend) WSsend("getDeviceList"); }
+    if(IEEE){ te_fileName=IEEE; window.te_fileLoaded=false; window.te_retryOnce=false; try{te_parseFile(IEEE);}catch(e){console.log("te parse",e);} try{te_afterLoad();}catch(e){} if(window.WSsend) WSsend("getDeviceList"); }
     else { te_file={Name:"",Location:"",IEEE:"",Report:{}}; try{te_drawJson(te_file);}catch(e){} }
     try{ te_wMain_cbResizeEnd(); }catch(e){}
     var dw0=document.getElementById("te_DeviceWidget");
     if(dw0){ dw0.addEventListener("touchend",te_DeviceWidgetHandler); dw0.addEventListener("click",te_DeviceWidgetHandler); }
     if(window.ResizeObserver){ var ro=new ResizeObserver(function(){ try{te_wMain_cbResizeEnd();}catch(e){} }); ro.observe(node.querySelector(".window-body")); node._state.ro=ro; }
   },
+  activate:function(node,opts){
+    try{
+      te_node=node; window.te_body=node.querySelector(".window-body");
+      var p=(opts&&opts.params)||"";
+      var parts=p.split("#");
+      var IEEE = parts.length>1 ? parts[1] : "";
+      if(IEEE && IEEE!==te_fileName){
+        te_fileName=IEEE; window.te_fileLoaded=false; window.te_retryOnce=false;
+        try{te_parseFile(IEEE);}catch(e){}
+        if(window.WSsend) WSsend("getDeviceList");
+      }
+      try{te_afterLoad();}catch(e){}
+    }catch(e){}
+  },
   destroy:function(node){
     if(node._state&&node._state.ro) node._state.ro.disconnect();
     if(window.te_retryIv){ clearInterval(window.te_retryIv); window.te_retryIv=null; }
     if(window.te_retryHdl && window.eventE){ try{window.eventE.off("updateDeviceList", window.te_retryHdl);}catch(e){} window.te_retryHdl=null; }
+    if(window.eventE){ try{eventE.off("genTemplateResult", te_onGenResult);}catch(e){} try{eventE.off("genTemplateCandidates", te_onGenCandidates);}catch(e){} try{eventE.off("teGenLog", te_onGenLog);}catch(e){} }
+    try{te_genHide();}catch(e){}
     window.te_fileLoaded=false; window.te_retryOnce=false;
     te_reset();
   }

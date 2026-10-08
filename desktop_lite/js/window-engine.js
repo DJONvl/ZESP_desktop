@@ -387,80 +387,131 @@ window.WinEngine = (function () {
   // ---------- drag / resize ----------
   const isTouchDevice = () => ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
-  // Custom resize for MOUSE. Invisible edge handles above everything in the window
-  // (z-index higher than the scrollbar), so resize works even when the cursor is over
-  // the scroll bar. Edges are thicker than the usual 8px,
-  // to overlap the vertical scrollbar.
+  // Custom resize for MOUSE, without overlay handles.
+  // Previously invisible 10-12px edge divs sat above everything in the window
+  // (z-index 20), so a press on a scrollbar started a resize instead of
+  // scrolling — the scrollbar thumb could not be dragged with the mouse.
+  // Now the edge is detected by coordinates on the window itself (capture, so
+  // the header drag does not start simultaneously), and a press over a native
+  // scrollbar is left to the browser.
   const MR_EDGE = 10;
   const MR_MIN_W = 100;
   const MR_MIN_H = 90;
 
+  // Which window edge (if any) the point is over. Letter order matches the old
+  // handles ('se' etc.); move() only uses indexOf, so any order works.
+  function mrEdgeAt(win, x, y) {
+    const r = win.getBoundingClientRect();
+    const ez = MR_EDGE * getZoom();
+    const nearE = x > r.right - ez, nearW = x < r.left + ez;
+    const nearS = y > r.bottom - ez, nearN = y < r.top + ez;
+    let edge = '';
+    if (nearS) edge += 's'; else if (nearN) edge += 'n';
+    if (nearE) edge += 'e'; else if (nearW) edge += 'w';
+    return edge || null;
+  }
+
+  function mrCursor(edge) {
+    const h = edge.indexOf('e') >= 0 || edge.indexOf('w') >= 0;
+    const v = edge.indexOf('s') >= 0 || edge.indexOf('n') >= 0;
+    if (h && v) {
+      const se = edge.indexOf('s') >= 0 && edge.indexOf('e') >= 0;
+      const nw = edge.indexOf('n') >= 0 && edge.indexOf('w') >= 0;
+      return (se || nw) ? 'nwse-resize' : 'nesw-resize';
+    }
+    return h ? 'ew-resize' : 'ns-resize';
+  }
+
+  // True if the point is over a native (non-overlay) scrollbar of the window
+  // content. Walks up from the hit-tested element, so nested scroll areas
+  // (tables, lists) are covered too.
+  function mrOverScrollbar(win, x, y) {
+    let el = null;
+    try { el = document.elementFromPoint(x, y); } catch (e) { return false; }
+    if (!el || (el !== win && !win.contains(el))) return false;
+    for (;;) {
+      try {
+        if (el.nodeType === 1 && el.getBoundingClientRect) {
+          const r = el.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0) {
+            const sbW = el.offsetWidth - el.clientWidth;
+            const sbH = el.offsetHeight - el.clientHeight;
+            if (sbW > 2 && sbW < 40 && el.scrollHeight > el.clientHeight &&
+                x >= r.right - sbW) return true;
+            if (sbH > 2 && sbH < 40 && el.scrollWidth > el.clientWidth &&
+                y >= r.bottom - sbH) return true;
+          }
+        }
+      } catch (e) {}
+      if (el === win) break;
+      el = el.parentNode;
+    }
+    return false;
+  }
+
   function wireMouseResize(win) {
     // On touch devices resize is done by wireTouchDragResize (long-press on the header).
-    // Do not attach mouse edges on touch: they conflict with the visible rh-handles
-    // (higher z-index), steal scroll at the edges and block scrolling.
     if (isTouchDevice()) return;
     if (win.__mr) return;
     win.__mr = true;
-    const zones = [
-      { edge: 'e', cls: 'mr-e', cursor: 'ew-resize' },
-      { edge: 'w', cls: 'mr-w', cursor: 'ew-resize' },
-      { edge: 's', cls: 'mr-s', cursor: 'ns-resize' },
-      { edge: 'n', cls: 'mr-n', cursor: 'ns-resize' },
-      { edge: 'se', cls: 'mr-se', cursor: 'nwse-resize' },
-      { edge: 'sw', cls: 'mr-sw', cursor: 'nesw-resize' },
-      { edge: 'ne', cls: 'mr-ne', cursor: 'nesw-resize' },
-      { edge: 'nw', cls: 'mr-nw', cursor: 'nwse-resize' },
-    ];
-    zones.forEach(z => {
-      const d = document.createElement('div');
-      d.className = 'mresize-handle ' + z.cls;
-      d.style.cursor = z.cursor;
-      d.addEventListener('pointerdown', (e) => {
-        if (e.pointerType === 'mouse' && e.button !== 0) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const zm0 = getZoom();
-        const r = win.getBoundingClientRect();
-        const dr = desktop().getBoundingClientRect();
-        const sx = e.clientX, sy = e.clientY;
-        const bx = (r.left - dr.left) / zm0, by = (r.top - dr.top) / zm0;
-        const bW = r.width / zm0, bH = r.height / zm0;
-        win.style.touchAction = 'none';
-        const move = (ev) => {
-          const dz = getZoom();
-          const dx = (ev.clientX - sx) / dz, dy = (ev.clientY - sy) / dz;
-          let w = bW, h = bH, x = bx, y = by;
-          if (z.edge.indexOf('e') >= 0) w = bW + dx;
-          if (z.edge.indexOf('w') >= 0) { w = bW - dx; x = bx + dx }
-          if (z.edge.indexOf('s') >= 0) h = bH + dy;
-          if (z.edge.indexOf('n') >= 0) { h = bH - dy; y = by + dy }
-          if (w < MR_MIN_W) { if (z.edge.indexOf('w') >= 0) x -= MR_MIN_W - w; w = MR_MIN_W }
-          if (h < MR_MIN_H) h = MR_MIN_H;
-          const ddr = desktop().getBoundingClientRect();
-          if (x < 0) { w += -x; x = 0 }
-          if (x + w > desktop().clientWidth) w = desktop().clientWidth - x;
-          if (y < 0) { h += -y; y = 0 }
-          if (y + h > desktop().clientHeight) h = desktop().clientHeight - y;
-          win.style.left = x + 'px';
-          win.style.top = y + 'px';
-          win.style.width = Math.max(MR_MIN_W, w) + 'px';
-          win.style.height = Math.max(MR_MIN_H, h) + 'px';
-          win.style.zIndex = ++winZ;
-        };
-        const up = () => {
-          window.removeEventListener('pointermove', move);
-          window.removeEventListener('pointerup', up);
-          window.removeEventListener('pointercancel', up);
-          win.style.touchAction = '';
-          saveLayout();
-          emitLayout();
-        };
-        window.addEventListener('pointermove', move);
-        window.addEventListener('pointerup', up);
-        window.addEventListener('pointercancel', up);
-      });
-      win.appendChild(d);
+    // Capture: runs before the header-drag handler, so an edge press inside
+    // the header starts a resize (as the old top handle did), not a drag.
+    win.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      const edge = mrEdgeAt(win, e.clientX, e.clientY);
+      if (!edge) return;
+      // Scrollbar wins over resize: leave the press to the browser.
+      if (mrOverScrollbar(win, e.clientX, e.clientY)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const zm0 = getZoom();
+      const r = win.getBoundingClientRect();
+      const dr = desktop().getBoundingClientRect();
+      const sx = e.clientX, sy = e.clientY;
+      const bx = (r.left - dr.left) / zm0, by = (r.top - dr.top) / zm0;
+      const bW = r.width / zm0, bH = r.height / zm0;
+      win.style.touchAction = 'none';
+      const move = (ev) => {
+        const dz = getZoom();
+        const dx = (ev.clientX - sx) / dz, dy = (ev.clientY - sy) / dz;
+        let w = bW, h = bH, x = bx, y = by;
+        if (edge.indexOf('e') >= 0) w = bW + dx;
+        if (edge.indexOf('w') >= 0) { w = bW - dx; x = bx + dx }
+        if (edge.indexOf('s') >= 0) h = bH + dy;
+        if (edge.indexOf('n') >= 0) { h = bH - dy; y = by + dy }
+        if (w < MR_MIN_W) { if (edge.indexOf('w') >= 0) x -= MR_MIN_W - w; w = MR_MIN_W }
+        if (h < MR_MIN_H) h = MR_MIN_H;
+        if (x < 0) { w += -x; x = 0 }
+        if (x + w > desktop().clientWidth) w = desktop().clientWidth - x;
+        if (y < 0) { h += -y; y = 0 }
+        if (y + h > desktop().clientHeight) h = desktop().clientHeight - y;
+        win.style.left = x + 'px';
+        win.style.top = y + 'px';
+        win.style.width = Math.max(MR_MIN_W, w) + 'px';
+        win.style.height = Math.max(MR_MIN_H, h) + 'px';
+        win.style.zIndex = ++winZ;
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+        win.style.touchAction = '';
+        saveLayout();
+        emitLayout();
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
+    }, true);
+    // Resize cursor on hover (the removed handles used to provide it via CSS).
+    win.addEventListener('pointermove', (e) => {
+      if (e.buttons) return;
+      const edge = mrEdgeAt(win, e.clientX, e.clientY);
+      if (edge && !mrOverScrollbar(win, e.clientX, e.clientY)) {
+        win.style.cursor = mrCursor(edge);
+      } else if (win.style.cursor !== '') {
+        win.style.cursor = '';
+      }
     });
   }
 

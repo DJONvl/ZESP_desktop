@@ -138,7 +138,10 @@
     if (d.DevType === 'GRP') { cls = 'online'; lbl = t('st.online', 'Онлайн'); cnt = (d.Members || []).length; }
     if (d.Leave && d.Leave !== 0) { cls = 'left'; lbl = t('st.left', 'Покинуло сеть'); }
     else if (d.lastSeen && (Date.now() / 1000 - tsSec(d.lastSeen)) < 300) { cls = 'online'; lbl = t('st.online', 'Онлайн'); }
-    var out = '<span class="dm-dot ' + cls + '"></span><span class="txt">' + lbl + '</span>';
+    var out = '<span class="dm-dot ' + cls + '" title="' + lbl + '"></span>';
+    // Текст статуса не показываем (точка + title): надписи Онлайн/Офлайн
+    // только шумят. Исключение — «Покинуло сеть»: это важное состояние.
+    if (cls === 'left') out += '<span class="txt">' + lbl + '</span>';
     if (cnt) out += '<span class="cnt">· ' + cnt + ' ' + t('st.sensors', 'датч.') + '</span>';
     if (d.lastSeen) out += '<span class="cnt">· ' + agoStr(d.lastSeen) + '</span>';
     return out;
@@ -185,19 +188,91 @@
 
       switch (role) {
         case 'light': {
-          // Single lamp role: the unit's job is class.light_part (anchor = onoff).
-          // Legacy roles and labels are fallbacks for unmigrated templates.
-          var lightPart = (attr && attr.light_part) || '';
-          if (!lightPart) {
-            if (lightKind === 'light_onoff') lightPart = 'onoff';
-            else if (lightKind === 'light_level') lightPart = 'level';
-            else if (lightKind === 'light_color_temp') lightPart = 'color_temp';
-            else if (lightKind === 'light_color') lightPart = 'color';
-          }
-          var isOnOff = (lightPart === 'onoff') || (value.label === 'On_Off' || value.label === 'on_off');
-          var isLevel = (lightPart === 'level') || (value.label === 'Level' || value.label === 'яркость' || value.label === 'brightness');
-          var isCt = (lightPart === 'color_temp') || (value.label === 'ColorT' || value.label === 'Color_temp');
-          var isColor = (lightPart === 'color') || (value.label === 'Color');
+          // Lamp puzzle (as in widgets.js getWidget): one role 'light' +
+          // class.light_part (anchor = onoff draws the whole card, other parts
+          // draw nothing). Legacy roles, key suffixes (ZCL clusters
+          // 0006/0008/0300) and labels cover unmigrated templates.
+          var dmLightCls = function (r) {
+            var o = {};
+            try { var t = String((r && r.role) || '').split('&'); if (t[1]) o = JSON.parse(t[1]); } catch (eJ) {}
+            try { if (r && r.class && typeof r.class === 'object') { for (var ck in r.class) if (o[ck] === undefined) o[ck] = r.class[ck]; } } catch (eC) {}
+            return o;
+          };
+          var dmLightLegacy = function (rb) {
+            if (rb === 'light_onoff') return 'onoff';
+            if (rb === 'light_level') return 'level';
+            if (rb === 'light_color_temp') return 'color_temp';
+            if (rb === 'light_color') return 'color';
+            return '';
+          };
+          var dmLightByKey = function (k) {
+            if (typeof k !== 'string' || k.length < 10) return '';
+            var cl = k.slice(k.length - 8, k.length - 4).toUpperCase();
+            var at = k.slice(k.length - 4).toUpperCase();
+            if (cl === '0006') return 'onoff';
+            if (cl === '0008') return 'level';
+            if (cl === '0300') return (at === '0007') ? 'color_temp' : 'color';
+            return '';
+          };
+          var dmLightByLabel = function (l) {
+            l = String(l || '');
+            if (l === 'On_Off' || l === 'on_off') return 'onoff';
+            if (l === 'Level' || l === 'яркость' || l === 'brightness') return 'level';
+            if (l === 'Color_Control' || l === 'ColorT' || l === 'Color_temp' || l === 'ColorTemp') return 'color_temp';
+            if (l === 'Color') return 'color';
+            return '';
+          };
+          var dmLightPartOf = function (rep, k) {
+            var rb = String((rep && rep.role) || '').split('&')[0];
+            return dmLightCls(rep).light_part || dmLightLegacy(rb) || dmLightByKey(k) || dmLightByLabel(rep && rep.label) || '';
+          };
+          var ownLightPart = (attr && attr.light_part) || dmLightLegacy(lightKind) || dmLightByKey(key) || dmLightByLabel(value && value.label) || '';
+          if (!ownLightPart) ownLightPart = 'onoff';
+          // sibling parts of the same lamp
+          var dmPuz = { onoff: null, level: null, ct: null, color: null };
+          try {
+            for (var dmPk in device.Report) {
+              if (!device.Report.hasOwnProperty(dmPk)) continue;
+              var dmPr = device.Report[dmPk] || {};
+              var dmPrb = String(dmPr.role || '').split('&')[0];
+              if (dmPrb !== 'light' && !dmLightLegacy(dmPrb)) continue;
+              var dmPp = dmLightPartOf(dmPr, dmPk);
+              if (dmPp === 'onoff' && !dmPuz.onoff) dmPuz.onoff = dmPk;
+              else if (dmPp === 'level' && !dmPuz.level) dmPuz.level = dmPk;
+              else if (dmPp === 'color_temp' && !dmPuz.ct) dmPuz.ct = dmPk;
+              else if (dmPp === 'color' && !dmPuz.color) dmPuz.color = dmPk;
+            }
+          } catch (ePz) {}
+          var dmPuzOn = !!(dmPuz.onoff && (dmPuz.level || dmPuz.ct || dmPuz.color));
+          // assembled card lives on the anchor only — sibling rows stay empty
+          if (dmPuzOn && ownLightPart !== 'onoff') { html += ''; break; }
+          var dmLvlRow = function (lvKey) {
+            var lvRep = device.Report[lvKey] || {};
+            var lvId = device.IEEE + '#' + lvKey;
+            var lvPct = Math.round((parseFloat(lvRep.parsed) || 0) * 100 / 255);
+            return '<span style="display:inline-flex;align-items:center;gap:3px;">' + window.getIconSvg('brightness', 14, '#ffd54f') +
+              '<input class="' + lvId + ' level" type="range" id="level|' + lvId + '" style="width:70px" min="0" max="100" step="2" value="' + lvPct + '" onchange="evm(\'level|' + lvId + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
+              '<span class="' + lvId + '" style="font-size:11px;color:var(--faint);min-width:26px">' + lvPct + '%</span></span>';
+          };
+          var dmCtRow = function (ctKey) {
+            var ctRep = device.Report[ctKey] || {};
+            var ctId = device.IEEE + '#' + ctKey;
+            var ctPct = Math.round(((parseFloat(ctRep.parsed) || 153) - 153) * 100 / 347);
+            return '<span style="display:inline-flex;align-items:center;gap:3px;">' + window.getIconSvg('sun_temp', 14, '#ff9800') +
+              '<input class="' + ctId + ' color-temp" type="range" id="colorT|' + ctId + '" style="width:70px" min="0" max="100" step="2" value="' + ctPct + '" onchange="evm(\'colorT|' + ctId + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
+              '<span class="' + ctId + '" style="font-size:11px;color:var(--faint);min-width:26px">' + ctPct + '%</span></span>';
+          };
+          var dmColRow = function (clKey) {
+            var clRep = device.Report[clKey] || {};
+            var clId = device.IEEE + '#' + clKey;
+            return '<span style="display:inline-flex;align-items:center;gap:3px;">' + window.getIconSvg('palette', 14, '#ff9800') +
+              '<input class="' + clId + ' color-range" type="range" id="color|' + clId + '" style="width:70px" min="0" max="100" step="2" value="75" onchange="var hue=((this.value/100)*360).toFixed(0);evm(\'color|' + clId + '\',hsl2Hex(hue,100,50))" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
+              '<span class="' + clId + '" style="font-size:11px;color:var(--faint);min-width:26px">' + (clRep.parsed != null ? clRep.parsed : '?') + '</span></span>';
+          };
+          var isOnOff = (ownLightPart === 'onoff');
+          var isLevel = (ownLightPart === 'level');
+          var isCt = (ownLightPart === 'color_temp');
+          var isColor = (ownLightPart === 'color');
           if (isOnOff) {
             var litOn = [1, '1', true, 'on', 'ON'].indexOf(value.parsed) !== -1;
             html += '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">' + window.getIconSvg('light_bulb', 18, litOn ? '#ffd54f' : '#666') +
@@ -205,25 +280,15 @@
               ' onchange="evm(\'on_off|' + id + '\',this.checked?1:0)"/>' +
               '<label for="lt_' + idw + '"><div class="toggle-switch ' + id + '"><span></span></div></label>' +
               '<span class="' + id + '" style="font-size:11px;color:var(--faint)">' + (value.parsed != null ? value.parsed : '?') + '</span>';
-            // Light puzzle (like the climate row): brightness sibling as a mini
-            // slider on the anchor row, so the lamp is driven from one place.
+            // anchor row carries the sibling sliders, so the lamp is driven
+            // from one place (same commands as widgets.js)
             try {
-              var dmLvKey = null, dmLvRep = null;
-              for (var dmK in device.Report) {
-                if (!device.Report.hasOwnProperty(dmK)) continue;
-                var dmR = device.Report[dmK] || {};
-                var dmRb = String(dmR.role || '').split('&')[0];
-                var dmCls = {};
-                try { var dmTail = String(dmR.role || '').split('&')[1]; if (dmTail) dmCls = JSON.parse(dmTail); } catch (eJ) {}
-                try { if (dmR.class && typeof dmR.class === 'object') { for (var dmCk in dmR.class) if (dmCls[dmCk] === undefined) dmCls[dmCk] = dmR.class[dmCk]; } } catch (eC) {}
-                if (dmRb === 'light_level' || (dmRb === 'light' && dmCls.light_part === 'level')) { dmLvKey = dmK; dmLvRep = dmR; break; }
-              }
-              if (dmLvKey) {
-                var dmLvId = device.IEEE + '#' + dmLvKey;
-                var dmLvPct = Math.round((parseFloat(dmLvRep.parsed) || 0) * 100 / 255);
-                html += '<span style="display:inline-flex;align-items:center;gap:3px;">' + window.getIconSvg('brightness', 14, '#ffd54f') +
-                  '<input class="' + dmLvId + ' level" type="range" id="level|' + dmLvId + '" style="width:70px" min="0" max="100" step="2" value="' + dmLvPct + '" onchange="evm(\'level|' + dmLvId + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
-                  '<span class="' + dmLvId + '" style="font-size:11px;color:var(--faint);min-width:26px">' + dmLvPct + '%</span></span>';
+              if (dmPuzOn) {
+                if (dmPuz.level) html += dmLvlRow(dmPuz.level);
+                if (dmPuz.ct) html += dmCtRow(dmPuz.ct);
+                if (dmPuz.color) html += dmColRow(dmPuz.color);
+              } else if (dmPuz.level) {
+                html += dmLvlRow(dmPuz.level);
               }
             } catch (eLv) {}
             html += '</div>';
@@ -324,16 +389,148 @@
           break;
         }
         case 'climate': {
+          // Thermostat puzzle (as in widgets.js getWidget): units declare
+          // class.climate_part, anchor = local_temp draws the whole card,
+          // other parts draw nothing. Table version is compact (no SVG dial)
+          // but uses the same parts, modes ("name:HEX" pairs, numeric codes)
+          // and commands (climate_mode/climate_temp/fan_speed).
+          var cMCols = { heat: '#ff7043', cool: '#42a5f5', auto: '#ab47bc', fan_only: '#29b6f6', dry: '#ffca28', eco: '#66bb6a', off: '#616161' };
+          var cMIcos = { heat: '🔥', cool: '❄️', auto: '♻️', fan_only: '💨', dry: '💧', eco: '🌱', off: '⏸' };
+          var dmCCls = function (r) {
+            try { var t = String((r && r.role) || '').split('&'); if (t[1]) return JSON.parse(t[1]); } catch (eJ) {}
+            try { if (r && r.class && typeof r.class === 'object') return r.class; } catch (eC) {}
+            return {};
+          };
+          var dmPairs = function (m) {
+            try { if (typeof window.parseModePairs === 'function') return window.parseModePairs(m); } catch (eP) {}
+            var list = Array.isArray(m) ? m.map(function (x) { return (x && typeof x === 'object') ? (x.value || x.name || x.mode || '') : String(x); }) : String(m || '').split(',');
+            var names = [], codeOf = {};
+            list.forEach(function (s) {
+              s = String(s == null ? '' : s).trim();
+              if (!s) return;
+              var nm = s, code = null, ci = s.lastIndexOf(':');
+              if (ci > 0 && ci < s.length - 1) { nm = s.slice(0, ci).trim().toLowerCase(); var hx = s.slice(ci + 1).trim(); if (/^[0-9a-fA-F]+$/.test(hx)) code = parseInt(hx, 16); }
+              else nm = s.toLowerCase();
+              if (!nm) return;
+              names.push(nm); codeOf[nm] = code;
+            });
+            return { names: names, codeOf: codeOf };
+          };
+          var dmSysMap = { 0: 'off', 1: 'auto', 2: 'auto', 3: 'cool', 4: 'heat', 5: 'heat', 6: 'cool', 7: 'fan_only', 8: 'dry', 9: 'auto' };
+          var dmModeVal = function (raw, pairs) {
+            if (raw === undefined || raw === null || raw === '') return 'off';
+            var num = (typeof raw === 'number') ? raw : (/^[0-9]+$/.test(String(raw).trim()) ? parseInt(String(raw).trim(), 10) : null);
+            if (num !== null && isFinite(num)) {
+              var found = null;
+              try { Object.keys(pairs.codeOf || {}).forEach(function (n) { if (pairs.codeOf[n] === num) found = n; }); } catch (eF) {}
+              return found || dmSysMap[num] || String(raw).toLowerCase().trim();
+            }
+            return String(raw).toLowerCase().trim();
+          };
+          var dmModeBtns = function (mId, modes, pairs, cur) {
+            var h = '';
+            modes.forEach(function (m) {
+              var act = (m === cur);
+              var send = ((pairs.codeOf[m] === null || pairs.codeOf[m] === undefined) ? ("'" + m + "'") : pairs.codeOf[m]);
+              var bg = act ? (cMCols[m] || '#888') : 'var(--bg3)';
+              h += '<span onclick="evm(\'climate_mode|' + mId + '\',' + send + ')" style="cursor:pointer;border-radius:8px;padding:1px 4px;font-size:10px;color:#fff;background:' + bg + ';border:1px solid ' + (cMCols[m] || '#888') + '">' + (cMIcos[m] || '') + m + '</span>';
+            });
+            return h;
+          };
+          var dmSetSlider = function (sKey, cool) {
+            var sRep = device.Report[sKey] || {};
+            var sCls = dmCCls(sRep);
+            var sId = device.IEEE + '#' + sKey;
+            var sMin = (sCls.min_temp != null && sCls.min_temp !== '') ? Number(sCls.min_temp) : 5;
+            var sMax = (sCls.max_temp != null && sCls.max_temp !== '') ? Number(sCls.max_temp) : 35;
+            var sStep = (sCls.temp_step != null && sCls.temp_step !== '') ? Number(sCls.temp_step) : 0.5;
+            var sVal = (sRep.parsed !== undefined && sRep.parsed !== null && sRep.parsed !== '') ? sRep.parsed : 20;
+            var col = cool ? '#42a5f5' : '#ff9800';
+            var ico = cool ? '❄️' : '🎯';
+            return '<div style="display:flex;align-items:center;gap:4px;margin-top:2px;"><span style="font-size:10px;color:var(--faint)">' + ico + '</span>' +
+              '<input class="' + sId + ' level" type="range" id="climate_temp|' + sId + '" style="width:70px" min="' + sMin + '" max="' + sMax + '" step="' + sStep + '" value="' + sVal + '" onchange="evm(\'climate_temp|' + sId + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'°\'">' +
+              '<span style="font-size:11px;color:' + col + ';min-width:26px">' + sVal + '°</span></div>';
+          };
+          // puzzle scan
+          var dmCP = { temp: null, heat: null, cool: null, mode: null, fan: null, hum: null, humSet: null };
+          try {
+            for (var dmCk in device.Report) {
+              if (!device.Report.hasOwnProperty(dmCk)) continue;
+              var dmCr = device.Report[dmCk] || {};
+              if (String(dmCr.role || '').split('&')[0] !== 'climate') continue;
+              var dmCpp = dmCCls(dmCr).climate_part || '';
+              if (dmCpp === 'local_temp' && !dmCP.temp) dmCP.temp = dmCk;
+              else if (dmCpp === 'occupied_heating_setpoint' && !dmCP.heat) dmCP.heat = dmCk;
+              else if (dmCpp === 'occupied_cooling_setpoint' && !dmCP.cool) dmCP.cool = dmCk;
+              else if (dmCpp === 'system_mode' && !dmCP.mode) dmCP.mode = dmCk;
+              else if (dmCpp === 'fan_mode' && !dmCP.fan) dmCP.fan = dmCk;
+              else if (dmCpp === 'relative_humidity' && !dmCP.hum) dmCP.hum = dmCk;
+              else if (dmCpp === 'humidity_setpoint' && !dmCP.humSet) dmCP.humSet = dmCk;
+            }
+          } catch (eCP) {}
+          var dmCPOn = !!(dmCP.temp || dmCP.heat || dmCP.cool || dmCP.mode || dmCP.fan || dmCP.hum || dmCP.humSet);
+          var ownCPart = (attr && attr.climate_part) || '';
+          if (dmCPOn) {
+            // humidity parts keep their own rows even without anchor
+            if ((ownCPart === 'relative_humidity' || ownCPart === 'humidity_setpoint') && !dmCP.temp) {
+              if (ownCPart === 'relative_humidity') {
+                var huV = (value.parsed !== undefined && value.parsed !== null && value.parsed !== '') ? value.parsed : '—';
+                html += '<div style="display:flex;align-items:center;gap:4px;">💧<span class="' + id + '" style="font-size:11px;color:#29b6f6;">' + huV + '</span><span style="font-size:10px;color:var(--faint)">%</span></div>';
+              } else {
+                var hsC = dmCCls(value);
+                var hsMn = (hsC.min_humidity != null && hsC.min_humidity !== '') ? Number(hsC.min_humidity) : 0;
+                var hsMx = (hsC.max_humidity != null && hsC.max_humidity !== '') ? Number(hsC.max_humidity) : 100;
+                var hsSt = (hsC.humidity_step != null && hsC.humidity_step !== '') ? Number(hsC.humidity_step) : 1;
+                var hsV = (value.parsed !== undefined && value.parsed !== null && value.parsed !== '') ? value.parsed : hsMn;
+                html += '<div style="display:flex;align-items:center;gap:4px;">💧🎯' +
+                  '<input class="' + id + ' level" type="range" id="number|' + id + '" style="width:70px" min="' + hsMn + '" max="' + hsMx + '" step="' + hsSt + '" value="' + hsV + '" onchange="evm(\'number|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
+                  '<span class="' + id + '" style="font-size:11px;color:#29b6f6;min-width:26px">' + hsV + '%</span></div>';
+              }
+              break;
+            }
+            if (ownCPart !== 'local_temp') { html += ''; break; }
+            // anchor: full thermostat card (compact table version)
+            var pT = device.Report[dmCP.temp] || {};
+            var pCur = (pT.parsed !== undefined && pT.parsed !== null && pT.parsed !== '') ? pT.parsed : '—';
+            var pM = dmCP.mode ? device.Report[dmCP.mode] : null;
+            var pMP = dmPairs(pM ? dmCCls(pM).modes : (attr && attr.modes));
+            var pModes = pMP.names.length ? pMP.names : ['off', 'auto', 'heat', 'cool', 'dry', 'fan_only', 'eco'];
+            if (pModes.indexOf('off') === -1) pModes.unshift('off');
+            var pMVal = pM ? dmModeVal(pM.parsed, pMP) : 'off';
+            var pMId = dmCP.mode ? (device.IEEE + '#' + dmCP.mode) : id;
+            var pMCol = cMCols[pMVal] || '#888';
+            html += '<div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap;">' + window.getIconSvg('climate', 18, pMCol) +
+              '<span class="' + id + '" style="color:' + pMCol + ';font-size:13px;font-weight:bold">' + pCur + '°</span>';
+            if (pM) html += dmModeBtns(pMId, pModes, pMP, pMVal);
+            html += '</div>';
+            if (dmCP.heat) html += dmSetSlider(dmCP.heat, false);
+            if (dmCP.cool) html += dmSetSlider(dmCP.cool, true);
+            if (dmCP.fan) {
+              var pF = device.Report[dmCP.fan] || {};
+              var pFC = dmCCls(pF);
+              var pFR = pFC.preset_modes;
+              var pFP = Array.isArray(pFR) ? pFR.map(function (x) { return String(x).toLowerCase().trim(); }) : String(pFR || '').split(',').map(function (s) { return s.toLowerCase().trim(); });
+              pFP = pFP.filter(function (s) { return !!s; });
+              if (!pFP.length) pFP = ['auto', 'low', 'medium', 'high'];
+              var pFId = device.IEEE + '#' + dmCP.fan;
+              var pFCur = String((pF && pF.parsed !== undefined && pF.parsed !== null) ? pF.parsed : '').toLowerCase().trim();
+              var pFFM = { 0: 'off', 1: 'low', 2: 'medium', 3: 'high', 4: 'on', 5: 'auto', 6: 'smart' };
+              if (/^[0-9]+$/.test(pFCur) && pFFM[parseInt(pFCur, 10)]) pFCur = pFFM[parseInt(pFCur, 10)];
+              html += '<div style="display:flex;align-items:center;gap:2px;flex-wrap:wrap;margin-top:2px;">💨';
+              pFP.forEach(function (fp) {
+                var fa = (fp === pFCur);
+                html += '<span onclick="evm(\'fan_speed|' + pFId + '\',\'' + fp + '\')" style="cursor:pointer;border-radius:8px;padding:1px 4px;font-size:10px;color:#fff;background:' + (fa ? '#29b6f6' : 'var(--bg3)') + ';border:1px solid #29b6f6">' + fp + '</span>';
+              });
+              html += '</div>';
+            }
+            break;
+          }
+          // legacy (no climate_part): header + modes + setpoint, as before,
+          // but modes as pairs with numeric codes and off ensured for 001C
           var cTemp = value.parsed || '—';
           var cSet = (attr && attr.target_temp != null) ? attr.target_temp : (value.set_temp || (value.temperature || '—'));
-          var cMode = (attr && attr.hvac_mode) ? attr.hvac_mode : (value.mode || 'off');
-          var cModes = ['off', 'heat', 'cool', 'auto'];
-          var normM = function(x){ return (x && typeof x === 'object') ? (x.value || x.name || x.mode || '') : String(x); };
-          if (attr && attr.modes) {
-            var am = Array.isArray(attr.modes) ? attr.modes.map(normM) : String(attr.modes).split(',');
-            am = am.map(function(s){ return String(s).trim(); }).filter(function(s){ return !!s; });
-            if (am.length) cModes = am;
-          }
+          var cPairs = dmPairs(attr && attr.modes);
+          var cModes = cPairs.names.length ? cPairs.names.slice() : ['off', 'heat', 'cool', 'auto'];
           try {
             var dmYa = value && value.ya_rep;
             if (typeof dmYa === 'string') { try { dmYa = JSON.parse(dmYa); } catch (e0) { dmYa = null; } }
@@ -341,8 +538,8 @@
             for (var cmi = 0; cmi < dmCaps.length; cmi++) {
               var dmCp = dmCaps[cmi] && dmCaps[cmi].parameters;
               if (dmCp && dmCp.modes) {
-                var ym2 = (Array.isArray(dmCp.modes) ? dmCp.modes.map(normM) : String(dmCp.modes).split(',')).map(function(s){ return String(s).trim(); }).filter(function(s){ return !!s; });
-                if (ym2.length) { cModes = ym2; break; }
+                var ym = dmPairs(dmCp.modes);
+                if (ym.names.length) { cModes = ym.names; cPairs = ym; break; }
               }
             }
           } catch (e2) {}
@@ -353,25 +550,79 @@
                 if (/^01\d{4}001C$/.test(dmk)) { dmSys = true; break; }
               }
             }
-            if (dmSys && cModes.indexOf('off') === -1) cModes.unshift('off');
+            if (dmSys && cModes.indexOf('off') === -1) { cModes.unshift('off'); }
           } catch (e3) {}
-          var cMinT = (attr && attr.min_temp) ? Number(attr.min_temp) : 5;
-          var cMaxT = (attr && attr.max_temp) ? Number(attr.max_temp) : 35;
-          var cTStep = (attr && attr.temp_step) ? Number(attr.temp_step) : 0.5;
-          var cMCols = { heat: '#ff7043', cool: '#42a5f5', auto: '#ab47bc', fan_only: '#29b6f6', dry: '#ffca28', off: '#616161' };
-          var cMIcos = { heat: '🔥', cool: '❄️', auto: '♻️', fan_only: '💨', dry: '💧', off: '⏸' };
+          var cMode = dmModeVal((attr && attr.hvac_mode) || value.mode || 'off', cPairs);
           var cMCol = cMCols[cMode] || '#888';
           html += '<div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap;">' + window.getIconSvg('climate', 18, cMCol) +
             '<span class="' + id + '" style="color:' + cMCol + ';font-size:13px;font-weight:bold">' + cTemp + '°</span>';
-          cModes.forEach(function (m) {
-            var bg = (m === cMode) ? (cMCols[m] || '#888') : 'var(--bg3)';
-            html += '<span onclick="evm(\'climate_mode|' + id + '\',\'' + m + '\')" style="cursor:pointer;border-radius:8px;padding:1px 4px;font-size:10px;color:#fff;background:' + bg + ';border:1px solid ' + (cMCols[m] || '#888') + '">' + (cMIcos[m] || '') + m + '</span>';
-          });
+          html += dmModeBtns(id, cModes, cPairs, cMode);
           html += '</div><div style="display:flex;align-items:center;gap:4px;margin-top:2px;">' +
             '<span style="font-size:10px;color:var(--faint)">🎯</span>';
+          var cMinT = (attr && attr.min_temp) ? Number(attr.min_temp) : 5;
+          var cMaxT = (attr && attr.max_temp) ? Number(attr.max_temp) : 35;
+          var cTStep = (attr && attr.temp_step) ? Number(attr.temp_step) : 0.5;
           var cSetVal = (cSet !== '—') ? cSet : 20;
           html += '<input class="' + id + ' level" type="range" id="climate_temp|' + id + '" style="width:70px" min="' + cMinT + '" max="' + cMaxT + '" step="' + cTStep + '" value="' + cSetVal + '" onchange="evm(\'climate_temp|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'°\'">' +
             '<span style="font-size:11px;color:#ff9800;min-width:26px">' + cSetVal + '°</span></div>';
+          break;
+        }
+        case 'climate_temp': {
+          // standalone setpoint entity (0x0012 heat / 0x0011 cool) — own slider
+          var stCool = /0011$/.test(key);
+          var stC = {};
+          try { var stT = String((value && value.role) || '').split('&'); if (stT[1]) stC = JSON.parse(stT[1]); } catch (eST) {}
+          try { if (value && value.class && typeof value.class === 'object') { for (var stK in value.class) if (stC[stK] === undefined) stC[stK] = value.class[stK]; } } catch (eSC) {}
+          var stMin = (stC.min_temp != null && stC.min_temp !== '') ? Number(stC.min_temp) : 5;
+          var stMax = (stC.max_temp != null && stC.max_temp !== '') ? Number(stC.max_temp) : 35;
+          var stStep = (stC.temp_step != null && stC.temp_step !== '') ? Number(stC.temp_step) : 0.5;
+          var stVal = (value.parsed !== undefined && value.parsed !== null && value.parsed !== '') ? value.parsed : 20;
+          html += '<div style="display:flex;align-items:center;gap:4px;">' + (stCool ? '❄️' : '🎯') +
+            '<input class="' + id + ' level" type="range" id="climate_temp|' + id + '" style="width:80px" min="' + stMin + '" max="' + stMax + '" step="' + stStep + '" value="' + stVal + '" onchange="evm(\'climate_temp|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'°\'">' +
+            '<span class="' + id + '" style="font-size:11px;color:' + (stCool ? '#42a5f5' : '#ff9800') + ';min-width:26px">' + stVal + '°</span></div>';
+          break;
+        }
+        case 'climate_mode': {
+          // standalone SystemMode entity (0x001C) — mode buttons with codes
+          var cmC = {};
+          try { var cmT = String((value && value.role) || '').split('&'); if (cmT[1]) cmC = JSON.parse(cmT[1]); } catch (eMT) {}
+          try { if (value && value.class && typeof value.class === 'object') { for (var cmK in value.class) if (cmC[cmK] === undefined) cmC[cmK] = value.class[cmK]; } } catch (eMC) {}
+          var cmP = (function (m) {
+            try { if (typeof window.parseModePairs === 'function') return window.parseModePairs(m); } catch (eP) {}
+            var list = Array.isArray(m) ? m : String(m || '').split(',');
+            var names = [], codeOf = {};
+            list.forEach(function (s) {
+              s = String(s == null ? '' : s).trim();
+              if (!s) return;
+              var nm = s, code = null, ci = s.lastIndexOf(':');
+              if (ci > 0 && ci < s.length - 1) { nm = s.slice(0, ci).trim().toLowerCase(); var hx = s.slice(ci + 1).trim(); if (/^[0-9a-fA-F]+$/.test(hx)) code = parseInt(hx, 16); }
+              else nm = s.toLowerCase();
+              if (!nm) return;
+              names.push(nm); codeOf[nm] = code;
+            });
+            return { names: names, codeOf: codeOf };
+          })(cmC.modes);
+          var cmModes = cmP.names.length ? cmP.names : ['off', 'auto', 'heat', 'cool', 'dry', 'fan_only', 'eco'];
+          var cmRaw = value.parsed;
+          var cmNum = /^[0-9]+$/.test(String(cmRaw)) ? parseInt(String(cmRaw), 10) : null;
+          var cmVal = 'off';
+          if (cmNum !== null) {
+            var cmF = null;
+            Object.keys(cmP.codeOf).forEach(function (n) { if (cmP.codeOf[n] === cmNum) cmF = n; });
+            var cmMap = { 0: 'off', 1: 'auto', 2: 'auto', 3: 'cool', 4: 'heat', 5: 'heat', 6: 'cool', 7: 'fan_only', 8: 'dry', 9: 'auto' };
+            cmVal = cmF || cmMap[cmNum] || String(cmRaw);
+          } else cmVal = String(cmRaw || 'off');
+          cmVal = String(cmVal).toLowerCase().trim();
+          var cmCol = { heat: '#ff7043', cool: '#42a5f5', auto: '#ab47bc', fan_only: '#29b6f6', dry: '#ffca28', eco: '#66bb6a', off: '#616161' }[cmVal] || '#888';
+          html += '<div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap;">' + window.getIconSvg('climate', 16, cmCol) +
+            '<span class="' + id + '" style="color:' + cmCol + ';font-size:11px;font-weight:bold">' + cmVal + '</span>';
+          cmModes.forEach(function (m) {
+            var act = (m === cmVal);
+            var send = ((cmP.codeOf[m] === null || cmP.codeOf[m] === undefined) ? ("'" + m + "'") : cmP.codeOf[m]);
+            var bg = act ? ({ heat: '#ff7043', cool: '#42a5f5', auto: '#ab47bc', fan_only: '#29b6f6', dry: '#ffca28', eco: '#66bb6a', off: '#616161' }[m] || '#888') : 'var(--bg3)';
+            html += '<span onclick="evm(\'climate_mode|' + id + '\',' + send + ')" style="cursor:pointer;border-radius:8px;padding:1px 4px;font-size:10px;color:#fff;background:' + bg + ';border:1px solid ' + (bg === 'var(--bg3)' ? '#888' : bg) + '">' + m + '</span>';
+          });
+          html += '</div>';
           break;
         }
         case 'lock': {
@@ -858,7 +1109,10 @@ dm.setBleTpl = function (dev, adr, name) {
     // single window: a repeated open may not trigger setup — poke the preselect directly
     setTimeout(function () { try { if (window.grpAddToUI) grpAddToUI(ieee); } catch (e) {} }, 350);
   };
-  // No template for the model — generation button via the template server (stage 1).
+  // No template for the model — offer to open the device editor.
+  // The template server request now lives in the editor (templateedit):
+  // ModelId/ManufName travel via window.tePendingGen, generation result
+  // events (genTemplateResult/genTemplateCandidates) are handled there.
   dm.onJoinNoTemplate = function (d) {
     try {
       var box = document.getElementById('joinstatus');
@@ -867,77 +1121,20 @@ dm.setBleTpl = function (dev, adr, name) {
       row.style.margin = '6px 0';
       var b = document.createElement('button');
       b.className = 'dm-btn';
-      b.textContent = '📦 Сгенерировать шаблон (' + (d.model || '?') + ')';
-      b.title = 'Запросить шаблон на сервере шаблонов';
-      b.onclick = function () { dm.genTemplate(d.ieee); };
+      b.textContent = '📝 Открыть в редакторе (' + (d.model || '?') + ')';
+      b.title = 'Шаблон не найден — открыть устройство в редакторе и запросить с сервера там';
+      b.onclick = function () { dm.openEditorForTemplate(d.ieee, d.model, d.manuf); };
       row.appendChild(b);
       box.appendChild(row);
       box.scrollIntoView({ behavior: 'smooth', block: 'end' });
     } catch (e) {}
   };
-  dm.genTemplate = function (ieee) {
-    WSsend('genTemplate|' + ieee);
-  };
-  dm.genTemplate2 = function (ieee, model, vendor) {
-    WSsend('genTemplate|' + ieee + '|' + model + '|' + vendor);
-  };
-  // Full JSON from the server: pour IEEE/address from the interview, save
-  // to Devices/IEEE (unverified is cleaned via Clean, lands in Devtemplates
-  // only via the explicit Tpl button) and show the go-to button.
-  // On the button: join finishes, the modal closes, the editor opens.
-  dm.onGenTemplateResult = function (d) {
-    try {
-      var obj = d.json || {};
-      var cur = (window.deviceList || []).find(function (x) { return x.IEEE === d.ieee; });
-      obj.IEEE = d.ieee;
-      if (cur) {
-        if (cur.Device) obj.Device = cur.Device;
-        if (cur.Name) obj.Name = cur.Name;
-        if (cur.Location) obj.Location = cur.Location;
-        if (cur.DevType) obj.DevType = cur.DevType;
-        // EP — только из интервью: серверный профиль может не совпадать
-        // с реальным железом, а по EP идут Bind/репорты/настройки из записей.
-        if (cur.EP && Object.keys(cur.EP).length) obj.EP = cur.EP;
-      }
-      WSsend('SaveJson|/Devices/' + d.ieee + '|' + JSON.stringify(obj));
-      eventE.once('updateDeviceList', function () {
-        try {
-          var box = document.getElementById('joinstatus');
-          if (!box) {
-            if (window.WinEngine) WinEngine.open('templateedit', { params: '1#' + d.ieee });
-            return;
-          }
-          var row = document.createElement('div');
-          row.style.margin = '6px 0';
-          var b = document.createElement('button');
-          b.className = 'dm-btn';
-          b.textContent = '📝 Открыть в редакторе';
-          b.onclick = function () {
-            try { dm.closeModal('join'); } catch (e) {}
-            if (window.WinEngine) WinEngine.open('templateedit', { params: '1#' + d.ieee });
-          };
-          row.appendChild(b);
-          box.appendChild(row);
-          box.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        } catch (e) {}
-      });
-    } catch (e) {}
-  };
-  // Several candidates — selection buttons into the join window.
-  dm.onGenTemplateCandidates = function (d) {
-    try {
-      var box = document.getElementById('joinstatus');
-      if (!box) return;
-      (d.candidates || []).forEach(function (c) {
-        var b = document.createElement('button');
-        b.className = 'dm-btn';
-        b.style.margin = '2px 4px 2px 0';
-        b.textContent = (c.vendor || '') + ' — ' + (c.model || '');
-        b.onclick = function () { dm.genTemplate2(d.ieee, c.model, c.vendor); };
-        box.appendChild(b);
-      });
-      box.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    } catch (e) {}
+  dm.openEditorForTemplate = function (ieee, model, manuf) {
+    // Только данные для панели редактора. Никакого автозапроса:
+    // genTemplate уходит лишь по явной кнопке «Запросить» в редакторе.
+    try { window.tePendingGen = { ieee: ieee, model: model || '', manuf: manuf || '' }; } catch (e) {}
+    try { dm.closeModal('join'); } catch (e) {}
+    if (window.WinEngine) WinEngine.open('templateedit', { params: '1#' + ieee });
   };
   // ── Bind ──
   // ponytail: coordinator (ZC) first, no duplicates
@@ -1132,8 +1329,6 @@ dm.setBleTpl = function (dev, adr, name) {
       st.agoTimer = setInterval(function () { if (!st.editing) renderTable(); }, 5000);
       if (window.eventE) eventE.on('bindStatus', dm.onBindStatus);
       if (window.eventE) eventE.on('joinNoTemplate', dm.onJoinNoTemplate);
-      if (window.eventE) eventE.on('genTemplateResult', dm.onGenTemplateResult);
-      if (window.eventE) eventE.on('genTemplateCandidates', dm.onGenTemplateCandidates);
       if (window.websocket && websocket.readyState === 1) window.WSsend('getDeviceList');
       renderTable();
       node.addEventListener('click', function (e) {
@@ -1159,8 +1354,6 @@ dm.setBleTpl = function (dev, adr, name) {
       eventE.off('ArBle', dm.ble);
       eventE.off('bindStatus', dm.onBindStatus);
       eventE.off('joinNoTemplate', dm.onJoinNoTemplate);
-      eventE.off('genTemplateResult', dm.onGenTemplateResult);
-      eventE.off('genTemplateCandidates', dm.onGenTemplateCandidates);
       stopAddTimer();
       stopSecTimer();
       st.editing = null;

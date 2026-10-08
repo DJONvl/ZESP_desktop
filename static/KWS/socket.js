@@ -227,6 +227,15 @@ function parseSocket(msg) {
 				eventE.emit('genTemplateCandidates', { ieee: z[1] || '', candidates: cands });
 			} catch (e) { console.warn('genTemplateCandidates', e); }
 		}
+		// Generation progress for the device editor panel (join window may be closed).
+		// teGenLog|IEEE|base64(html)
+		if (z[0] === "teGenLog") {
+			try {
+				var traw = atob(z.slice(2).join('|'));
+				var thtml = decodeURIComponent(escape(traw));
+				eventE.emit('teGenLog', { ieee: z[1] || '', html: thtml });
+			} catch (e) { console.warn('teGenLog', e); }
+		}
 		//var htmlj=$('#joinstatus').append(z[1]);
 		if (z[0] === "removedDevice") {
 			new Toast({
