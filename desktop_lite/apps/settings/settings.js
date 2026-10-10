@@ -239,8 +239,34 @@
   function regYa(node) {
     var get = function (k) { var el = node.querySelector('[data-cfg="Ya.' + k + '"]'); return el ? el.value : ''; };
     var ok = get('ya_Enable') === '1' && get('ac_id') !== '' && get('ac_login') !== '' && get('ac_pass') !== '';
-    if (ok) { if (window.WSsend) window.WSsend('regYandex'); }
-    else alert(L.t ? L.t('settings', 'ya.err_reg') : 'активируйте ya_Enable 1, заполните ac_id/ac_login/ac_pass и сохраните');
+    if (!ok) { alert(L.t ? L.t('settings', 'ya.err_reg') : 'активируйте ya_Enable 1, заполните ac_id/ac_login/ac_pass и сохраните'); return; }
+    if (window._yaHubState && window._yaHubState !== 'online') {
+      alert('Хаб Ya переподключается (' + window._yaHubState + '), подождите online и повторите');
+      return;
+    }
+    if (window.WSsend) window.WSsend('regYandex');
+  }
+
+  function applyYaState(node, state) {
+    window._yaHubState = state;
+    var btn = node.querySelector('[data-action="yaRegister"]');
+    if (btn) {
+      btn.disabled = (state !== 'online');
+      btn.style.opacity = (state === 'online') ? '' : '0.5';
+      btn.title = (state === 'online') ? '' : ('хаб: ' + state);
+    }
+    var pane = node.querySelector('[data-pane="Ya"]');
+    if (pane) {
+      var hint = pane.querySelector('[data-ya-state]');
+      if (!hint) {
+        hint = document.createElement('div');
+        hint.setAttribute('data-ya-state', '1');
+        hint.style.cssText = 'font-size:12px;opacity:.8;margin-bottom:8px';
+        pane.insertBefore(hint, pane.firstChild);
+      }
+      var label = state === 'online' ? '● хаб подключён' : (state === 'connecting' ? '… подключение...' : '○ хаб офлайн');
+      hint.textContent = 'Ya: ' + label;
+    }
   }
 
   // ---------------- register ----------------
@@ -269,8 +295,18 @@
 
       // socket.js сам шлёт loadConfig в onOpen; подписка постоянная — любой повторный
       // loadConfig/переподключение обновляет окно. Именованная функция — чтобы снять в destroy.
-      node._state.onCfg = function (data) { render(node, data); };
+      node._state.onCfg = function (data) { render(node, data); applyYaState(node, window._yaHubState || 'offline'); };
       if (window.eventE) window.eventE.on('jsconfig', node._state.onCfg);
+      node._state.onYaState = function (state) { applyYaState(node, state); };
+      if (window.eventE) window.eventE.on('yaState', node._state.onYaState);
+      applyYaState(node, window._yaHubState || 'offline');
+      if (typeof window.WSsend === 'function' && window.websocket && window.websocket.readyState === 1) {
+        window.WSsend('yaStateGet');
+      } else if (window.eventE) {
+        // сокет ещё не открыт — запросим состояние при первом wsopen
+        node._state.onWsOpen = function () { if (window.WSsend) window.WSsend('yaStateGet'); };
+        window.eventE.on('wsopen', node._state.onWsOpen);
+      }
       if (typeof window.WSsend === 'function' && window.websocket && window.websocket.readyState === 1) {
         window.WSsend('loadConfig');
       }
@@ -383,6 +419,8 @@
       if (window.eventE) {
         if (st && st.onCfg) window.eventE.off('jsconfig', st.onCfg);
         if (st && st.onYa) window.eventE.off('yaLogin', st.onYa);
+        if (st && st.onYaState) window.eventE.off('yaState', st.onYaState);
+        if (st && st.onWsOpen) window.eventE.off('wsopen', st.onWsOpen);
       }
       if (st && st.onDoc) document.removeEventListener('pointerdown', st.onDoc);
       var bd = node.querySelector('.ya-backdrop');

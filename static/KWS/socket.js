@@ -247,14 +247,20 @@ function parseSocket(msg) {
 			});
 		}
 		if (z[0] === "regYandex") {
-			//regYandex|mak|regYandex|ok|user_updated
+			// Хаб шлёт regYandex|ok|user_created (3 части), старый формат
+			// regYandex|mak|regYandex|ok|user_updated (5 частей) — показываем хвост.
+			var txt = z.length >= 5 ? z[4] : z.slice(1).join("|");
 			new Toast({
 				title: 'Yandex',
-				text: z[4] ,
+				text: txt || 'ok',
 				theme: 'light',
 				autohide: true,
 				interval: 3500
 			});
+			try { eventE.emit('yaReg', txt); } catch (e) {}
+		}
+		if (z[0] === "yaState") {
+			try { eventE.emit('yaState', z[1] || ''); } catch (e) {}
 		}
 
 		if (z[0] === "status") {
