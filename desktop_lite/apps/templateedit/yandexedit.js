@@ -31,9 +31,6 @@ te_yre_refreshPreview = function() {
 te_yre_tabMode = 'human';
 te_yre_tab = function(mode) {
   te_yre_tabMode = mode;
-  var styles = {
-    human: 'human', json: 'json', full: 'full'
-  };
   ['human', 'json', 'full'].forEach(function (m) {
     var b = document.getElementById('te_yre_tab_' + m);
     if (b) b.style.cssText += ';background:' + (m === mode ? 'var(--accent);color:#fff;border-color:var(--accent)' : 'var(--bg3);color:var(--text);border-color:var(--border2)');
@@ -47,9 +44,10 @@ te_yre_tab = function(mode) {
 
 // ─── Режимы из устройства: class.modes канала ("off,heat" или пары "name:HEX") ───
 // Возвращает список имён в нижнем регистре или null, если в устройстве их нет.
-te_yre_devModes = function() {
+te_yre_devModes = function(objKey) {
   try {
-    var ro = window.te_file && window.te_file.Report && window.te_file.Report[te_currentYaObj];
+    var ck = objKey || te_currentYaObj;
+    var ro = window.te_file && window.te_file.Report && window.te_file.Report[ck];
     if (!ro) return null;
     var m = (ro.class && ro.class.modes != null) ? ro.class.modes : null;
     if (m == null) {
@@ -92,9 +90,10 @@ te_yre_tplModes = function(instance) {
 };
 
 // ─── class канала (объект class или зашит в role&{...}) ───
-te_yre_chanClass = function() {
+te_yre_chanClass = function(objKey) {
   try {
-    var ro = window.te_file && window.te_file.Report && window.te_file.Report[te_currentYaObj];
+    var ck = objKey || te_currentYaObj;
+    var ro = window.te_file && window.te_file.Report && window.te_file.Report[ck];
     if (!ro) return {};
     if (ro.class && typeof ro.class === 'object') return ro.class;
     var role = String(ro.role || ''), ai = role.indexOf('&');
@@ -104,9 +103,9 @@ te_yre_chanClass = function() {
 };
 
 // ─── Диапазон из устройства: min_temp/max_temp/temp_step или min/max/step ───
-te_yre_devRange = function() {
+te_yre_devRange = function(objKey) {
   try {
-    var cls = te_yre_chanClass();
+    var cls = te_yre_chanClass(objKey);
     var num = function (v) {
       if (v == null || v === '') return null;
       var f = parseFloat(String(v).replace(',', '.'));
@@ -339,6 +338,24 @@ te_yre_validate = function(dev) {
     if (!((m.caps && m.caps.length) || (m.props && m.props.length)))
       push('err', m.key + ': multi-устройство без умений и свойств Яндекс отвергнет');
   });
+  // Дублей умений/свойств (type+instance) Яндекс не принимает —
+  // отклоняет устройство целиком (см. лог провайдера: duplicated capability found).
+  var seenC = {};
+  dev.caps.forEach(function (e) {
+    var c = e.cap || {};
+    var inst = (c.parameters && c.parameters.instance) || ((c.state && c.state.instance) || '');
+    var k = String(c.type) + ':' + String(inst);
+    if (seenC[k]) push('err', e.key + ': дубль ' + te_yre_shortType(c.type) + (inst ? ':' + inst : '') + ' — вынеси канал в multi_id или скрой (none)');
+    else seenC[k] = true;
+  });
+  var seenP = {};
+  dev.props.forEach(function (e) {
+    var c = e.prop || {};
+    var inst = (c.parameters && c.parameters.instance) || ((c.state && c.state.instance) || '');
+    var k = String(c.type) + ':' + String(inst);
+    if (seenP[k]) push('err', e.key + ': дубль свойства ' + te_yre_shortType(c.type) + (inst ? ':' + inst : '') + ' — вынеси канал в multi_id или скрой (none)');
+    else seenP[k] = true;
+  });
   return out;
 };
 
@@ -480,6 +497,7 @@ te_yre_refreshDevice = function() {
   s += '<div style="max-height:120px;overflow-y:auto;margin-bottom:6px">';
   dev.chans.forEach(function (ch) {
     var mark = '?', desc = '';
+    var isCur = (ch.key === te_currentYaObj);
     if (ch.kind === 'none') { mark = '🚫'; desc = 'скрыт'; }
     else if (ch.kind === 'empty') { mark = '🤖'; desc = 'авто по role'; }
     else if (ch.kind === 'bad') { mark = '❌'; desc = 'битый JSON'; }
@@ -496,34 +514,15 @@ te_yre_refreshDevice = function() {
       });
       mark = ch.caps.length ? '⚡' : '📊';
       desc = (ch.label ? ch.label + ' — ' : '') + (names.join(', ') || 'пусто');
-      if (k_isCur(ch.key)) desc = '<b>' + desc + ' ✏️ редактируется</b>';
+      if (isCur) desc = '<b>' + desc + ' ✏️ редактируется</b>';
     }
-    function k_isCur(k) { return k === te_currentYaObj; }
     s += '<div style="font-size:11px;padding:2px 0;border-bottom:1px solid var(--border)">' + mark + ' <span style="font-family:monospace">' +
       ch.key + '</span> — ' + desc + '</div>';
   });
   s += '</div>';
   if (dev.multis.length) {
     s += '<div style="margin-bottom:4px"><b>🔀 Отдельных устройств: ' + dev.multis.length + '</b></div>';
-  // Дублей умений/свойств (type+instance) Яндекс не принимает —
-  // отклоняет устройство целиком (см. лог провайдера: duplicated capability found).
-  var seenC = {};
-  dev.caps.forEach(function (e) {
-    var c = e.cap || {};
-    var inst = (c.parameters && c.parameters.instance) || ((c.state && c.state.instance) || '');
-    var k = String(c.type) + ':' + String(inst);
-    if (seenC[k]) push('err', e.key + ': дубль ' + te_yre_shortType(c.type) + (inst ? ':' + inst : '') + ' — вынеси канал в multi_id или скрой (none)');
-    else seenC[k] = true;
-  });
-  var seenP = {};
-  dev.props.forEach(function (e) {
-    var c = e.prop || {};
-    var inst = (c.parameters && c.parameters.instance) || ((c.state && c.state.instance) || '');
-    var k = String(c.type) + ':' + String(inst);
-    if (seenP[k]) push('err', e.key + ': дубль свойства ' + te_yre_shortType(c.type) + (inst ? ':' + inst : '') + ' — вынеси канал в multi_id или скрой (none)');
-    else seenP[k] = true;
-  });
-  dev.multis.forEach(function (m) {
+    dev.multis.forEach(function (m) {
       s += '<div style="font-size:11px;padding:3px 6px;margin-bottom:3px;background:var(--bg3);border-radius:4px">🔀 <b>' +
         (m.multi.name || '?') + '</b> · ' + (m.multi.room || '?') + ' · ' + (m.multi.type || '?') +
         '<br><span style="color:var(--faint)">id: ' + dev.id + '^' + m.key + '</span></div>';
@@ -627,56 +626,56 @@ te_yre_selectTpl = function(cat, i) {
   te_yre_renderList();
 };
 
+// ─── Сборка объекта шаблона из te_YA_JSON (общее для модалки и вкладки) ───
+// j == null → целый tpl без arparameter; иначе вариант arparameter[j].
+// objKey — канал для подхвата режимов/диапазонов из устройства (по умолчанию te_currentYaObj).
+te_yre_buildTpl = function(cat, i, j, objKey) {
+  var entry = te_YA_JSON[cat][i];
+  var tpl = JSON.parse(JSON.stringify(entry[Object.keys(entry)[0]].tpl));
+  if (j !== undefined && j !== null) {
+    var arp = tpl.arparameter[j];
+    if (tpl.type === 'devices.capabilities.range') {
+      tpl.parameters = { instance: arp.instance, random_access: arp.random_access || true };
+      if (arp.range)  tpl.parameters.range = arp.range;
+      if (arp.unit)   tpl.parameters.unit  = arp.unit;
+      var devR = te_yre_devRange(objKey);
+      if (devR) tpl.parameters.range = devR;
+      var stVal = (tpl.parameters.range && tpl.parameters.range.min != null) ? tpl.parameters.range.min : 0;
+      try {
+        var pro2 = window.te_file && window.te_file.Report && window.te_file.Report[objKey || te_currentYaObj];
+        var pf2 = pro2 ? parseFloat(String(pro2.parsed).replace(',', '.')) : NaN;
+        if (isFinite(pf2)) {
+          var rg2 = tpl.parameters.range || {};
+          if ((rg2.min == null || pf2 >= rg2.min) && (rg2.max == null || pf2 <= rg2.max)) stVal = pf2;
+        }
+      } catch (e) {}
+      tpl.state = { instance: arp.instance, value: stVal };
+    } else if (tpl.type === 'devices.capabilities.mode') {
+      var devModes = te_yre_devModes(objKey);
+      var srcModes = arp.modes || [];
+      var useModes = srcModes;
+      if (devModes && devModes.length) {
+        var filtered = srcModes.filter(function (mm) {
+          var vv = String((mm && mm.value != null) ? mm.value : mm).toLowerCase();
+          return devModes.indexOf(vv) !== -1;
+        });
+        if (filtered.length) useModes = filtered;
+      }
+      tpl.parameters = { instance: arp.instance, modes: useModes };
+      tpl.state = { instance: arp.instance, value: (useModes && useModes[0]) ? useModes[0].value : '' };
+    } else if (tpl.type === 'devices.capabilities.toggle') {
+      tpl.parameters = { instance: arp.instance };
+      tpl.state = { instance: arp.instance, value: false };
+    }
+    delete tpl.arparameter;
+  }
+  return cat === 'capability' ? { capabilities: [tpl] } : { properties: [tpl] };
+};
+
 // Apply the selected arparameter
 te_yre_selectTpl_arp = function(cat, i, j) {
-  const Ya  = te_YA_JSON;
-  const key = Object.keys(Ya[cat][i])[0];
-  const tpl = JSON.parse(JSON.stringify(Ya[cat][i][key].tpl));
-  const arp = tpl.arparameter[j];
+  var tt = te_yre_buildTpl(cat, i, j);
 
-  // Assemble the resulting parameter
-  if (tpl.type === 'devices.capabilities.range') {
-    tpl.parameters = { instance: arp.instance, random_access: arp.random_access || true };
-    if (arp.range)  tpl.parameters.range = arp.range;
-    if (arp.unit)   tpl.parameters.unit  = arp.unit;
-    // Диапазон из устройства (class канала: min_temp/max_temp/temp_step
-    // или min/max/step) важнее шаблонного.
-    var devR = te_yre_devRange();
-    if (devR) tpl.parameters.range = devR;
-    var stVal = (tpl.parameters.range && tpl.parameters.range.min != null) ? tpl.parameters.range.min : 0;
-    // Начальное — текущий parsed, если попадает в диапазон.
-    try {
-      var pro2 = window.te_file && window.te_file.Report && window.te_file.Report[te_currentYaObj];
-      var pf2 = pro2 ? parseFloat(String(pro2.parsed).replace(',', '.')) : NaN;
-      if (isFinite(pf2)) {
-        var rg2 = tpl.parameters.range || {};
-        if ((rg2.min == null || pf2 >= rg2.min) && (rg2.max == null || pf2 <= rg2.max)) stVal = pf2;
-      }
-    } catch (e) {}
-    tpl.state = { instance: arp.instance, value: stVal };
-  } else if (tpl.type === 'devices.capabilities.mode') {
-    // Режимы из устройства (class.modes канала, пары "name[:HEX]") имеют
-    // приоритет: оставляем из шаблона только те, что знает железо.
-    // Пустой фильтр (ничего не совпало) = оставляем шаблон как есть.
-    var devModes = te_yre_devModes();
-    var srcModes = arp.modes || [];
-    var useModes = srcModes;
-    if (devModes && devModes.length) {
-      var filtered = srcModes.filter(function (mm) {
-        var vv = String((mm && mm.value != null) ? mm.value : mm).toLowerCase();
-        return devModes.indexOf(vv) !== -1;
-      });
-      if (filtered.length) useModes = filtered;
-    }
-    tpl.parameters = { instance: arp.instance, modes: useModes };
-    tpl.state = { instance: arp.instance, value: (useModes && useModes[0]) ? useModes[0].value : '' };
-  } else if (tpl.type === 'devices.capabilities.toggle') {
-    tpl.parameters = { instance: arp.instance };
-    tpl.state = { instance: arp.instance, value: false };
-  }
-  delete tpl.arparameter;
-
-  let tt = cat === 'capability' ? { capabilities: [tpl] } : { properties: [tpl] };
   if (te_currentYaData && te_currentYaData.multi_id)
     tt.multi_id = te_currentYaData.multi_id;
 
@@ -839,13 +838,12 @@ te_yre_updateView = function(obj, d) {
   if (!el) return;
   if (!d) { el.innerHTML = '<span style="color:#bbb">none</span>'; return; }
   try {
-    if (d.capabilities) {
-      el.textContent = '⚡ ' + d.capabilities.map(c => c.type.replace('devices.capabilities.','')).join(', ');
-    } else if (d.properties) {
-      el.textContent = '📊 ' + d.properties.map(p => (p.parameters && p.parameters.instance) || p.type).join(', ');
-    } else {
-      el.textContent = JSON.stringify(d).substring(0, 50);
-    }
+    var parts = [];
+    (d.capabilities || []).forEach(function (c) { parts.push('⚡ ' + te_yre_shortType(c.type)); });
+    (d.properties || []).forEach(function (p) {
+      parts.push('📊 ' + ((p.parameters && p.parameters.instance) || te_yre_shortType(p.type)));
+    });
+    el.textContent = parts.join(', ') || JSON.stringify(d).substring(0, 50);
   } catch(e) { el.textContent = '?'; }
 };
 

@@ -17,9 +17,10 @@
 .dm-statusbar{flex-shrink:0;display:flex;align-items:center;gap:12px;padding:5px 10px;border-top:1px solid var(--border);background:var(--bg3);font-size:11px;color:var(--faint)}
 .dm-table{width:100%;border-collapse:collapse;font-size:13px}
 .dm-table thead{position:sticky;top:0;z-index:5;background:var(--bg3)}
-.dm-table th{padding:6px 8px;text-align:left;font-weight:600;color:var(--faint);font-size:11px;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border);border-right:1px solid var(--border)}
-.dm-table td{padding:5px 8px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);vertical-align:middle}
-.dm-table .parent-row{background:var(--bg2);font-weight:600}
+.dm-table th{padding:6px 8px;text-align:left;font-weight:700;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border);border-right:1px solid var(--border)}
+.dm-table td{padding:5px 8px;border-bottom:1px solid var(--border2);border-right:1px solid var(--border);vertical-align:middle}
+.dm-table .parent-row{background:var(--bg3);font-weight:700;box-shadow:inset 3px 0 0 var(--accent)}
+body.light .dm-table .parent-row{background:#e4e9f2}
 .dm-table .parent-row:hover{background:var(--hover)}
 .dm-table .child-row{background:var(--bg)}
 .dm-table .child-row:hover{background:var(--hover)}
@@ -33,7 +34,6 @@
 .editable-cell:hover{background:rgba(59,130,246,.08)}
 .cell-value{display:inline-block;word-break:break-word}
 .edit-input{position:absolute;left:0;top:0;margin:0;padding:4px 6px;width:100%;height:100%;border:2px solid var(--accent);border-radius:2px;background:var(--bg2);font-size:13px;outline:none;color:var(--text);box-sizing:border-box}
-.edit-select{position:absolute;left:0;top:0;margin:0;padding:4px 6px;width:100%;height:100%;border:2px solid var(--accent);border-radius:2px;background:var(--bg2);font-size:13px;outline:none;color:var(--text);box-sizing:border-box}
 .menu-dots{cursor:pointer;display:inline-block;padding:0 6px;font-size:16px;line-height:1;color:var(--faint)}
 .menu-dots:hover{color:var(--accent)}
 .dm-th-sort{cursor:pointer;user-select:none;white-space:nowrap}
@@ -51,7 +51,7 @@
 .toggle-switch span{position:absolute;top:2px;left:2px;width:12px;height:12px;background:var(--text);border-radius:50%;transition:left .15s ease}
 .toggle-input:checked + label .toggle-switch{background:rgba(34,197,94,.35);border-color:var(--green)}
 .toggle-input:checked + label .toggle-switch span{left:20px;background:var(--green)}
-.dm-table input[type=range]{-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;background:var(--bg3);border:none;outline:none;cursor:pointer;vertical-align:middle;flex-shrink:0}
+.dm-table input[type=range]{-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;background:var(--border2);border:none;outline:none;cursor:pointer;vertical-align:middle;flex-shrink:0}
 .dm-table input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--text);border:2px solid var(--accent);cursor:pointer}
 .dm-table select,.dm-table input{background:var(--bg);color:var(--text);border:1px solid var(--border2);border-radius:4px;padding:3px 6px;font-size:12px;outline:none}
 .dm-table select:focus{border-color:var(--accent)}
@@ -87,6 +87,9 @@
 #dmContextMenu .itemTxt{flex:1}
 .dm-clear{cursor:pointer;color:var(--faint);font-size:15px;padding:0 2px 0 6px;user-select:none}
 .dm-clear:hover{color:var(--red)}
+.dm-loc-drop{position:absolute;left:0;top:100%;min-width:100%;max-height:170px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;z-index:60;box-shadow:0 4px 12px rgba(0,0,0,.35);display:none}
+.dm-loc-item{padding:5px 8px;font-size:13px;cursor:pointer;white-space:nowrap}
+.dm-loc-item:hover{background:var(--hover);color:var(--accent)}
 @keyframes dmSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 `;
 
@@ -143,7 +146,7 @@
     // только шумят. Исключение — «Покинуло сеть»: это важное состояние.
     if (cls === 'left') out += '<span class="txt">' + lbl + '</span>';
     if (cnt) out += '<span class="cnt">· ' + cnt + ' ' + t('st.sensors', 'датч.') + '</span>';
-    if (d.lastSeen) out += '<span class="cnt">· ' + agoStr(d.lastSeen) + '</span>';
+    if (d.lastSeen) out += '<span class="cnt ago">· ' + agoStr(d.lastSeen) + '</span>';
     return out;
   }
 
@@ -250,23 +253,23 @@
             var lvRep = device.Report[lvKey] || {};
             var lvId = device.IEEE + '#' + lvKey;
             var lvPct = Math.round((parseFloat(lvRep.parsed) || 0) * 100 / 255);
-            return '<span style="display:inline-flex;align-items:center;gap:3px;">' + window.getIconSvg('brightness', 14, '#ffd54f') +
-              '<input class="' + lvId + ' level" type="range" id="level|' + lvId + '" style="width:70px" min="0" max="100" step="2" value="' + lvPct + '" onchange="evm(\'level|' + lvId + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
+            return '<span style="display:inline-flex;align-items:center;gap:8px;min-height:28px;">' + window.getIconSvg('brightness', 14, '#ffd54f') +
+              '<input class="' + lvId + ' level" type="range" id="level|' + lvId + '" style="width:110px" min="0" max="100" step="2" value="' + lvPct + '" onchange="evm(\'level|' + lvId + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
               '<span class="' + lvId + '" style="font-size:11px;color:var(--faint);min-width:26px">' + lvPct + '%</span></span>';
           };
           var dmCtRow = function (ctKey) {
             var ctRep = device.Report[ctKey] || {};
             var ctId = device.IEEE + '#' + ctKey;
             var ctPct = Math.round(((parseFloat(ctRep.parsed) || 153) - 153) * 100 / 347);
-            return '<span style="display:inline-flex;align-items:center;gap:3px;">' + window.getIconSvg('sun_temp', 14, '#ff9800') +
-              '<input class="' + ctId + ' color-temp" type="range" id="colorT|' + ctId + '" style="width:70px" min="0" max="100" step="2" value="' + ctPct + '" onchange="evm(\'colorT|' + ctId + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
+            return '<span style="display:inline-flex;align-items:center;gap:8px;min-height:28px;">' + window.getIconSvg('sun_temp', 14, '#ff9800') +
+              '<input class="' + ctId + ' color-temp" type="range" id="colorT|' + ctId + '" style="width:110px" min="0" max="100" step="2" value="' + ctPct + '" onchange="evm(\'colorT|' + ctId + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
               '<span class="' + ctId + '" style="font-size:11px;color:var(--faint);min-width:26px">' + ctPct + '%</span></span>';
           };
           var dmColRow = function (clKey) {
             var clRep = device.Report[clKey] || {};
             var clId = device.IEEE + '#' + clKey;
-            return '<span style="display:inline-flex;align-items:center;gap:3px;">' + window.getIconSvg('palette', 14, '#ff9800') +
-              '<input class="' + clId + ' color-range" type="range" id="color|' + clId + '" style="width:70px" min="0" max="100" step="2" value="75" onchange="var hue=((this.value/100)*360).toFixed(0);evm(\'color|' + clId + '\',hsl2Hex(hue,100,50))" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
+            return '<span style="display:inline-flex;align-items:center;gap:8px;min-height:28px;">' + window.getIconSvg('palette', 14, '#ff9800') +
+              '<input class="' + clId + ' color-range" type="range" id="color|' + clId + '" style="width:110px" min="0" max="100" step="2" value="75" onchange="var hue=((this.value/100)*360).toFixed(0);evm(\'color|' + clId + '\',hsl2Hex(hue,100,50))" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
               '<span class="' + clId + '" style="font-size:11px;color:var(--faint);min-width:26px">' + (clRep.parsed != null ? clRep.parsed : '?') + '</span></span>';
           };
           var isOnOff = (ownLightPart === 'onoff');
@@ -275,11 +278,14 @@
           var isColor = (ownLightPart === 'color');
           if (isOnOff) {
             var litOn = [1, '1', true, 'on', 'ON'].indexOf(value.parsed) !== -1;
-            html += '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">' + window.getIconSvg('light_bulb', 18, litOn ? '#ffd54f' : '#666') +
+            // Вертикальный пазл: каждый юнит с новой строки + тач-зазоры
+            // (на широкой таблице flex-wrap складывал всё в одну строку).
+            html += '<div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;">' +
+              '<div style="display:flex;align-items:center;gap:5px;min-height:28px;">' + window.getIconSvg('light_bulb', 18, litOn ? '#ffd54f' : '#666') +
               '<input type="checkbox" class="' + id + ' input toggle-input" id="lt_' + idw + '"' + (litOn ? ' checked' : '') +
               ' onchange="evm(\'on_off|' + id + '\',this.checked?1:0)"/>' +
               '<label for="lt_' + idw + '"><div class="toggle-switch ' + id + '"><span></span></div></label>' +
-              '<span class="' + id + '" style="font-size:11px;color:var(--faint)">' + (value.parsed != null ? value.parsed : '?') + '</span>';
+              '<span class="' + id + '" style="font-size:11px;color:var(--faint)">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
             // anchor row carries the sibling sliders, so the lamp is driven
             // from one place (same commands as widgets.js)
             try {
@@ -737,14 +743,6 @@
     var wrap = document.getElementById('dm_table_wrap');
     if (!wrap) return;
     wrap.innerHTML = genTable();
-    var icons = wrap.querySelectorAll('.expand-icon');
-    for (var i = 0; i < icons.length; i++) icons[i].addEventListener('click', toggleExpand);
-    var cells = wrap.querySelectorAll('.editable-cell');
-    for (var j = 0; j < cells.length; j++) cells[j].addEventListener('dblclick', startEdit);
-    var heads = wrap.querySelectorAll('.dm-th-sort');
-    for (var h = 0; h < heads.length; h++) heads[h].addEventListener('click', function (e) {
-      dm.sortBy(e.currentTarget.getAttribute('data-sort'));
-    });
     var stc = document.getElementById('dm_st_count');
     if (stc) {
       var visible = deviceList.length;
@@ -759,18 +757,43 @@
     }
   }
 
+  // Лёгкий 5-секундный тик: только статусы parent-row (точка + ago),
+  // без пересоздания DOM — виджеты, фокус и ввод не страдают.
+  // Свежесть данных обеспечивает widgetReport (socket.js): на каждый rep
+  // он обновляет deviceList в памяти и виджеты по классам IEEE#key.
+  function updateAgo() {
+    var wrap = document.getElementById('dm_table_wrap');
+    if (!wrap) return;
+    var byIeee = {};
+    for (var j = 0; j < deviceList.length; j++) byIeee[deviceList[j].IEEE] = deviceList[j];
+    var rows = wrap.querySelectorAll('tr.parent-row');
+    for (var i = 0; i < rows.length; i++) {
+      var d = byIeee[rows[i].getAttribute('data-ieee')];
+      if (!d) continue;
+      var stEl = rows[i].querySelector('.dm-status');
+      if (!stEl) continue;
+      // Точки меню живут внутри .dm-status — сохраняем узел, иначе тик
+      // стирает вызов контекстного меню (inline onclick переживает перенос).
+      var dots = stEl.querySelector('.menu-dots');
+      stEl.innerHTML = statusHtml(d);
+      if (dots) stEl.appendChild(dots);
+    }
+  }
+
   function toggleExpand(e) {
-    e.stopPropagation();
-    var ieee = e.currentTarget.getAttribute('data-ieee');
+    var icon = e.target ? e.target.closest('.expand-icon') : null;
+    var ieee = icon ? icon.getAttribute('data-ieee') : null;
+    if (!ieee) return;
     if (st.expanded[ieee]) { delete st.expanded[ieee]; }
     else st.expanded[ieee] = true;
     renderTable();
   }
 
   // ── cell editing ──
-  function startEdit(e) {
+  function startEdit(e, cellEl) {
     if (st.editing) cancelEdit();
-    var cell = e.currentTarget;
+    var cell = cellEl || (e.currentTarget || (e.target && e.target.closest('.editable-cell')));
+    if (!cell) return;
     var value = cell.querySelector('.cell-value').textContent;
     var ieee = cell.getAttribute('data-ieee');
     var key = cell.getAttribute('data-key');
@@ -779,26 +802,48 @@
       doSaveEdit({ cell: cell, ieee: ieee, key: key, field: field, old: value }, nv, sel);
     };
     if (field === 'location') {
+      // Комбобокс: свой список (datalist фильтрует по введённому и прячет
+      // остальное). Фокус — полный список, ввод — фильтр, клик — выбор.
       var locs = [];
       deviceList.forEach(function (d) {
         if (d.Location && locs.indexOf(d.Location) === -1) locs.push(d.Location);
         if (d.Report) for (var k in d.Report) { var l = d.Report[k].location; if (l && locs.indexOf(l) === -1) locs.push(l); }
       });
       locs.sort();
-      var sel = document.createElement('select');
-      sel.className = 'edit-select';
-      var empty = document.createElement('option'); empty.value = ''; empty.textContent = t('sel.select', '— Select —'); sel.appendChild(empty);
-      locs.forEach(function (l) { var o = document.createElement('option'); o.value = l; o.textContent = l; if (l === value) o.selected = true; sel.appendChild(o); });
+      var inp = document.createElement('input');
+      inp.type = 'text';
+      inp.value = (value === '—' ? '' : value);
+      inp.className = 'edit-input';
+      inp.setAttribute('autocomplete', 'off');
+      var drop = document.createElement('div');
+      drop.className = 'dm-loc-drop';
+      var renderDrop = function (filter) {
+        drop.innerHTML = '';
+        var f = (filter || '').toLowerCase();
+        var shown = 0;
+        locs.forEach(function (l) {
+          if (f && l.toLowerCase().indexOf(f) === -1) return;
+          var it = document.createElement('div');
+          it.className = 'dm-loc-item';
+          it.textContent = l;
+          it.addEventListener('mousedown', function (ev) { ev.preventDefault(); commit(l); });
+          drop.appendChild(it);
+          shown++;
+        });
+        drop.style.display = shown ? 'block' : 'none';
+      };
       cell.innerHTML = '';
-      cell.appendChild(sel);
-      sel.focus();
-      st.editing = { cell: cell, select: sel, ieee: ieee, key: key, field: field, old: value };
-      sel.addEventListener('change', function () { commit(sel.value); });
-      sel.addEventListener('blur', function () { commit(sel.value); });
-      sel.addEventListener('keydown', function (e2) {
-        if (e2.key === 'Enter') commit(sel.value);
+      cell.appendChild(inp); cell.appendChild(drop);
+      inp.focus(); inp.select();
+      st.editing = { cell: cell, input: inp, ieee: ieee, key: key, field: field, old: value };
+      inp.addEventListener('focus', function () { renderDrop(''); });
+      inp.addEventListener('input', function () { renderDrop(inp.value); });
+      inp.addEventListener('blur', function () { commit(inp.value.trim()); });
+      inp.addEventListener('keydown', function (e2) {
+        if (e2.key === 'Enter') commit(inp.value.trim());
         if (e2.key === 'Escape') cancelEdit();
       });
+      renderDrop('');
     } else {
       var inp = document.createElement('input');
       inp.type = 'text'; inp.value = value; inp.className = 'edit-input';
@@ -1236,12 +1281,13 @@ dm.setBleTpl = function (dev, adr, name) {
   dm.confirmYes = function () { closeModal('confirm'); WSsend('Init_Zigbee'); };
   dm.confirmNo = function () { closeModal('confirm'); };
 
-  // ── search ──
+  // ── search (debounced: полный ререндер не чаще раза в 180 мс) ──
   dm.search = function (v) {
     st.filter = v || '';
     var x = document.getElementById('dm_search_clear');
     if (x) x.style.display = st.filter ? 'block' : 'none';
-    renderTable();
+    if (st.searchTimer) clearTimeout(st.searchTimer);
+    st.searchTimer = setTimeout(function () { st.searchTimer = null; renderTable(); }, 180);
   };
   dm.clearSearch = function () { var i = document.getElementById('dm_search'); if (i) i.value = ''; dm.search(''); };
 
@@ -1297,7 +1343,7 @@ dm.setBleTpl = function (dev, adr, name) {
         '<div class="dm-modal-body"><div class="dm-tabs">' +
           '<button class="dm-tab" id="dm_tab_zigbee" data-i18n="tab.zigbee" onclick="dm.zigbeeUI()">Zigbee</button>' +
           '<button class="dm-tab" id="dm_tab_ble" data-i18n="tab.ble" onclick="dm.bleUI()">BLE</button>' +
-          '<button class="dm-tab" id="dm_tab_had" data-i18n="tab.had" style="display:none" onclick="dm.hadUI()">Импорт</button>' +
+          '<button class="dm-tab" id="dm_tab_had" data-i18n="tab.had" style="display:none" onclick="dm.hadUI()">HADmqtt</button>' +
         '</div><div class="dm-join-scroll"></div></div>' +
       '</div></div>' +
 
@@ -1324,9 +1370,25 @@ dm.setBleTpl = function (dev, adr, name) {
       if (window.eventE) eventE.on('updateDeviceList', st.onDev);
       if (window.eventE) eventE.on('jsconfig', dm.updateHadTab);
       dm.updateHadTab();
-      // live "ago" recount (s/min/h/d), skip while a cell is being edited
+      // live "ago" recount (s/min/h/d): точечно по .dm-status,
+      // полный ререндер не нужен — данные свежие через widgetReport (rep).
       if (st.agoTimer) clearInterval(st.agoTimer);
-      st.agoTimer = setInterval(function () { if (!st.editing) renderTable(); }, 5000);
+      st.agoTimer = setInterval(updateAgo, 5000);
+      // Делегированные события таблицы: переживают innerHTML-рендеры,
+      // вместо сотен addEventListener на каждой перерисовке.
+      if (!node._dmDelegated) {
+        node._dmDelegated = true;
+        node.addEventListener('click', function (e) {
+          var ex = e.target && e.target.closest ? e.target.closest('.expand-icon') : null;
+          if (ex && node.contains(ex)) { toggleExpand(e); return; }
+          var th = e.target && e.target.closest ? e.target.closest('.dm-th-sort') : null;
+          if (th && node.contains(th)) { dm.sortBy(th.getAttribute('data-sort')); }
+        });
+        node.addEventListener('dblclick', function (e) {
+          var cell = e.target && e.target.closest ? e.target.closest('.editable-cell') : null;
+          if (cell && node.contains(cell)) startEdit(e, cell);
+        });
+      }
       if (window.eventE) eventE.on('bindStatus', dm.onBindStatus);
       if (window.eventE) eventE.on('joinNoTemplate', dm.onJoinNoTemplate);
       if (window.websocket && websocket.readyState === 1) window.WSsend('getDeviceList');
