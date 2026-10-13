@@ -29,11 +29,6 @@
     '.logv-x{position:absolute;right:2px;display:none;background:transparent;border:none;color:var(--faint);cursor:pointer;font-size:14px;line-height:1;padding:2px 5px;border-radius:4px}' +
     '.logv-x:hover{color:var(--red);background:rgba(239,68,68,.1)}' +
     '.logv-f.has .logv-x{display:block}' +
-    // one-click filter presets + value hints
-    '.logv-presets{display:flex;flex-wrap:wrap;gap:4px;align-items:center}' +
-    '.logv-pre{background:transparent;border:1px solid var(--border2);color:var(--muted);border-radius:11px;padding:2px 10px;font-size:11px;cursor:pointer;white-space:nowrap}' +
-    '.logv-pre:hover{color:var(--accent);border-color:var(--accent)}' +
-    '.logv-pre.on{color:var(--accent);border-color:var(--accent);background:rgba(59,130,246,.12)}' +
     // checkbox multiselect dropdown (mod, ev)
     '.logv-dd{position:relative;display:inline-flex;min-width:0}' +
     '.logv-ddb{background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}' +
@@ -58,24 +53,17 @@
   var LOGV_BODY =
     '<div class="logv-wrap">' +
     '<div class="logv-bar">' +
-    '<select class="logv-lvl" title="Уровень (и выше)"></select>' +
+    '<div class="logv-dd"><button class="logv-ddb" data-dd="lvl" title="Уровни: клик — выбрать галочками, пусто — всё (кроме Trace)">lvl: всё ▾</button><div class="logv-ddp hidden" data-ddp="lvl"></div></div>' +
     '<div class="logv-dd"><button class="logv-ddb" data-dd="mod" title="Модули: клик — выбрать галочками">mod: всё ▾</button><div class="logv-ddp hidden" data-ddp="mod"></div></div>' +
     '<div class="logv-dd"><button class="logv-ddb" data-dd="ev" title="События: клик — выбрать галочками">ev: всё ▾</button><div class="logv-ddp hidden" data-ddp="ev"></div></div>' +
     '<span class="logv-f" style="width:60px"><input class="logv-cid" placeholder="cid" title="ID цепочки — клик по строке подставляет сам"><button class="logv-x" title="Очистить поле">×</button></span>' +
     '<span class="logv-f" style="flex:1;min-width:80px"><input class="logv-text" placeholder="текст" title="Подстрока по строке"><button class="logv-x" title="Очистить поле">×</button></span>' +
+    '<label class="logv-textonlb" title="Применять фильтр по тексту (снять — смотреть всё, текст не удаляется)"><input type="checkbox" class="logv-texton" checked> txt</label>' +
     '<input class="logv-n" type="number" value="200" min="10" max="1000" title="Сколько строк истории подтянуть" style="width:64px">' +
-    '<button class="logv-btn logv-apply">Применить</button>' +
     '<button class="logv-btn logv-pause">Пауза</button>' +
     '<button class="logv-btn logv-clear">Очистить</button>' +
+    '<label class="logv-full" title="Полный лог без обрезки (консоль, лента, история)"><input type="checkbox" class="logv-fullcb"> full</label>' +
     '<span class="logv-cnt">○ 0</span>' +
-    '</div>' +
-    '<div class="logv-presets" title="Готовые фильтры в один клик">' +
-    '<button class="logv-pre" data-lvl="D" data-mod="telink,zcl" data-ev="">Эфир</button>' +
-    '<button class="logv-pre" data-lvl="D" data-mod="ws,mqtt" data-ev="cmd">Команды</button>' +
-    '<button class="logv-pre" data-lvl="D" data-mod="rep,zcl" data-ev="rx,report">Репорты</button>' +
-    '<button class="logv-pre" data-lvl="D" data-mod="zcl,rep,mqtt,ws" data-ev="rx,report,cmd,pub">Цепочки</button>' +
-    '<button class="logv-pre" data-lvl="E" data-mod="" data-ev="">Ошибки</button>' +
-    '<button class="logv-pre" data-lvl="D" data-mod="" data-ev="">Всё</button>' +
     '</div>' +
     '<div class="logv-tape"></div>' +
     '<div class="logv-hint">Клик по строке с cid= — показать только эту цепочку. Пауза отписывает ленту на сервере.</div>' +
@@ -92,15 +80,21 @@
 
   function buildQuery(node) {
     var q = [];
-    var lvl = node.querySelector('.logv-lvl').value || 'D';
-    q.push('lvl=' + lvl);
+    var lvls = ddVals(node, 'lvl');
+    if (lvls.length) q.push('lvls=' + lvls.join(','));
     var mods = ddVals(node, 'mod');
     if (mods.length) q.push('mod=' + mods.join(','));
     var evs = ddVals(node, 'ev');
     if (evs.length) q.push('ev=' + evs.join(','));
     var cid = node.querySelector('.logv-cid').value.trim();
     if (cid) q.push('cid=' + cid);
-    var text = node.querySelector('.logv-text').value.trim();
+    var text = '';
+    // текстовый фильтр действует только при включённой галке (текст хранится).
+    // null-safe: старый закэшированный шаблон без галки — фильтр включён.
+    var texton = node.querySelector('.logv-texton');
+    if (!texton || texton.checked) {
+      text = node.querySelector('.logv-text').value.trim();
+    }
     if (text) q.push('text=' + encodeURIComponent(text));
     return q.join('&');
   }
@@ -108,21 +102,13 @@
   function tape(node) { return node.querySelector('.logv-tape'); }
   function cnt(node) { return node.querySelector('.logv-cnt'); }
 
-  // setField sets the field value and syncs the clear cross.
-  function setField(node, sel, v) {
-    var inp = node.querySelector(sel);
-    if (!inp) return;
-    inp.value = v;
-    var f = inp.closest('.logv-f');
-    if (f) f.classList.toggle('has', !!v);
-  }
-
   // Checkbox multiselect dropdowns: state — arrays on node,
   // checkboxes in the dropped panel. Empty = all.
   var LOGV_MODS = ['telink', 'zboss', 'zigate', 'ember', 'zstack', 'zcl',
     'rep', 'mqtt', 'ws', 'ya', 'ble', 'auto', 'trs', 'db', 'sys', 'main'];
   var LOGV_EVS = ['rx', 'tx', 'report', 'cmd', 'pub', 'join', 'leave', 'ack',
     'lux', 'ping', 'state', 'err', 'dbg'];
+  var LOGV_LVLS = ['E', 'W', 'I', 'D', 'T'];
   function ddVals(node, kind) { return node['_logv_' + kind] || []; }
   function paintDd(node, kind) {
     var v = ddVals(node, kind);
@@ -135,13 +121,6 @@
       b.textContent = kind + ': ' + v.join(',');
       b.title = kind + ' = ' + v.join(', ');
     }
-  }
-  function setDd(node, kind, arr) {
-    node['_logv_' + kind] = (arr || []).slice();
-    node.querySelectorAll('.logv-ddp[data-ddp="' + kind + '"] input').forEach(function (cb) {
-      cb.checked = node['_logv_' + kind].indexOf(cb.value) !== -1;
-    });
-    paintDd(node, kind);
   }
   function buildDd(node, kind, values) {
     var p = node.querySelector('.logv-ddp[data-ddp="' + kind + '"]');
@@ -159,7 +138,6 @@
         cur.sort(function (a, b) { return values.indexOf(a) - values.indexOf(b); });
         node['_logv_' + kind] = cur;
         paintDd(node, kind);
-        clearPre(node);
         applyFilter(node);
       });
       lb.appendChild(cb);
@@ -167,18 +145,6 @@
       p.appendChild(lb);
     });
   }
-  function clearPre(node) {
-    node.querySelectorAll('.logv-pre.on').forEach(function (o) { o.classList.remove('on'); });
-  }
-  function splitList(s) {
-    var out = [];
-    String(s || '').split(',').forEach(function (x) {
-      x = x.trim().toLowerCase();
-      if (x) out.push(x);
-    });
-    return out;
-  }
-
   // paintCnt: counter + subscription indicator (● streaming / ○ silence).
   function paintCnt(node) {
     cnt(node).textContent = (node._logvSub ? '● ' : '○ ') + (node._logvCount || 0);
@@ -220,30 +186,35 @@
     paintCnt(node);
   }
 
+  // Лента идёт через ОТДЕЛЬНОЕ соединение (WSsendLog → /logs), чтобы флуд
+  // log| не забивал общий сокет и не тормозил rep| (статус в вебе).
+  function logSend(message) {
+    if (typeof WSsendLog === 'function') { WSsendLog(message); return; }
+    if (typeof WSsend === 'function') WSsend(message); // fallback: старый фронт
+  }
+
   function applyFilter(node) {
-    if (typeof WSsend !== 'function') return;
     var q = buildQuery(node);
     var n = parseInt(node.querySelector('.logv-n').value, 10) || 200;
     clearTape(node);
     node._logvPaused = false;
     node.querySelector('.logv-pause').classList.remove('on');
     node.querySelector('.logv-pause').textContent = 'Пауза';
-    WSsend('logSub|' + q);
-    WSsend('logHist|n=' + n + '&' + q);
+    logSend('logSub|' + q);
+    logSend('logHist|n=' + n + '&' + q);
   }
 
   function setPaused(node, paused) {
-    if (typeof WSsend !== 'function') return;
     node._logvPaused = paused;
     var b = node.querySelector('.logv-pause');
     if (paused) {
-      WSsend('logUnsub');
+      logSend('logUnsub');
       b.classList.add('on');
       b.textContent = 'Продолжить';
     } else {
       b.classList.remove('on');
       b.textContent = 'Пауза';
-      WSsend('logSub|' + buildQuery(node));
+      logSend('logSub|' + buildQuery(node));
     }
   }
 
@@ -264,24 +235,22 @@
     setup: function (node, opts) {
       node._logvCount = 0;
       node._logvPaused = false;
-      // levels: E/W/I/D/T; default I — quiet, detail via presets below
-      var sel = node.querySelector('.logv-lvl');
-      [['E', 'E — ошибки'], ['W', 'W — и выше'], ['I', 'I — и выше'],
-       ['D', 'D — и выше'], ['T', 'T — всё']].forEach(function (o) {
-        var el = document.createElement('option');
-        el.value = o[0];
-        el.textContent = o[1];
-        if (o[0] === 'I') el.selected = true;
-        sel.appendChild(el);
+      // live-применение: кнопка «Применить» убрана, всё применяется сразу.
+      // текстовые поля — с дебаунсом 500мс (иначе подписка дёргается на каждую букву).
+      node.querySelector('.logv-texton').addEventListener('change', function () { applyFilter(node); });
+      node.querySelector('.logv-fullcb').addEventListener('change', function (e) {
+        logSend('logFull|' + (e.target.checked ? '1' : '0'));
       });
-      node.querySelector('.logv-apply').addEventListener('click', function () { applyFilter(node); });
       // multiselect dropdowns: state + checkbox building
       node._logv_mod = [];
       node._logv_ev = [];
+      node._logv_lvl = [];
       buildDd(node, 'mod', LOGV_MODS);
       buildDd(node, 'ev', LOGV_EVS);
+      buildDd(node, 'lvl', LOGV_LVLS);
       paintDd(node, 'mod');
       paintDd(node, 'ev');
+      paintDd(node, 'lvl');
       // panel open/close; outside click — close
       node.querySelectorAll('.logv-ddb').forEach(function (b) {
         b.addEventListener('click', function (e) {
@@ -299,42 +268,31 @@
         node.querySelectorAll('.logv-ddp').forEach(function (o) { o.classList.add('hidden'); });
       };
       document.addEventListener('click', node._logvDocCl);
-      // presets: one click sets a ready filter (cid/text reset)
-      node.querySelectorAll('.logv-pre').forEach(function (b) {
-        b.addEventListener('click', function () {
-          node.querySelector('.logv-lvl').value = b.getAttribute('data-lvl') || 'D';
-          setDd(node, 'mod', splitList(b.getAttribute('data-mod')));
-          setDd(node, 'ev', splitList(b.getAttribute('data-ev')));
-          setField(node, '.logv-cid', '');
-          setField(node, '.logv-text', '');
-          node.querySelectorAll('.logv-pre').forEach(function (o) { o.classList.remove('on'); });
-          b.classList.add('on');
-          applyFilter(node);
-        });
-      });
-      // clear crosses: × visible on non-empty field, click clears without applying
-      // (the filter takes effect via the "Apply" button)
+      // clear crosses: × visible on non-empty field, click clears and applies at once
       var bar = node.querySelector('.logv-bar');
       bar.addEventListener('input', function (e) {
         var f = e.target.closest ? e.target.closest('.logv-f') : null;
         if (!f) return;
         var inp = f.querySelector('input');
         f.classList.toggle('has', !!(inp && inp.value));
-        // manual edit — the active preset no longer reflects the filter
-        node.querySelectorAll('.logv-pre.on').forEach(function (o) { o.classList.remove('on'); });
+        // live: текстовые поля применяются с дебаунсом
+        if (e.target.classList && (e.target.classList.contains('logv-text') || e.target.classList.contains('logv-cid'))) {
+          if (node._logvDeb) clearTimeout(node._logvDeb);
+          node._logvDeb = setTimeout(function () { applyFilter(node); }, 500);
+        }
       });
       bar.addEventListener('click', function (e) {
         var x = e.target.closest ? e.target.closest('.logv-x') : null;
         if (!x) return;
         var f = x.closest('.logv-f');
         var inp = f && f.querySelector('input');
-        if (inp) { inp.value = ''; inp.focus(); f.classList.remove('has'); }
+        if (inp) { inp.value = ''; inp.focus(); f.classList.remove('has'); applyFilter(node); }
       });
       node.querySelector('.logv-pause').addEventListener('click', function () { setPaused(node, !node._logvPaused); });
       node.querySelector('.logv-clear').addEventListener('click', function () {
         clearTape(node);
         // drop the server ring too: the next logHist will start clean
-        if (typeof WSsend === 'function') WSsend('logClear');
+        logSend('logClear');
       });
       tape(node).addEventListener('click', function (e) {
         var ln = e.target.closest ? e.target.closest('.logv-line.has-cid') : null;
@@ -362,9 +320,9 @@
           else return;
           paintCnt(node);
         };
-        // wsopen — socket recreated (drop): the subscription lived on the old
-        // connection, resubscribe. Window closed — no handler,
-        // server is silent: traffic only with the window open.
+        // wsopenlog — лог-сокет поднят (пере)создан: подписка жила на старом
+        // соединении, переподписываемся. Окно закрыто — обработчика нет,
+        // сервер молчит: трафик только с открытым окном.
         node._logvOnOpen = function () {
           if (node._logvPaused) return;
           applyFilter(node);
@@ -372,7 +330,7 @@
         eventE.on('log', node._logvOnLog);
         eventE.on('logHist', node._logvOnHist);
         eventE.on('logCtl', node._logvOnCtl);
-        eventE.on('wsopen', node._logvOnOpen);
+        eventE.on('wsopenlog', node._logvOnOpen);
       }
       if (window.L) { L.load('logviewer', '/desktop_lite/apps/logviewer/'); setTimeout(function () { L.applyLang(node, 'logviewer'); }, 400); }
       applyFilter(node);
@@ -384,10 +342,10 @@
           if (node._logvOnLog) eventE.off('log', node._logvOnLog);
           if (node._logvOnHist) eventE.off('logHist', node._logvOnHist);
           if (node._logvOnCtl) eventE.off('logCtl', node._logvOnCtl);
-          if (node._logvOnOpen) eventE.off('wsopen', node._logvOnOpen);
+          if (node._logvOnOpen) eventE.off('wsopenlog', node._logvOnOpen);
         }
         // Окно закрыто — отписываемся: сервер перестаёт слать нам ленту.
-        if (typeof WSsend === 'function') WSsend('logUnsub');
+        logSend('logUnsub');
       } catch (e) {}
     }
   });

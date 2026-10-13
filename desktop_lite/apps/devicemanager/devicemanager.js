@@ -1054,7 +1054,7 @@ dm.setBleTpl = function (dev, adr, name) {
     WSsend('BLEscan|"true"');
   };
   function setJoinTab(id) {
-    ['dm_tab_zigbee', 'dm_tab_ble', 'dm_tab_had'].forEach(function (t) {
+    ['dm_tab_zigbee', 'dm_tab_ble', 'dm_tab_had', 'dm_tab_lgtv'].forEach(function (t) {
       var b = document.getElementById(t); if (b) b.classList.toggle('active', t === id);
     });
   }
@@ -1120,6 +1120,117 @@ dm.setBleTpl = function (dev, adr, name) {
     box.innerHTML = html;
   };
   dm.hadDel = function (ieee) { WSsend('removeDevice||' + ieee + '|force'); };
+  // ── LG NetCast TV: поиск и привязка ──
+  function lgtvStatus(html) { var e = document.getElementById('lgtv_status'); if (e) e.innerHTML = html; }
+  dm.lgtvUI = function () {
+    openModal('join');
+    setJoinTab('dm_tab_lgtv');
+    var box = document.querySelector('#dm_modal_join .dm-join-scroll');
+    if (!box) return;
+    box.innerHTML = '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">' +
+      '<button class="dm-scan-btn" id="lgtv_scan_btn" onclick="dm.lgtvScan()">' + t('lgtv.scan', '🔍 Найти в сети') + '</button>' +
+      '<span id="lgtv_status" style="font-size:12px;color:var(--faint)"></span></div>' +
+      '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center"><b>' + t('lgtv.manual', 'Адрес вручную') + ':</b>' +
+      '<input id="lgtv_ip" style="width:120px" value="192.168.1.125" placeholder="192.168.1.x">' +
+      '<input id="lgtv_port" style="width:60px" value="8080">' +
+      '<button class="dm-btn" onclick="dm.lgtvCheckManual()">✓ ' + t('lgtv.check', 'Проверить') + '</button>' +
+      '<button class="dm-btn" onclick="dm.lgtvAddManual()">' + t('lgtv.add', 'Добавить') + '</button></div>' +
+      '<div style="margin:8px 0 4px"><b>' + t('lgtv.found', 'Найдено') + '</b></div><div id="lgtv_list"><i>—</i></div>' +
+      '<div style="margin:8px 0 4px"><b>' + t('lgtv.inbase', 'В базе') + '</b></div><div id="lgtv_base"></div>';
+    eventE.off('lgtvScan', dm.onLgtvScan); eventE.on('lgtvScan', dm.onLgtvScan);
+    eventE.off('lgtvCheck', dm.onLgtvCheck); eventE.on('lgtvCheck', dm.onLgtvCheck);
+    eventE.off('lgtvAdd', dm.onLgtvAdd); eventE.on('lgtvAdd', dm.onLgtvAdd);
+    eventE.off('lgtvRemove', dm.onLgtvSimple); eventE.on('lgtvRemove', dm.onLgtvSimple);
+    eventE.off('lgtvRequestCode', dm.onLgtvCode); eventE.on('lgtvRequestCode', dm.onLgtvCode);
+    eventE.off('lgtvPair', dm.onLgtvPair); eventE.on('lgtvPair', dm.onLgtvPair);
+    dm.renderLgtvBase();
+  };
+  dm.lgtvScan = function () {
+    var b = document.getElementById('lgtv_scan_btn');
+    if (b) { b.classList.add('running'); b.textContent = t('lgtv.scanning', '⏳ Идёт поиск (~15 с)...'); }
+    lgtvStatus('');
+    WSsend('lgtvScan');
+  };
+  dm.onLgtvScan = function (data) {
+    var b = document.getElementById('lgtv_scan_btn');
+    if (b) { b.classList.remove('running'); b.textContent = t('lgtv.scan', '🔍 Найти в сети'); }
+    var box = document.getElementById('lgtv_list'); if (!box) return;
+    if (!data || !data.length) { box.innerHTML = '<i>' + t('lgtv.empty', 'Ничего не найдено — проверьте, что ТВ включён и в той же сети.') + '</i>'; return; }
+    var html = '';
+    data.forEach(function (f) {
+      var ip = hadEsc(f.ip || ''), port = f.port || 8080;
+      var srv = f.server ? ' · ' + hadEsc(f.server) : '';
+      var inBase = (typeof deviceList !== 'undefined') && deviceList.some(function (d) { return d && d.DevType === 'LGT' && d.Device === f.ip; });
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border)">' +
+        '<div style="flex:1;min-width:0"><b>' + ip + ':' + port + '</b>' +
+        '<div style="color:var(--faint);font-size:11px">NetCast' + srv + '</div></div>' +
+        (inBase ? '<i style="font-size:12px;color:var(--faint)">✓</i>'
+          : '<button class="dm-btn" onclick="dm.lgtvAdd(\'' + ip + '\',' + port + ')">' + t('lgtv.add', 'Добавить') + '</button>') + '</div>';
+    });
+    box.innerHTML = html;
+  };
+  dm.lgtvAdd = function (ip, port) { WSsend('lgtvAdd|' + ip + '|' + (port || 8080) + '|LG TV ' + ip); };
+  dm.lgtvCheckManual = function () {
+    var ipEl = document.getElementById('lgtv_ip'), pEl = document.getElementById('lgtv_port');
+    var ip = ipEl ? ipEl.value.trim() : '';
+    if (!ip) return;
+    var port = (pEl && parseInt(pEl.value, 10)) || 8080;
+    lgtvStatus(t('lgtv.checking', '⏳ Проверяю с сервера...'));
+    WSsend('lgtvCheck|' + ip + '|' + port);
+  };
+  dm.onLgtvCheck = function (data) {
+    if (!data || !data.alive) { lgtvStatus(t('lgtv.dead', '❌ Сервер не видит этот адрес')); return; }
+    lgtvStatus(t('lgtv.alive', '✅ Сервер видит устройство') + (data.server ? ' · ' + hadEsc(data.server) : ''));
+  };
+  dm.lgtvAddManual = function () {
+    var ipEl = document.getElementById('lgtv_ip'), pEl = document.getElementById('lgtv_port');
+    var ip = ipEl ? ipEl.value.trim() : '';
+    if (!ip) return;
+    var port = (pEl && parseInt(pEl.value, 10)) || 8080;
+    dm.lgtvAdd(ip, port);
+  };
+  dm.onLgtvAdd = function (data) {
+    if (data && data.error) { lgtvStatus(t('lgtv.err', 'Ошибка: {msg}', { msg: hadEsc(data.error) })); return; }
+    lgtvStatus(t('lgtv.added', 'Добавлено'));
+    dm.renderLgtvBase();
+  };
+  dm.onLgtvSimple = function () { dm.renderLgtvBase(); };
+  dm.onLgtvCode = function (data) {
+    if (data && data.error) { lgtvStatus(t('lgtv.err', 'Ошибка: {msg}', { msg: hadEsc(data.error) })); return; }
+    lgtvStatus(t('lgtv.codeshown', 'Код на экране ТВ — введите его ниже'));
+  };
+  dm.onLgtvPair = function (data) {
+    if (data && data.error) { lgtvStatus(t('lgtv.err', 'Ошибка: {msg}', { msg: hadEsc(data.error) })); return; }
+    lgtvStatus(t('lgtv.paired', 'Вход выполнен'));
+    dm.renderLgtvBase();
+  };
+  dm.lgtvCode = function (ieee) { WSsend('lgtvRequestCode|' + ieee); };
+  dm.lgtvPair = function (ieee) {
+    var el = document.getElementById('lgtv_code_' + ieee);
+    var code = el ? el.value.trim() : '';
+    if (!code) return;
+    WSsend('lgtvPair|' + ieee + '|' + code);
+  };
+  dm.lgtvDel = function (ieee) { WSsend('lgtvRemove|' + ieee); };
+  dm.renderLgtvBase = function () {
+    var box = document.getElementById('lgtv_base'); if (!box) return;
+    var list = (typeof deviceList !== 'undefined' ? deviceList : []).filter(function (d) { return d && d.DevType === 'LGT'; });
+    if (!list.length) { box.innerHTML = '<i>—</i>'; return; }
+    var html = '';
+    list.forEach(function (d) {
+      var ieee = hadEsc(d.IEEE);
+      html += '<div style="padding:6px 4px;border-bottom:1px solid var(--border)">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+        '<div style="flex:1;min-width:0"><b>' + hadEsc(d.Name || d.IEEE) + '</b>' +
+        '<div style="color:var(--faint);font-size:11px">' + hadEsc(d.Device || '') + ' · ' + ieee + '</div></div>' +
+        '<button class="dm-btn" onclick="dm.lgtvDel(\'' + ieee + '\')">' + t('lgtv.del', 'Удалить') + '</button></div>' +
+        '<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">' +
+        '<button class="dm-btn" onclick="dm.lgtvCode(\'' + ieee + '\')">' + t('lgtv.showcode', 'Показать код') + '</button>' +
+        '<input id="lgtv_code_' + ieee + '" style="width:110px" maxlength="6" placeholder="' + t('lgtv.codeph', '6 цифр с экрана') + '">' +
+        '<button class="dm-btn" onclick="dm.lgtvPair(\'' + ieee + '\')">' + t('lgtv.pair', 'Войти') + '</button></div></div>';
+    });
+    box.innerHTML = html;
+  };
   dm.zigbeeUI = function () {
     openModal('join');
     setJoinTab('dm_tab_zigbee');
@@ -1344,6 +1455,7 @@ dm.setBleTpl = function (dev, adr, name) {
           '<button class="dm-tab" id="dm_tab_zigbee" data-i18n="tab.zigbee" onclick="dm.zigbeeUI()">Zigbee</button>' +
           '<button class="dm-tab" id="dm_tab_ble" data-i18n="tab.ble" onclick="dm.bleUI()">BLE</button>' +
           '<button class="dm-tab" id="dm_tab_had" data-i18n="tab.had" style="display:none" onclick="dm.hadUI()">HADmqtt</button>' +
+          '<button class="dm-tab" id="dm_tab_lgtv" data-i18n="tab.lgtv" onclick="dm.lgtvUI()">ТВ</button>' +
         '</div><div class="dm-join-scroll"></div></div>' +
       '</div></div>' +
 
@@ -1366,7 +1478,7 @@ dm.setBleTpl = function (dev, adr, name) {
     setup(node) {
       node._state = { onDev: null };
       if (window.L) L.ready('devicemgr').then(function () { L.applyLang(node, 'devicemgr'); });
-      st.onDev = function () { renderTable(); dm.renderHadBase(); };
+      st.onDev = function () { renderTable(); dm.renderHadBase(); dm.renderLgtvBase(); };
       if (window.eventE) eventE.on('updateDeviceList', st.onDev);
       if (window.eventE) eventE.on('jsconfig', dm.updateHadTab);
       dm.updateHadTab();
@@ -1414,6 +1526,12 @@ dm.setBleTpl = function (dev, adr, name) {
       if (window.eventE) eventE.off('jsconfig', dm.updateHadTab);
       if (st.agoTimer) { clearInterval(st.agoTimer); st.agoTimer = null; }
       eventE.off('ArBle', dm.ble);
+      eventE.off('lgtvScan', dm.onLgtvScan);
+      eventE.off('lgtvCheck', dm.onLgtvCheck);
+      eventE.off('lgtvAdd', dm.onLgtvAdd);
+      eventE.off('lgtvRemove', dm.onLgtvSimple);
+      eventE.off('lgtvRequestCode', dm.onLgtvCode);
+      eventE.off('lgtvPair', dm.onLgtvPair);
       eventE.off('bindStatus', dm.onBindStatus);
       eventE.off('joinNoTemplate', dm.onJoinNoTemplate);
       stopAddTimer();

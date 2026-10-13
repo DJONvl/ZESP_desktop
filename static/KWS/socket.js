@@ -62,6 +62,35 @@ function WSsend(message) {
 }
 var checkWS = setInterval(function () { if (websocket.readyState != 1) { testWebSocket(); } }, 10000);
 testWebSocket();
+
+// ── Отдельное соединение только для ленты логов (/logs) ────────────────────
+// Флуд log| забивал общий сокет и за ним вставали rep| (статус в вебе
+// опаздывал при живом эфире). Входящие идут в ту же шину eventE.
+var websocketLog = null;
+var logReconnectTimer = null;
+function testWebSocketLog() {
+	if (ZESPip == undefined) { ZESPip = window.location.hostname; }
+	if (websocketLog) { try { websocketLog.onclose = null; websocketLog.close(); } catch (e) {} websocketLog = null; }
+	try {
+		websocketLog = new WebSocket('ws://' + ZESPip + ':8181/logs');
+	} catch (e) { scheduleLogReconnect(); return; }
+	websocketLog.onopen = function (evt) { eventE.emit('wsopenlog'); };
+	websocketLog.onmessage = function (evt) { try { parseSocket({ data: evt.data }); } catch (e) {} };
+	websocketLog.onerror = function (evt) { console.log("log socket error"); };
+	websocketLog.onclose = function (evt) { console.log("log socket closed, reconnecting"); scheduleLogReconnect(); };
+}
+function scheduleLogReconnect() {
+	if (logReconnectTimer) return;
+	logReconnectTimer = setTimeout(function () { logReconnectTimer = null; testWebSocketLog(); }, 1000);
+}
+function WSsendLog(message) {
+	if (websocketLog && websocketLog.readyState === 1) { websocketLog.send(message); return; }
+	// Сокета нет — поднимаем; сообщение теряется, лента переподпишется сама.
+	testWebSocketLog();
+}
+var checkWSLog = setInterval(function () {
+	if (!websocketLog || websocketLog.readyState != 1) { testWebSocketLog(); }
+}, 10000);
 function SaveJson(path, data) { WSsend('SaveJson|' + path + '|' + data); }
 //function SaveFile(path,data){WSsend('SaveFile|'+path+'|'+data);}
 function SaveFile(path, data) { WSsend(JSON.stringify({ "SaveFile": { "path": path, "data": data } })) }
@@ -379,6 +408,18 @@ function parseSocket(msg) {
 		if (z[0] === "speakerRemove") { eventE.emit('speakerRemove', JSON.parse(z.slice(1).join('|'))); }
 		if (z[0] === "speakerSetIP") { eventE.emit('speakerSetIP', JSON.parse(z.slice(1).join('|'))); }
 		if (z[0] === "speakerState") { eventE.emit('speakerState', JSON.parse(z.slice(1).join('|'))); }
+		// ── LG NetCast TV messages ──────────────────────────────────────────────
+		if (z[0] === "lgtvList") { eventE.emit('lgtvList', JSON.parse(z.slice(1).join('|'))); }
+		if (z[0] === "lgtvScan") { eventE.emit('lgtvScan', JSON.parse(z.slice(1).join('|'))); }
+		if (z[0] === "lgtvCheck") { eventE.emit('lgtvCheck', JSON.parse(z.slice(1).join('|'))); }
+		if (z[0] === "lgtvAdd") { eventE.emit('lgtvAdd', JSON.parse(z.slice(1).join('|'))); }
+		if (z[0] === "lgtvRemove") { eventE.emit('lgtvRemove', JSON.parse(z.slice(1).join('|'))); }
+		if (z[0] === "lgtvSetIP") { eventE.emit('lgtvSetIP', JSON.parse(z.slice(1).join('|'))); }
+		if (z[0] === "lgtvRequestCode") { eventE.emit('lgtvRequestCode', JSON.parse(z.slice(1).join('|'))); }
+		if (z[0] === "lgtvPair") { eventE.emit('lgtvPair', JSON.parse(z.slice(1).join('|'))); }
+		if (z[0] === "lgtvKey") { eventE.emit('lgtvKey', JSON.parse(z.slice(1).join('|'))); }
+		if (z[0] === "lgtvVolume") { eventE.emit('lgtvVolume', JSON.parse(z.slice(1).join('|'))); }
+		if (z[0] === "lgtvChannel") { eventE.emit('lgtvChannel', JSON.parse(z.slice(1).join('|'))); }
 		if (z[0] === "ZD_RSP") {
 			if (z[2] == "00" || z[2] == "Ok") {
 				//toastr["success"]("<div>"+z[3]+"</div><div>"+z[1]+" Status: "+z[2]+"</div>");
