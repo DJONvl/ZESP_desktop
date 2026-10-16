@@ -23,6 +23,14 @@
   var edges = [];
   var networkEvents = [];
   var curInd = 0;
+  // Защита опроса: максимум страниц таблицы соседей с одного адреса.
+  // Прошивка с врущим total иначе крутит запросы минутами.
+  var pageNum = 0;
+  var MAX_PAGES = 8;
+  // Аварийный предохранитель: сколько ответов обработано за один проход.
+  // Любой зацикленный опрос обрывается сам, фронт не вешается.
+  var rspCount = 0;
+  var MAX_RSP = 300;
   var messages2send = [];
   var tim_map = null;
   var autoFitted = false;
@@ -77,12 +85,15 @@
   }
 
   // ── LQI request queue ──
+  // Один таймер на каждый запрос: потерянный ответ всегда сдвигает
+  // очередь, опрос не висит вечно.
   function scheduleTimeout() {
     if (tim_map) clearTimeout(tim_map);
     tim_map = setTimeout(function () {
       if (tim_map) clearTimeout(tim_map);
       if (messages2send.length) {
         curInd = 0;
+        pageNum = 0;
         messages2send.shift();
         if (messages2send.length) { WSsend(messages2send[0].cmd); scheduleTimeout(); }
         else finishLoad();
@@ -90,6 +101,8 @@
     }, 3000);
   }
   function nextMsg() {
+    curInd = 0;
+    pageNum = 0;
     messages2send.shift();
     if (messages2send.length) { WSsend(messages2send[0].cmd); scheduleTimeout(); }
     else finishLoad();
@@ -104,15 +117,36 @@
   }
 
   function listenerLQI_RSP(tmp) {
-    if (tmp === 'timeout') return;
+    // Опрос уже завершён (финиш по таймауту или лимиту): опоздавшие ответы
+    // не рисуем и новых запросов по ним не шлём.
+    if (!mapLoading) return;
+    // Предохранитель от зацикливания: обрываем проход принудительно.
+    if (++rspCount > MAX_RSP) {
+      console.warn('zigbeemap: опрос оборван по лимиту, ответов: ' + rspCount);
+      messages2send = [];
+      curInd = 0;
+      pageNum = 0;
+      finishLoad();
+      return;
+    }
+    if (tmp === 'timeout') { if (tim_map) clearTimeout(tim_map); nextMsg(); return; }
     if (!tmp || tmp.error) {
-      curInd = 0; messages2send.shift();
-      if (messages2send.length) WSsend(messages2send[0].cmd);
-      else finishLoad();
+      if (tim_map) clearTimeout(tim_map);
+      nextMsg();
+      return;
+    }
+    // Привязка ответа к адресу: сырой путь отдаёт SrcAddr отправителя.
+    // Пусто (старый путь, ошибка) — fallback на голову очереди, как раньше.
+    var head = String((messages2send[0] && messages2send[0].nwkAddr) || '0000').toUpperCase();
+    var adr = (tmp.SrcAddr && tmp.SrcAddr.length === 4) ? String(tmp.SrcAddr).toUpperCase() : head;
+    if (adr !== head) {
+      // Опоздавший ответ (опрос уже ушёл дальше): только дорисовываем
+      // соседей с верным источником. Очередь, таймеры и запросы не трогаем.
+      tmp.src_addr = adr;
+      parseMap(tmp);
       return;
     }
     if (tim_map) clearTimeout(tim_map);
-    var adr = (messages2send[0] && messages2send[0].nwkAddr) || '0000';
     tmp.src_addr = adr;
     parseMap(tmp);
 
@@ -124,15 +158,17 @@
       });
       var total = parseInt(tmp.NeighborTableEntries, 16);
       var count = parseInt(tmp.NeighborTableListCount, 16);
-      if (!isNaN(total) && !isNaN(count) && total > (count + curInd)) {
+      // count==0 — прогресса нет (устройство врёт total): повтор того же
+      // запроса крутился бы вечно. Идём дальше.
+      // pageNum — вторая защита: total врёт в большую сторону.
+      if (!isNaN(total) && !isNaN(count) && count > 0 && total > (count + curInd) && pageNum < MAX_PAGES) {
+        pageNum++;
         curInd += count;
         WSsend('LQI_REQ|' + adr + '|' + Hex(curInd, 2));
         scheduleTimeout();
-      } else { curInd = 0; nextMsg(); }
+      } else { nextMsg(); }
     } else {
-      curInd = 0; messages2send.shift();
-      if (messages2send.length) WSsend(messages2send[0].cmd);
-      else finishLoad();
+      nextMsg();
     }
   }
 
@@ -153,15 +189,20 @@
     messages2send = [];
     autoFitted = false;
     mapLoading = true;
+    curInd = 0;
+    pageNum = 0;
+    rspCount = 0;
     if (nodesDS) nodesDS.clear();
     if (edgesDS) edgesDS.clear();
-    messages2send.push({ cmd: 'LQI_REQ|0000|0', nwkAddr: '0000' });
+    messages2send.push({ cmd: 'LQI_REQ|0000|00', nwkAddr: '0000' });
     for (var i = 1; i < deviceList.length; i++) {
       if (deviceList[i]['DevType'] === 'ZR') {
-        messages2send.push({ cmd: 'LQI_REQ|' + deviceList[i].Device + '|0', nwkAddr: deviceList[i].Device });
+        messages2send.push({ cmd: 'LQI_REQ|' + deviceList[i].Device + '|00', nwkAddr: deviceList[i].Device });
       }
     }
-    WSsend('LQI_REQ|0000|00');
+    if (tim_map) clearTimeout(tim_map);
+    WSsend(messages2send[0].cmd);
+    scheduleTimeout();
   }
 
   function buildNodes() {
@@ -228,6 +269,59 @@
     return 'other';
   }
 
+  // Длина ребра — по типу связи, не по уровню сигнала.
+  // Уровень (LQI) живёт только в подписи; иначе физику рвёт:
+  // плохой сигнал давал короткое ребро и стягивал узлы в кучу,
+  // а одно и то же ребро прыгало в длине от порядка ответов.
+  function edgeStyle(kind) {
+    // Соседи (магистраль роутер-роутер) — вне физики: линии рисуются,
+    // но карту не тянут. Иначе их клубок перетаскиванием не распутать.
+    if (kind === 'sibling') return { color: 'gold', dashes: true, physics: false };
+    if (kind === 'parent') return { length: EDGE_LENGTH_SUB, color: 'green' };
+    if (kind === 'child') return { length: EDGE_LENGTH_SUB, color: 'white' };
+    return { length: EDGE_LENGTH_SUB };
+  }
+
+  // Встречная пара A→B / B→A — один факт эфира (оба конца видят друг
+  // друга). Храним одно ребро на пару: ключ по отсортированным концам.
+  // Подпись двойная «туда/обратно» (от меньшего адреса к большему и назад):
+  // асимметрия линка видна сразу. Свежий ответ дописывает своё направление,
+  // а не плодит вторую линию.
+  // Приоритет типа при конфликте в паре: иерархия бьёт соседей,
+  // родитель бьёт ребёнка — зелёные не затираются белыми.
+  function kindRank(kind) {
+    if (kind === 'parent') return 4;
+    if (kind === 'child') return 3;
+    if (kind === 'sibling') return 2;
+    return 1;
+  }
+
+  function upsertPairEdge(srcId, neighborId, lqiLabel, kind) {
+    var a = Math.min(srcId, neighborId), b = Math.max(srcId, neighborId);
+    var id = a + ':' + b;
+    var old = null;
+    for (var i = 0; i < edges.length; i++) {
+      if (edges[i].id === id) { old = edges[i]; break; }
+    }
+    var lq1 = old ? old.lq1 : '', lq2 = old ? old.lq2 : '';
+    if (srcId === a) lq1 = lqiLabel; else lq2 = lqiLabel;
+    var label = lq1 && lq2 ? lq1 + '/' + lq2 : (lq1 || lq2);
+    var keepKind = kind;
+    if (old && kindRank(old.kind) > kindRank(kind)) keepKind = old.kind;
+    var st = edgeStyle(keepKind);
+    var edge = { id: id, label: label, from: a, to: b,
+      length: st.length || EDGE_LENGTH_SUB, kind: keepKind,
+      physics: st.physics !== false, lq1: lq1, lq2: lq2 };
+    if (st.color) edge.color = st.color;
+    if (st.dashes) edge.dashes = true;
+    if (old) {
+      for (var j = 0; j < edges.length; j++) {
+        if (edges[j].id === id) { edges[j] = edge; return; }
+      }
+    }
+    edges.push(edge);
+  }
+
   function parseMap(dev) {
     if (dev.Status === '00') {
       if (nodes.length === 0) buildNodes();
@@ -243,27 +337,8 @@
           var nmid = tryname(ModelIdDev(neighbor.ExtendedAddress));
           if (!nodes.some(function (n) { return n.id === neighborId; })) {
             nodes.push({ id: neighborId, label: nmid + '\n' + neighbor.ExtendedAddress, image: deviceIconSrc(neighbor.ExtendedAddress) || (DIR + nmid + '.jpg'), shape: 'circularImage', color: { background: '#f4f6fa', border: '#8a94a8' } });
-            var newKind = relKind(neighbor.Relationship, neighbor.DeviceType);
-            var newEdge = { id: srcId + '>' + neighborId, label: lqiLabel, from: srcId, to: neighborId, length: EDGE_LENGTH_SUB, kind: newKind };
-            if (newKind === 'child') newEdge.color = 'white';
-            else if (newKind === 'sibling') { newEdge.color = 'gold'; newEdge.dashes = true; newEdge.length = EDGE_LENGTH_MAIN * 2; }
-            else if (newKind === 'parent') newEdge.color = 'green';
-            edges.push(newEdge);
-          } else {
-            var edKind = relKind(neighbor.Relationship, neighbor.DeviceType);
-            var edgeData = {
-              id: srcId + '>' + neighborId,
-              label: lqiLabel,
-              from: srcId,
-              to: neighborId,
-              length: isNaN(lqi) ? EDGE_LENGTH_SUB : lqi,
-              kind: edKind
-            };
-            if (edKind === 'child') edgeData.color = 'white';
-            else if (edKind === 'sibling') { edgeData.color = 'gold'; edgeData.dashes = true; edgeData.length = EDGE_LENGTH_MAIN * 2; }
-            else if (edKind === 'parent') edgeData.color = 'green';
-            if (!edges.some(function (e) { return e.from === edgeData.from && e.to === edgeData.to; })) edges.push(edgeData);
           }
+          upsertPairEdge(srcId, neighborId, lqiLabel, relKind(neighbor.Relationship, neighbor.DeviceType));
         });
       }
       redrawMap();
@@ -297,6 +372,9 @@
       interaction: { hover: true, dragNodes: true, dragView: true, zoomView: true },
       autoResize: true,
       nodes: { shape: 'box' },
+      // Прямые линии: динамическое сглаживание без физики рисует
+      // дикие дуги через полкарты вместо связей.
+      edges: { smooth: false },
       layout: { improvedLayout: false },
       physics: {
         enabled: true,
@@ -442,20 +520,18 @@
       '</div></div></div>',
 
     setup(node) {
-      node._state = { loopTimer: null, wsOnLQI: null, wsOnReport: null, wsOnDevList: null, destroyed: false };
+      node._state = { loopTimer: null, wsOnLQI: null, wsOnReport: null, destroyed: false };
 
       node._state.wsOnReport = function (report) {
         try { if (report && report[0] && report[0].ShortAddr) putEventToNode(parseInt('0x' + report[0].ShortAddr, 16)); } catch (e) {}
       };
       node._state.wsOnLQI = function (tmp) { listenerLQI_RSP(tmp); };
-      node._state.wsOnDevList = function () {
-        // deviceList arrived/updated after reload — rebuild the map
-        if (network && deviceList && deviceList.length) reqMap();
-      };
+      // Авто-перестроения по updateDeviceList НЕТ (убрано): alldev летит при
+      // каждом изменении и крутил опрос бесконечно. Перестроение — кнопкой
+      // (zigbeeMapRefresh) и один раз при открытии.
       if (window.eventE) {
         eventE.on('report', node._state.wsOnReport);
         eventE.on('LQI_RSP', node._state.wsOnLQI);
-        eventE.on('updateDeviceList', node._state.wsOnDevList);
       }
 
       loadVis(function () {
@@ -494,7 +570,6 @@
       if (window.eventE) {
         if (node._state.wsOnLQI) eventE.off('LQI_RSP', node._state.wsOnLQI);
         if (node._state.wsOnReport) eventE.off('report', node._state.wsOnReport);
-        if (node._state.wsOnDevList) eventE.off('updateDeviceList', node._state.wsOnDevList);
       }
       if (tim_map) clearTimeout(tim_map);
       tim_map = null;
