@@ -1,30 +1,93 @@
 // yandexedit.js — редактор описания Яндекс (ya_rep) для Device editor.
 // Вынесен из templateedit.js. Зависимости (рантайм, globals):
-// te_file, te_currentYaObj (чтение/запись), te_syncLive(), te_YA_JSON внутри.
+// te_file, te_currentYaObj / te_currentYaMode / te_yre_draft (чтение/запись),
+// te_syncLive(), te_YA_JSON внутри. Окно редактирует всё устройство:
+// слева список каналов + библиотека шаблонов, справа — выбранный канал.
+// Правки копятся в te_yre_draft и пишутся в te_file только по «Применить».
 // Подключается в desktop/index.html ПОСЛЕ templateedit.js.
 
 // ===== YA REP EDITOR =====
 te_YA_JSON = {"capability": [{"on_off": {"desc": "Включение/выключение", "tpl": {"type": "devices.capabilities.on_off", "retrievable": true, "reportable": true, "state": {"instance": "on", "value": false}}}}, {"color_setting": {"desc": "Цвет (температура K)", "tpl": {"type": "devices.capabilities.color_setting", "retrievable": true, "reportable": true, "parameters": {"temperature_k": {"max": 6500, "min": 1000}}, "state": {"instance": "temperature_k", "value": 4000}}}}, {"range": {"desc": "Диапазон — выбери instance ▼", "tpl": {"type": "devices.capabilities.range", "retrievable": true, "reportable": true, "parameters": {}, "arparameter": [{"instance": "brightness", "random_access": true, "range": {"max": 100, "min": 1, "precision": 1}, "unit": "unit.percent"}, {"instance": "volume", "random_access": true, "range": {"max": 100, "min": 0, "precision": 1}, "unit": "unit.percent"}, {"instance": "open", "random_access": true, "range": {"max": 100, "min": 0, "precision": 10}, "unit": "unit.percent"}, {"instance": "humidity", "random_access": true, "range": {"max": 100, "min": 10, "precision": 10}, "unit": "unit.percent"}, {"instance": "temperature", "random_access": true, "range": {"max": 40, "min": 18, "precision": 1}, "unit": "unit.temperature.celsius"}, {"instance": "channel", "random_access": true, "range": {"min": 0, "max": 999, "precision": 1}}], "state": {"instance": "brightness", "value": 50}}}}, {"toggle": {"desc": "Переключатель — выбери instance ▼", "tpl": {"type": "devices.capabilities.toggle", "retrievable": true, "reportable": true, "parameters": {}, "arparameter": [{"instance": "backlight"}, {"instance": "controls_locked"}, {"instance": "ionization"}, {"instance": "keep_warm"}, {"instance": "mute"}, {"instance": "oscillation"}, {"instance": "pause"}]}}}, {"mode": {"desc": "Режим работы — выбери instance ▼", "tpl": {"type": "devices.capabilities.mode", "retrievable": true, "reportable": true, "parameters": {}, "arparameter": [{"instance": "fan_speed", "modes": [{"value": "auto"}, {"value": "high"}, {"value": "medium"}, {"value": "low"}, {"value": "quiet"}, {"value": "turbo"}]}, {"instance": "thermostat", "modes": [{"value": "auto"}, {"value": "fan_only"}, {"value": "heat"}, {"value": "cool"}, {"value": "dry"}, {"value": "preheat"}]}, {"instance": "work_speed", "modes": [{"value": "auto"}, {"value": "fast"}, {"value": "max"}, {"value": "medium"}, {"value": "min"}, {"value": "slow"}, {"value": "turbo"}]}, {"instance": "swing", "modes": [{"value": "vertical"}, {"value": "horizontal"}, {"value": "stationary"}, {"value": "auto"}]}, {"instance": "program", "modes": [{"value": "auto"}, {"value": "eco"}, {"value": "express"}, {"value": "normal"}, {"value": "quiet"}]}, {"instance": "input_source", "modes": [{"value": "one"}, {"value": "two"}, {"value": "three"}, {"value": "four"}, {"value": "five"}, {"value": "hdmi"}, {"value": "hdmi1"}, {"value": "hdmi2"}]}, {"instance": "cleanup_mode", "modes": [{"value": "auto"}, {"value": "eco"}, {"value": "express"}, {"value": "normal"}, {"value": "quiet"}]}, {"instance": "tea_mode", "modes": [{"value": "black_tea"}, {"value": "green_tea"}, {"value": "oolong_tea"}, {"value": "express"}]}]}}}], "float": [{"amperage": {"desc": "Ток (А)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "amperage", "unit": "unit.ampere"}, "state": {"instance": "amperage", "value": 0}}}}, {"battery_level": {"desc": "Заряд батареи (%)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "battery_level", "unit": "unit.percent"}, "state": {"instance": "battery_level", "value": 0}}}}, {"co2_level": {"desc": "CO₂ (ppm)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "co2_level", "unit": "unit.ppm"}, "state": {"instance": "co2_level", "value": 0}}}}, {"humidity": {"desc": "Влажность (%)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "humidity", "unit": "unit.percent"}, "state": {"instance": "humidity", "value": 0}}}}, {"illumination": {"desc": "Освещённость (лк)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "illumination", "unit": "unit.illumination.lux"}, "state": {"instance": "illumination", "value": 0}}}}, {"pm1_density": {"desc": "PM1 (мкг/м³)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "pm1_density", "unit": "unit.density.mcg_m3"}, "state": {"instance": "pm1_density", "value": 0}}}}, {"pm2_5_density": {"desc": "PM2.5 (мкг/м³)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "pm2.5_density", "unit": "unit.density.mcg_m3"}, "state": {"instance": "pm2.5_density", "value": 0}}}}, {"pm10_density": {"desc": "PM10 (мкг/м³)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "pm10_density", "unit": "unit.density.mcg_m3"}, "state": {"instance": "pm10_density", "value": 0}}}}, {"power": {"desc": "Мощность (Вт)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "power", "unit": "unit.watt"}, "state": {"instance": "power", "value": 0}}}}, {"pressure": {"desc": "Давление (мм рт.ст.)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "pressure", "unit": "unit.pressure.mmhg"}, "state": {"instance": "pressure", "value": 0}}}}, {"temperature": {"desc": "Температура (°C)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "temperature", "unit": "unit.temperature.celsius"}, "state": {"instance": "temperature", "value": 0}}}}, {"tvoc": {"desc": "TVOC органика (мкг/м³)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "tvoc", "unit": "unit.density.mcg_m3"}, "state": {"instance": "tvoc", "value": 0}}}}, {"voltage": {"desc": "Напряжение (В)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "voltage", "unit": "unit.volt"}, "state": {"instance": "voltage", "value": 0}}}}, {"water_level": {"desc": "Уровень воды (%)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "water_level", "unit": "unit.percent"}, "state": {"instance": "water_level", "value": 0}}}}, {"electricity_meter": {"desc": "Счётчик эл.энергии (кВт·ч)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "electricity_meter", "unit": "unit.kilowatt_hour"}, "state": {"instance": "electricity_meter", "value": 0}}}}, {"water_meter": {"desc": "Счётчик воды (м³)", "tpl": {"type": "devices.properties.float", "retrievable": true, "reportable": true, "parameters": {"instance": "water_meter", "unit": "unit.cubic_meter"}, "state": {"instance": "water_meter", "value": 0}}}}], "event": [{"vibration": {"desc": "Вибрация / наклон / падение", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "vibration", "events": [{"value": "tilt"}, {"value": "fall"}, {"value": "vibration"}]}, "state": {"instance": "vibration", "value": "vibration"}}}}, {"open": {"desc": "Открытие / закрытие", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "open", "events": [{"value": "opened"}, {"value": "closed"}]}, "state": {"instance": "open", "value": "opened"}}}}, {"button": {"desc": "Кнопка (клик / двойной / удержание)", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "button", "events": [{"value": "click"}, {"value": "double_click"}, {"value": "long_press"}]}, "state": {"instance": "button", "value": "click"}}}}, {"motion": {"desc": "Движение / покой", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "motion", "events": [{"value": "detected"}, {"value": "not_detected"}]}, "state": {"instance": "motion", "value": "not_detected"}}}}, {"smoke": {"desc": "Дым", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "smoke", "events": [{"value": "detected"}, {"value": "not_detected"}]}, "state": {"instance": "smoke", "value": "not_detected"}}}}, {"gas": {"desc": "Газ", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "gas", "events": [{"value": "detected"}, {"value": "not_detected"}]}, "state": {"instance": "gas", "value": "not_detected"}}}}, {"water_leak": {"desc": "Протечка", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "water_leak", "events": [{"value": "dry"}, {"value": "leak"}]}, "state": {"instance": "water_leak", "value": "dry"}}}}, {"battery_level": {"desc": "Заряд батареи (событие low/normal)", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "battery_level", "events": [{"value": "low"}, {"value": "normal"}]}, "state": {"instance": "battery_level", "value": "normal"}}}}, {"water_level": {"desc": "Уровень воды (событие low/normal)", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "water_level", "events": [{"value": "low"}, {"value": "normal"}]}, "state": {"instance": "water_level", "value": "normal"}}}}, {"food_level": {"desc": "Уровень корма (empty/normal)", "tpl": {"type": "devices.properties.event", "retrievable": true, "reportable": true, "parameters": {"instance": "food_level", "events": [{"value": "empty"}, {"value": "normal"}]}, "state": {"instance": "food_level", "value": "normal"}}}}]};
 
 te_currentYaObj = null;
-te_currentYaData = null; // editor working object
+te_currentYaData = null; // editor working object (mode === 'obj')
+te_currentYaMode = 'auto'; // 'obj' | 'none' | 'auto' — режим активного канала
+te_yre_draft = null;       // черновики по всем каналам: key -> {mode, data}
+te_yre_leftView = 'chan';  // левая панель: 'chan' (каналы) | 'lib' (библиотека)
 
 te_yre_getObj = function() {
   return te_currentYaData;
 };
 
+// HTML-escape для подписей в списках
+te_yre_esc = function(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+};
+
+// Эффективное ya_rep канала из ФАЙЛА (без черновика)
+te_yre_fileEff = function(key) {
+  var ro = (window.te_file && te_file.Report && te_file.Report[key]) || {};
+  var n = te_yre_parseYaRep(ro.ya_rep);
+  if (n.kind === 'none') return { mode: 'none', data: null };
+  if (n.kind === 'obj') return { mode: 'obj', data: n.data };
+  if (n.kind === 'bad') return { mode: 'auto', data: null, bad: true };
+  return { mode: 'auto', data: null };
+};
+
+// Эффективное ya_rep канала: черновик, иначе файл
+te_yre_eff = function(key) {
+  if (te_yre_draft && Object.prototype.hasOwnProperty.call(te_yre_draft, key)) return te_yre_draft[key];
+  return te_yre_fileEff(key);
+};
+
+// Есть ли несохранённые правки в канале
+te_yre_isDirty = function(key) {
+  if (!te_yre_draft || !Object.prototype.hasOwnProperty.call(te_yre_draft, key)) return false;
+  var cur = te_yre_draft[key], saved = te_yre_fileEff(key);
+  if (cur.mode !== saved.mode) return true;
+  if (cur.mode === 'obj') {
+    try { return JSON.stringify(cur.data) !== JSON.stringify(saved.data); } catch (e) { return true; }
+  }
+  return false;
+};
+
+// Что канал значит для Яндекса — словами, без имён типов.
+// «float» или «range:temperature» человеку ничего не говорят — нужны иконка и название.
+te_yre_effectLabel = function(d) {
+  try {
+    if (!d) return '—';
+    if (d.multi_id) return '🔀 Отдельное устройство: ' + (d.multi_id.name || 'без имени');
+    var caps = d.capabilities || [], props = d.properties || [];
+    var total = caps.length + props.length;
+    if (!total) return '<span style="color:var(--faint)">пусто</span>';
+    var first = caps.length ? { o: caps[0], isCap: true } : { o: props[0], isCap: false };
+    var c = te_yre_card(first.o, first.isCap);
+    return c.icon + ' <b>' + c.title + '</b>' + (total > 1 ? ' <span style="color:var(--faint)">+' + (total - 1) + '</span>' : '');
+  } catch (e) { return '—'; }
+};
+
 te_yre_setObj = function(obj) {
   te_currentYaData = JSON.parse(JSON.stringify(obj)); // deep copy
+  te_currentYaMode = 'obj';
   te_yre_refreshPreview();
 };
 
 // ─── JSON preview ───
+// Центральная точка обновления: синхронизирует текущий канал в черновик,
+// перерисовывает превью/устройство/список каналов.
 te_yre_refreshPreview = function() {
+  if (te_currentYaObj && window.te_file && te_file.Report && te_file.Report[te_currentYaObj]) {
+    if (!te_yre_draft) te_yre_draft = {};
+    te_yre_draft[te_currentYaObj] = { mode: te_currentYaMode, data: te_currentYaData };
+  }
   const pre = document.getElementById('te_yre_preview');
-  if (!pre) return;
-  const d = te_currentYaData;
-  if (!d) { pre.textContent = '—'; } else { pre.textContent = JSON.stringify(d, null, 2); }
+  if (pre) {
+    const d = te_currentYaData;
+    if (!d) { pre.textContent = '—'; } else { pre.textContent = JSON.stringify(d, null, 2); }
+  }
   try { te_yre_refreshDevice(); } catch (e) { console.log('yre device', e); }
+  try { te_yre_renderChans(); } catch (e) { console.log('yre chans', e); }
 };
 
 // ─── Режим вкладок «Понятно / JSON» ───
@@ -211,7 +274,7 @@ te_yre_shortType = function(t) {
 // ─── Человекочитаемая расшифровка одного умения/свойства ───
 te_yre_humanOne = function(o, isCap) {
   try {
-    var icon = isCap ? '⚡' : '📊';
+    var icon = te_yre_card(o, isCap).icon; // тот же набор иконок, что и в карточках
     var type = te_yre_shortType(o.type);
     var p = o.parameters || {};
     var inst = p.instance || ((o.state && o.state.instance) || '');
@@ -240,10 +303,10 @@ te_yre_humanOne = function(o, isCap) {
 };
 
 // ─── Сборка итогового устройства «как увидит Яндекс» ───
-// Склеивает ya_rep всех каналов te_file.Report; текущий редактируемый канал
-// подменяется несохранённым te_currentYaData. Повторяет логику бэкенда:
-// buildDeviceList + zesp2ya (internal/yandex/hubws.go) — multi_id уходит
-// отдельными устройствами, 'none' скрывает канал, пусто = автоподбор по role.
+// Склеивает ya_rep всех каналов te_file.Report; значения берутся из черновиков
+// (te_yre_eff), так что сводка и валидация сразу видят несохранённые правки.
+// Повторяет логику бэкенда: buildDeviceList + zesp2ya (internal/yandex/hubws.go) —
+// multi_id уходит отдельными устройствами, 'none' скрывает канал, пусто = автоподбор по role.
 te_yre_collectDevice = function() {
   var dev = { name: '', room: '', type: '', id: '', caps: [], props: [], multis: [], chans: [], empty: false };
   if (!window.te_file) return dev;
@@ -257,22 +320,19 @@ te_yre_collectDevice = function() {
   var autoCount = 0, noneCount = 0;
   keys.forEach(function (k) {
     var ro = rep[k] || {};
-    var val = (k === te_currentYaObj) ? te_currentYaData : ro.ya_rep;
-    // несохранённый редактор: null = пользователь ещё ничего не выбрал,
-    // тогда берём сохранённое значение канала
-    if (k === te_currentYaObj && (val === null || val === undefined)) val = ro.ya_rep;
-    var n = te_yre_parseYaRep(val);
-    var ch = { key: k, label: ro.label || '', parsed: ro.parsed, kind: n.kind, caps: [], props: [], multi: null };
-    if (n.kind === 'obj' && n.data) {
-      if (n.data.multi_id) {
-        ch.multi = n.data.multi_id;
-        dev.multis.push({ key: k, multi: n.data.multi_id, caps: n.data.capabilities || [], props: n.data.properties || [] });
+    var eff = te_yre_eff(k);
+    var kind = (eff.mode === 'obj') ? 'obj' : (eff.mode === 'none' ? 'none' : 'empty');
+    var ch = { key: k, label: ro.label || '', parsed: ro.parsed, kind: kind, caps: [], props: [], multi: null };
+    if (eff.mode === 'obj' && eff.data) {
+      if (eff.data.multi_id) {
+        ch.multi = eff.data.multi_id;
+        dev.multis.push({ key: k, multi: eff.data.multi_id, caps: eff.data.capabilities || [], props: eff.data.properties || [] });
       } else {
-        (n.data.capabilities || []).forEach(function (c) { ch.caps.push(c); dev.caps.push({ key: k, cap: c }); });
-        (n.data.properties || []).forEach(function (p) { ch.props.push(p); dev.props.push({ key: k, prop: p }); });
+        (eff.data.capabilities || []).forEach(function (c) { ch.caps.push(c); dev.caps.push({ key: k, cap: c }); });
+        (eff.data.properties || []).forEach(function (p) { ch.props.push(p); dev.props.push({ key: k, prop: p }); });
       }
-    } else if (n.kind === 'empty') { autoCount++; }
-    else if (n.kind === 'none') { noneCount++; }
+    } else if (eff.mode === 'none') { noneCount++; }
+    else { autoCount++; }
     dev.chans.push(ch);
   });
   dev.autoCount = autoCount;
@@ -370,41 +430,241 @@ te_yre_short = function(val) {
     if (d.multi_id) return '🔀 ' + ((d.multi_id && d.multi_id.name) || '?');
     var t = (d.capabilities || []).map(function (c) { return te_yre_shortType(c.type); })
       .concat((d.properties || []).map(function (p) { return te_yre_shortType(p.type); }));
-    return (d.capabilities ? '⚡ ' : '📊 ') + (t.join(', ') || 'пусто');
+    return t.join(', ') || 'пусто';
   }
   return '—';
+};
+
+// ─── Превью карточек в стиле приложения Яндекс ───
+// Яндекс рисует capabilities и properties разными группами: «Управление» и
+// «Датчики». Словари РАЗНЫЕ и намеренно не объединены: один и тот же instance
+// в capabilities и в properties — разные сущности (temperature в capabilities
+// — уставка, в properties — показание), сливать их в одну карту нельзя.
+te_YA_CARD_CAP = {  // управление — то, чем устройство УПРАВЛЯЮТ (только цветные эмодзи)
+  on:               ['💡', 'Вкл/выкл'],
+  brightness:       ['☀️', 'Яркость'],
+  volume:           ['🔊', 'Громкость'],
+  open:             ['🎚', 'Положение'],
+  temperature:      ['🌡', 'Уставка температуры'],
+  channel:          ['📺', 'Канал'],
+  thermostat:       ['🔀', 'Режим работы'],
+  fan_speed:        ['🌀', 'Скорость вентилятора'],
+  work_speed:       ['🌀', 'Рабочая скорость'],
+  hsv:              ['🎨', 'Цвет'],
+  temperature_k:    ['🎨', 'Цветовая температура'],
+  backlight:        ['🌟', 'Подсветка'],
+  mute:             ['🔇', 'Без звука'],
+  pause:            ['⏸️', 'Пауза'],
+  controls_locked:  ['🔒', 'Блокировка'],
+  ionization:       ['⚡', 'Ионизация'],
+  keep_warm:        ['♨️', 'Подогрев'],
+  oscillation:      ['🔄', 'Колебания']
+};
+
+te_YA_CARD_PROP = { // показания — то, что устройство ПОКАЗЫВАЕТ (только цветные эмодзи)
+  temperature:      ['🌡', 'Температура'],
+  humidity:         ['💧', 'Влажность'],
+  battery:          ['🔋', 'Заряд'],
+  battery_charging: ['🔋', 'Заряд'],
+  illumination:     ['🔆', 'Освещённость'],
+  illuminance:      ['🔆', 'Освещённость'],
+  light_level:      ['🔆', 'Освещённость'],
+  pressure:         ['⚖️', 'Давление'],
+  co2:              ['🌫', 'CO₂'],
+  'ppM2.5_density': ['🏭', 'PM2.5'],
+  pm25:             ['🏭', 'PM2.5'],
+  pm10:             ['🌪', 'PM10'],
+  tvoc:             ['🌿', 'ЛОВС'],
+  voc:              ['🍃', 'VOC'],
+  noise:            ['📣', 'Шум'],
+  voltage:          ['⚡', 'Напряжение'],
+  current:          ['🔌', 'Ток'],
+  amperage:         ['🔌', 'Ток'],
+  power:            ['💡', 'Мощность'],
+  energy:           ['📈', 'Энергия'],
+  wind_speed:       ['🌬', 'Скорость ветра'],
+  soil_moisture:    ['🌱', 'Влажность почвы'],
+  signal_level:     ['📶', 'Уровень сигнала'],
+  water_leak:       ['💦', 'Протечка'],
+  motion:           ['🚶', 'Движение'],
+  door:             ['🚪', 'Дверь'],
+  smoke:            ['🔥', 'Дым'],
+  gas:              ['☁',  'Газ'],
+  vibration:        ['📳', 'Вибрация'],
+  button:           ['🔘', 'Кнопка'],
+  online:           ['🟢', 'Связь']
+};
+
+// Иконка + название по instance из СВОЕГО словаря (управление/показание)
+te_yre_card = function(o, isCap) {
+  var p = o.parameters || {}, st = o.state || {};
+  var inst = p.instance || st.instance || '';
+  var dict = isCap ? te_YA_CARD_CAP : te_YA_CARD_PROP;
+  var hit = dict[String(inst)];
+  if (hit) return { icon: hit[0], title: hit[1] };
+  var short = te_yre_shortType(o.type);
+  if (isCap) return { icon: '🎛', title: short };
+  return { icon: '📈', title: short === 'float' ? 'Показание' : short };
+};
+
+// Единица: из шаблона Яндекса, иначе class.unit_of_measurement канала
+te_yre_unit = function(o, key) {
+  var map = { 'percent': '%', 'temperature.celsius': '°C', 'temperature.fahrenheit': '°F' };
+  var u = (o.parameters && o.parameters.unit) || '';
+  if (u) {
+    u = String(u).replace(/^unit\./, '');
+    return map[u] || u;
+  }
+  try {
+    var cls = te_yre_chanClass(key);
+    if (cls && cls.unit_of_measurement) return String(cls.unit_of_measurement);
+  } catch (e) {}
+  return '';
+};
+
+// Текущее значение канала (parsed, иначе val) — как его увидит Яндекс
+te_yre_valStr = function(key) {
+  try {
+    var ro = te_file.Report[key] || {};
+    var v = (ro.parsed !== undefined && ro.parsed !== null && ro.parsed !== '') ? ro.parsed : ro.val;
+    if (v === undefined || v === null || v === '') return '—';
+    if (typeof v === 'boolean') return v ? 'да' : 'нет';
+    if (typeof v === 'object') return '—';
+    var n = parseFloat(String(v).replace(',', '.'));
+    if (isFinite(n)) {
+      var r = Math.round(n * 100) / 100;
+      return (r === 0 || r % 1 === 0) ? String(r) : String(r);
+    }
+    return String(v).substring(0, 24);
+  } catch (e) { return '—'; }
+};
+
+// Режим работы для capability `mode`: в Яндекс уходит ИМЯ режима, а не ZCL-код.
+// Порядок как в zesp2ya: пары "имя:HEX" из class.modes → канон ZCL SystemMode →
+// кламп к parameters.modes (иначе Яндекс роняет весь discovery).
+te_YA_MODE_RU = { off: 'Выключен', auto: 'Авто', heat: 'Отопление', cool: 'Охлаждение', dry: 'Сушка', fan_only: 'Вентиляция' };
+te_YA_SYSMODE = { 0: 'off', 1: 'auto', 2: 'auto', 3: 'cool', 4: 'heat', 5: 'heat', 6: 'cool', 7: 'fan_only', 8: 'dry', 9: 'auto' };
+
+te_yre_rawVal = function(key) {
+  try {
+    var ro = te_file.Report[key] || {};
+    var v = (ro.parsed !== undefined && ro.parsed !== null && ro.parsed !== '') ? ro.parsed : ro.val;
+    return v === undefined ? null : v;
+  } catch (e) { return null; }
+};
+
+// Пары "имя:HEX" из class.modes канала → [[имя, код]]
+te_yre_devModePairs = function(key) {
+  var out = [];
+  try {
+    var ro = te_file.Report[key] || {};
+    var m = null;
+    if (ro.class && typeof ro.class === 'object') m = ro.class.modes;
+    if (m == null) {
+      var role = String(ro.role || ''), ai = role.indexOf('&');
+      if (ai !== -1) { try { m = JSON.parse(role.slice(ai + 1)).modes; } catch (e) {} }
+    }
+    if (m == null) return out;
+    var list = Array.isArray(m) ? m : String(m).split(',');
+    list.forEach(function (s) {
+      s = String(s == null ? '' : s).trim();
+      if (!s) return;
+      var ci = s.lastIndexOf(':');
+      if (ci > 0 && ci < s.length - 1) {
+        var nm = s.slice(0, ci).trim(), code = s.slice(ci + 1).trim();
+        var n = parseInt(code, 16);
+        if (isFinite(n) && nm) out.push([nm, n]);
+      } else {
+        out.push([s, null]);
+      }
+    });
+  } catch (e) {}
+  return out;
+};
+
+te_yre_modeVal = function(o, key) {
+  var allowed = ((o.parameters && o.parameters.modes) || []).map(function (m) {
+    return String((m && m.value != null) ? m.value : m);
+  });
+  var raw = te_yre_rawVal(key);
+  var name = null;
+  var pairs = te_yre_devModePairs(key);
+  var n = parseFloat(String(raw).replace(',', '.'));
+  // 1) код из пар class.modes выигрывает у канона
+  if (isFinite(n) && pairs.length) {
+    for (var i = 0; i < pairs.length; i++) {
+      if (pairs[i][1] !== null && pairs[i][1] === n) { name = pairs[i][0]; break; }
+    }
+  }
+  // 2) значение уже строкой (устройство шлёт имя режима)
+  if (name === null && typeof raw === 'string' && raw.trim() && isNaN(n)) name = raw.trim();
+  // 3) канон ZCL SystemMode
+  if (name === null && isFinite(n) && te_YA_SYSMODE[n] !== undefined) name = te_YA_SYSMODE[n];
+  if (name === null) return '—';
+  // 4) кламп к объявленному modes — иначе Яндекс отвергнет устройство
+  if (allowed.length && allowed.indexOf(name) === -1) name = allowed[0];
+  return te_YA_MODE_RU[name] || name;
+};
+
+// Значение + единица для карточки — с учётом типа умения
+te_yre_cardVal = function(o, isCap, key) {
+  var t = te_yre_shortType(o.type);
+  if (isCap && t === 'mode') return { v: te_yre_modeVal(o, key), u: '' };
+  if (isCap && (t === 'on_off' || t === 'toggle')) {
+    var raw = te_yre_rawVal(key);
+    var s = String(raw == null ? '' : raw).trim().toLowerCase();
+    var on = (raw === true || s === 'on' || s === '1' || s === 'true' || s === 'вкл');
+    return { v: on ? 'вкл' : 'выкл', u: '' };
+  }
+  return { v: te_yre_valStr(key), u: te_yre_unit(o, key) };
+};
+
+// Строка «значение — название» без плиток и без ключа канала:
+// ключ и так есть в списке каналов слева, в плитке он только ломал вёрстку.
+te_yre_cardRow = function(key, o, isCap) {
+  var c = te_yre_card(o, isCap);
+  var cv = te_yre_cardVal(o, isCap, key);
+  var hi = key === te_currentYaObj;
+  return '<div style="display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px;' +
+    (hi ? 'background:var(--bg3);' : '') + '">' +
+    '<span style="font-size:14px;line-height:1;width:16px;text-align:center">' + c.icon + '</span>' +
+    '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
+    (hi ? 'font-weight:600;' : '') + '">' + te_yre_esc(c.title) + '</span>' +
+    '<b style="white-space:nowrap">' + te_yre_esc(cv.v) + (cv.u ? ' ' + te_yre_esc(cv.u) : '') + '</b>' +
+    '</div>';
 };
 
 // ─── Перерисовка панели «Как увидит Яндекс» ───
 te_yre_refreshDevice = function() {
   var dev = te_yre_collectDevice();
-  // --- строка статуса: сохранено vs выбрано ---
+  // --- строка статуса: что канал значит для Яндекса + кнопка выбора нового ---
   var stBox = document.getElementById('te_yre_status');
   if (stBox) {
-    var savedVal = null;
-    try { savedVal = window.te_file.Report[te_currentYaObj].ya_rep; } catch (e) {}
-    var dirty = false;
-    try {
-      var sNorm = te_yre_parseYaRep(savedVal);
-      var sKey = sNorm.kind === 'obj' ? JSON.stringify(sNorm.data) : sNorm.kind;
-      var cKey = te_currentYaData ? JSON.stringify(te_currentYaData) : sKey;
-      dirty = (te_currentYaData && cKey !== sKey);
-    } catch (e) {}
-    stBox.innerHTML = 'Сохранено: <b>' + te_yre_short(savedVal) + '</b> · Выбрано: <b>' +
-      (te_currentYaData ? te_yre_short(te_currentYaData) : '—') + '</b>' +
-      (dirty ? ' <span style="color:var(--yellow)">● не применено</span>' : '');
+    var eff = te_currentYaObj ? te_yre_eff(te_currentYaObj) : { mode: 'auto', data: null };
+    var dirty = te_currentYaObj ? te_yre_isDirty(te_currentYaObj) : false;
+    var label;
+    if (!te_currentYaObj) label = '<span style="color:var(--faint)">выбери канал слева</span>';
+    else if (eff.mode === 'none') label = '🚫 Скрыт от Яндекса';
+    else if (eff.mode === 'auto') label = '🤖 Авто по role';
+    else label = te_yre_effectLabel(eff.data);
+    stBox.innerHTML = '<b>Канал ' + te_yre_esc(te_currentYaObj || '—') + '</b> · ' + label +
+      (dirty ? ' <span style="color:var(--yellow)">● не применено</span>' : '') +
+      ' <button class="obj-mnu-btn" style="padding:1px 8px;margin-left:6px" ' +
+      'onclick="te_yre_lview(\'lib\')" title="Открыть библиотеку и выбрать другое описание канала">Изменить</button>';
   }
   // --- расшифровка текущего канала ---
   var human = document.getElementById('te_yre_human');
   if (human && te_currentYaData) {
     var h = '';
+    var del = function (ix, fn) {
+      return '<span onclick="' + fn + '(' + ix + ')" title="Убрать из канала"' +
+        ' style="position:absolute;right:4px;top:2px;cursor:pointer;color:var(--red);font-weight:bold">✖</span>';
+    };
     (te_currentYaData.capabilities || []).forEach(function (c, cix) {
-      h += '<div style="position:relative">' + te_yre_humanOne(c, true) +
-        '<span onclick="te_yre_delCap(' + cix + ')" title="Убрать умение из канала" style="cursor:pointer;color:var(--red)">✖</span></div>';
+      h += '<div style="position:relative;padding-right:16px">' + te_yre_humanOne(c, true) + del(cix, 'te_yre_delCap') + '</div>';
     });
     (te_currentYaData.properties || []).forEach(function (p, pix) {
-      h += '<div style="position:relative">' + te_yre_humanOne(p, false) +
-        '<span onclick="te_yre_delProp(' + pix + ')" title="Убрать свойство из канала" style="cursor:pointer;color:var(--red)">✖</span></div>';
+      h += '<div style="position:relative;padding-right:16px">' + te_yre_humanOne(p, false) + del(pix, 'te_yre_delProp') + '</div>';
     });
     if (te_currentYaData.multi_id) {
       var m = te_currentYaData.multi_id;
@@ -412,7 +672,13 @@ te_yre_refreshDevice = function() {
         (m.name || 'без имени') + '</b> · ' + (m.room || 'без комнаты') + ' · ' + (m.type || '?') + '</div>';
     }
     human.innerHTML = h || '<span style="color:var(--faint)">—</span>';
-  } else if (human) { human.innerHTML = '<span style="color:var(--faint)">Пока пусто — выбери шаблон слева.</span>'; }
+  } else if (human) {
+    if (te_currentYaMode === 'none') {
+      human.innerHTML = '<span style="color:var(--faint)">Канал скрыт от Яндекса (none). Назначь шаблон в «Библиотеке», чтобы снова показать его Алисе.</span>';
+    } else {
+      human.innerHTML = '<span style="color:var(--faint)">Авто по role — Яндекс подберёт описание сам. Можно переопределить шаблоном из «Библиотеки».</span>';
+    }
+  }
   // --- живое значение канала ---
   var live = document.getElementById('te_yre_live');
   if (live) {
@@ -485,47 +751,43 @@ te_yre_refreshDevice = function() {
       }).join('');
     }
   }
-  // --- устройство целиком ---
+  // --- устройство целиком: превью как в приложении Яндекс ---
   var box = document.getElementById('te_yre_device');
   if (!box) return;
-  var s = '<div style="margin-bottom:6px"><b>' + (dev.name || 'Без имени') + '</b> · ' + (dev.room || 'без комнаты') +
-    '<br><span style="color:var(--faint)">type: ' + (dev.type || '?') + ' · id: ' + (dev.id || '?') + '</span></div>';
-  s += '<div style="margin-bottom:4px">📦 Умения: <b>' + dev.caps.length + '</b> · Свойства: <b>' + dev.props.length + '</b>';
-  if (dev.autoCount) s += ' · <span style="color:var(--faint)">авто по role: ' + dev.autoCount + '</span>';
-  if (dev.noneCount) s += ' · <span style="color:var(--faint)">скрыто (none): ' + dev.noneCount + '</span>';
-  s += '</div>';
-  s += '<div style="max-height:120px;overflow-y:auto;margin-bottom:6px">';
-  dev.chans.forEach(function (ch) {
-    var mark = '?', desc = '';
-    var isCur = (ch.key === te_currentYaObj);
-    if (ch.kind === 'none') { mark = '🚫'; desc = 'скрыт'; }
-    else if (ch.kind === 'empty') { mark = '🤖'; desc = 'авто по role'; }
-    else if (ch.kind === 'bad') { mark = '❌'; desc = 'битый JSON'; }
-    else if (ch.multi) { mark = '🔀'; desc = '→ ' + (ch.multi.name || ch.key) + (ch.label ? ' (' + ch.label + ')' : ''); }
-    else {
-      var names = [];
-      ch.caps.forEach(function (c) {
-        var ci = (c.parameters && c.parameters.instance) ? ':' + c.parameters.instance : '';
-        names.push(te_yre_shortType(c.type) + ci);
-      });
-      ch.props.forEach(function (p) {
-        var pi = (p.parameters && p.parameters.instance) ? ':' + p.parameters.instance : '';
-        names.push(te_yre_shortType(p.type) + pi);
-      });
-      mark = ch.caps.length ? '⚡' : '📊';
-      desc = (ch.label ? ch.label + ' — ' : '') + (names.join(', ') || 'пусто');
-      if (isCur) desc = '<b>' + desc + ' ✏️ редактируется</b>';
-    }
-    s += '<div style="font-size:11px;padding:2px 0;border-bottom:1px solid var(--border)">' + mark + ' <span style="font-family:monospace">' +
-      ch.key + '</span> — ' + desc + '</div>';
-  });
-  s += '</div>';
+  var s = '<div style="margin-bottom:2px"><b>' + te_yre_esc(dev.name || 'Без имени') + '</b>' +
+    (dev.room ? ' · ' + te_yre_esc(dev.room) : ' · <span style="color:var(--faint)">без комнаты</span>') + '</div>';
+  s += '<div style="color:var(--faint);font-size:10px;margin-bottom:8px;word-break:break-all;">' +
+    te_yre_esc(dev.type || 'type не задан') + ' · ' + te_yre_esc(dev.id || '?') + '</div>';
+
+  // Группа «Управление» — то, чем устройство управляют
+  if (dev.caps.length) {
+    s += '<div style="font-weight:700;font-size:11px;margin:8px 0 2px;">Управление · ' + dev.caps.length + '</div>';
+    dev.caps.forEach(function (e) { s += te_yre_cardRow(e.key, e.cap, true); });
+  }
+
+  // Группа «Датчики» — то, что устройство показывает
+  if (dev.props.length) {
+    s += '<div style="font-weight:700;font-size:11px;margin:8px 0 2px;">Датчики · ' + dev.props.length + '</div>';
+    dev.props.forEach(function (e) { s += te_yre_cardRow(e.key, e.prop, false); });
+  }
+
+  if (!dev.caps.length && !dev.props.length) {
+    s += '<div style="color:var(--faint);margin-top:4px">Управления и показаний нет — Яндекс отвергнет устройство.</div>';
+  } else if (!dev.caps.length) {
+    s += '<div style="color:var(--faint);font-size:10px;margin-top:6px;">Управления нет — устройство только показывает.</div>';
+  }
+
+  if (dev.autoCount || dev.noneCount) {
+    s += '<div style="color:var(--faint);font-size:10px;margin-top:6px;">Ещё: авто по role ' + dev.autoCount +
+      ' · скрыто ' + dev.noneCount + '</div>';
+  }
+  if (dev.empty) s += '<div style="color:var(--red);margin-top:6px">Ни одного умения или свойства — Яндекс отвергнет устройство целиком.</div>';
   if (dev.multis.length) {
-    s += '<div style="margin-bottom:4px"><b>🔀 Отдельных устройств: ' + dev.multis.length + '</b></div>';
+    s += '<div class="ce-divider"></div><div style="margin-bottom:3px;font-weight:700;font-size:11px;">Отдельные устройства (multi): ' + dev.multis.length + '</div>';
     dev.multis.forEach(function (m) {
-      s += '<div style="font-size:11px;padding:3px 6px;margin-bottom:3px;background:var(--bg3);border-radius:4px">🔀 <b>' +
-        (m.multi.name || '?') + '</b> · ' + (m.multi.room || '?') + ' · ' + (m.multi.type || '?') +
-        '<br><span style="color:var(--faint)">id: ' + dev.id + '^' + m.key + '</span></div>';
+      s += '<div style="font-size:10px;padding:3px 6px;margin-bottom:3px;background:var(--bg3);border-radius:4px">' +
+        te_yre_esc(m.multi.name || '?') + ' · ' + te_yre_esc(m.multi.room || '?') + ' · ' + te_yre_esc(m.multi.type || '?') +
+        '<br><span style="color:var(--faint)">id: ' + te_yre_esc(dev.id) + '^' + te_yre_esc(m.key) + '</span></div>';
     });
   }
   box.innerHTML = s;
@@ -549,7 +811,13 @@ te_yre_setAddMode = function(on) {
 
 // ─── Добавить умения/свойства к текущему объекту (не заменяя) ───
 te_yre_addObj = function(obj) {
-  if (!te_currentYaData) { te_yre_setObj(obj); return; }
+  if (!te_currentYaData) {
+    te_currentYaData = JSON.parse(JSON.stringify(obj));
+    te_currentYaMode = 'obj';
+    te_yre_refreshPreview();
+    try { te_yre_syncFlags(); } catch (e) {}
+    return;
+  }
   var d = te_currentYaData;
   ['capabilities', 'properties'].forEach(function (k) {
     if (!obj[k] || !obj[k].length) return;
@@ -574,7 +842,7 @@ te_yre_delProp = function(ix) {
 
 // ─── Template list render: дерево, варианты arparameter — дети узла ───
 te_yre_renderList = function() {
-  const container = document.getElementById('te_yre_list');
+  const container = document.getElementById('te_yre_tpllist') || document.getElementById('te_yre_list');
   if (!container) return;
   const Ya = te_YA_JSON;
   const catLabels = { capability: '⚡ Capability', float: '📊 Float', event: '🔔 Event' };
@@ -624,6 +892,8 @@ te_yre_selectTpl = function(cat, i) {
   if (window.te_yre_addMode) te_yre_addObj(tt); else te_yre_setObj(tt);
   te_yre_syncFlags();
   te_yre_renderList();
+  // шаблон выбран — возвращаемся к списку каналов, чтобы был виден результат
+  if (te_yre_leftView === 'lib') te_yre_lview('chan');
 };
 
 // ─── Сборка объекта шаблона из te_YA_JSON (общее для модалки и вкладки) ───
@@ -685,20 +955,23 @@ te_yre_selectTpl_arp = function(cat, i, j) {
   window.te_yre_selTpl = null;
   window.te_yre_selArp = cat + ':' + i + ':' + j;
   te_yre_renderList();
+  // вариант выбран — возвращаемся к списку каналов, чтобы был виден результат
+  if (te_yre_leftView === 'lib') te_yre_lview('chan');
 };
 
 // ─── retrievable/reportable flag sync with the current object ───
 te_yre_syncFlags = function() {
   const d = te_currentYaData;
-  if (!d) return;
   let retr = false, repo = false;
-  try {
-    const arr = d.capabilities || d.properties || [];
-    retr = arr[0].retrievable === true;
-    repo = arr[0].reportable  === true;
-  } catch(e) {}
-  document.getElementById('te_yre_retrievable').checked = retr;
-  document.getElementById('te_yre_reportable').checked  = repo;
+  if (d) {
+    try {
+      const arr = d.capabilities || d.properties || [];
+      retr = arr[0].retrievable === true;
+      repo = arr[0].reportable  === true;
+    } catch(e) {}
+  }
+  var r = document.getElementById('te_yre_retrievable'); if (r) r.checked = retr;
+  var p = document.getElementById('te_yre_reportable');  if (p) p.checked = repo;
 };
 
 // ─── Updating flags in the object on checkbox click ───
@@ -719,9 +992,13 @@ te_yre_updateFlags = function() {
 te_yre_toggleMulti = function() {
   const on  = document.getElementById('te_yre_multi').checked;
   const fld = document.getElementById('te_yre_multi_fields');
-  fld.style.display = on ? 'block' : 'none';
   const d = te_currentYaData;
-  if (!d) return;
+  if (!d) {
+    document.getElementById('te_yre_multi').checked = false;
+    fld.style.display = 'none';
+    return;
+  }
+  fld.style.display = on ? 'block' : 'none';
   if (on) {
     if (!d.multi_id) d.multi_id = { name: '', room: '', type: 'devices.types.other' };
     document.getElementById('te_yre_mname').value = d.multi_id.name || '';
@@ -742,69 +1019,179 @@ te_yre_updateMulti = function() {
   te_yre_refreshPreview();
 };
 
-// ─── Opening the editor ───
-te_openYaRepEditor = function(obj) {
-  te_currentYaObj = obj;
-  const ro = te_file.Report[obj];
-  let val = ro.ya_rep;
-
-  // Normalize to an object
-  if (!val || val === 'none') {
-    te_currentYaData = null;
-  } else {
-    try {
-      te_currentYaData = (typeof val === 'object') ? JSON.parse(JSON.stringify(val)) : JSON.parse(val);
-    } catch(e) { te_currentYaData = null; }
+// ─── Левая панель: список каналов устройства + библиотека шаблонов ───
+// Перестраиваем существующую колонку модалки (#te_yre_list живёт в разметке
+// TE_BODY внутри div шириной 200px) в двухрежимную панель.
+te_yre_buildLeftPanel = function() {
+  var panel = document.getElementById('te_yre_left');
+  if (!panel) {
+    var anchor = document.getElementById('te_yre_list');
+    if (!anchor) return;
+    panel = anchor.parentNode;
+    panel.id = 'te_yre_left';
   }
+  panel.style.width = '240px';
+  panel.style.display = 'flex';
+  panel.style.flexDirection = 'column';
+  panel.style.minHeight = '0';
+  panel.innerHTML = te_yre_leftHtml();
+  te_yre_lview(te_yre_leftView || 'chan');
+};
 
-  try { te_yre_tab('human'); } catch (e) {}
-  try { te_yre_setAddMode(false); } catch (e) {}
+te_yre_leftHtml = function() {
+  return '' +
+    '<div style="padding:4px 6px;border-bottom:1px solid var(--border);display:flex;gap:4px;align-items:center;flex-shrink:0;">' +
+      '<button id="te_yre_libBack" class="obj-mnu-btn" style="padding:1px 8px" onclick="te_yre_lview(\'chan\')" title="Вернуться к списку каналов">← Каналы</button>' +
+      '<span id="te_yre_lhint" style="font-size:10px;color:var(--faint)"></span>' +
+    '</div>' +
+    '<div id="te_yre_chanlist" style="flex:1;overflow-y:auto;padding:2px 0;font-size:12px;"></div>' +
+    '<div id="te_yre_libbox" style="display:none;flex:1;min-height:0;flex-direction:column;">' +
+      '<div style="padding:4px 6px;border-bottom:1px solid var(--border);display:flex;gap:4px;align-items:center;flex-shrink:0;">' +
+        '<button id="te_yre_btn_replace" class="obj-mnu-btn" style="padding:1px 6px;background:var(--accent);color:#fff;border-color:var(--accent)" onclick="te_yre_setAddMode(false)" title="Клик по шаблону заменит умения канала целиком">Заменить</button>' +
+        '<button id="te_yre_btn_add" class="obj-mnu-btn" style="padding:1px 6px" onclick="te_yre_setAddMode(true)" title="Клик по шаблону добавит умение к текущим (напр. mode + on_off от SystemMode)">+ Добавить</button>' +
+      '</div>' +
+      '<div id="te_yre_tpllist" style="flex:1;overflow-y:auto;padding:4px 0;font-size:12px;"></div>' +
+    '</div>';
+};
+
+te_yre_lview = function(v) {
+  te_yre_leftView = v;
+  var chan = document.getElementById('te_yre_chanlist');
+  var lib  = document.getElementById('te_yre_libbox');
+  var back = document.getElementById('te_yre_libBack');
+  var hint = document.getElementById('te_yre_lhint');
+  var isLib = (v === 'lib');
+  if (chan) chan.style.display = isLib ? 'none' : 'block';
+  if (lib)  lib.style.display  = isLib ? 'flex' : 'none';
+  if (back) back.style.display = isLib ? 'inline-block' : 'none';
+  if (hint) hint.innerHTML = isLib
+    ? 'Выбери шаблон для канала <b>' + te_yre_esc(te_currentYaObj || '') + '</b>'
+    : 'Каналы устройства';
+  if (isLib) { try { te_yre_renderList(); } catch (e) {} }
+};
+
+// Список каналов устройства со статусами (авто / скрыт / типы / multi / ● изменено)
+te_yre_renderChans = function() {
+  var box = document.getElementById('te_yre_chanlist');
+  if (!box) return;
+  if (!window.te_file || !te_file.Report) { box.innerHTML = ''; return; }
+  var rep = te_file.Report;
+  var h = '';
+  Object.keys(rep).forEach(function (k) {
+    var ro = rep[k] || {};
+    var eff = te_yre_eff(k);
+    var mark = '?', desc = '';
+    if (eff.mode === 'none') { mark = '🚫'; desc = 'скрыт от Яндекса'; }
+    else if (eff.mode === 'auto') { mark = '🤖'; desc = eff.bad ? 'битый JSON → авто' : 'авто по role'; }
+    else {
+      var d = eff.data || {};
+      if (d.multi_id) { mark = '🔀'; desc = 'отдельное: ' + (d.multi_id.name || 'multi'); }
+      else {
+        var names = [];
+        (d.capabilities || []).forEach(function (c) {
+          var i = (c.parameters && c.parameters.instance) || (c.state && c.state.instance) || '';
+          names.push(te_yre_shortType(c.type) + (i ? ':' + i : ''));
+        });
+        (d.properties || []).forEach(function (p) {
+          var i = (p.parameters && p.parameters.instance) || '';
+          names.push(te_yre_shortType(p.type) + (i ? ':' + i : ''));
+        });
+        var firstObj = null, firstIsCap = false;
+        if (d.capabilities && d.capabilities.length) { firstObj = d.capabilities[0]; firstIsCap = true; }
+        else if (d.properties && d.properties.length) { firstObj = d.properties[0]; firstIsCap = false; }
+        // та же иконка, что и в карточке — один стиль на весь редактор
+        mark = firstObj ? te_yre_card(firstObj, firstIsCap).icon : '📈';
+        desc = names.join(', ') || 'пусто';
+      }
+    }
+    var dirty = te_yre_isDirty(k) ? ' <span style="color:var(--yellow)" title="не применено">●</span>' : '';
+    var active = (k === te_currentYaObj) ? ' yre-active' : '';
+    h += '<div class="yre-item' + active + '" style="padding:4px 8px;line-height:1.3;white-space:normal"' +
+      ' title="' + te_yre_esc(ro.label || k) + '" onclick="te_yre_loadChan(\'' + k + '\')">' +
+      mark + ' <span style="font-family:monospace;font-size:11px">' + te_yre_esc(k) + '</span>' + dirty +
+      '<div style="font-size:10px;opacity:0.75">' + (ro.label ? te_yre_esc(ro.label) + ' — ' : '') + te_yre_esc(desc) + '</div>' +
+      '</div>';
+  });
+  box.innerHTML = h || '<div style="padding:6px 8px;color:var(--faint)">В устройстве нет объектов</div>';
+};
+
+// Загрузка канала в редактор (без потери несохранённых правок других каналов)
+te_yre_loadChan = function(key) {
+  if (!key || !window.te_file || !te_file.Report || !te_file.Report[key]) return;
+  te_currentYaObj = key;
+  var eff = te_yre_eff(key);
+  te_currentYaMode = eff.mode;
+  te_currentYaData = (eff.mode === 'obj' && eff.data) ? JSON.parse(JSON.stringify(eff.data)) : null;
   window.te_yre_expanded = null;
   window.te_yre_selTpl = null;
   window.te_yre_selArp = null;
-  te_yre_renderList();
-  te_yre_refreshPreview();
-  te_yre_syncFlags();
-
-  // Multi-id
-  const hasMulti = te_currentYaData && te_currentYaData.multi_id;
-  document.getElementById('te_yre_multi').checked = !!hasMulti;
-  document.getElementById('te_yre_multi_fields').style.display = hasMulti ? 'block' : 'none';
+  try { te_yre_renderList(); } catch (e) {}
+  try { te_yre_syncFlags(); } catch (e) {}
+  // Multi-device шапка
+  var hasMulti = te_currentYaData && te_currentYaData.multi_id;
+  var mc = document.getElementById('te_yre_multi');
+  if (mc) mc.checked = !!hasMulti;
+  var mf = document.getElementById('te_yre_multi_fields');
+  if (mf) mf.style.display = hasMulti ? 'block' : 'none';
   if (hasMulti) {
     document.getElementById('te_yre_mname').value = te_currentYaData.multi_id.name || '';
     document.getElementById('te_yre_mroom').value = te_currentYaData.multi_id.room || '';
     document.getElementById('te_yre_mtype').value = te_currentYaData.multi_id.type || 'devices.types.other';
   }
-
-  document.getElementById('te_yaRepEditorWnd').style.display = 'flex';
+  te_yre_refreshPreview();
 };
 
-// ─── Closing ───
-te_closeYaRepEditor = function() {
+// ─── Opening the editor (сразу во весь рост) ───
+te_openYaRepEditor = function(obj) {
+  te_yre_draft = {};
+  te_yre_buildLeftPanel();
+  try { te_yre_tab('human'); } catch (e) {}
+  try { te_yre_setAddMode(false); } catch (e) {}
+  var wnd = document.getElementById('te_yaRepEditorWnd');
+  wnd.style.display = 'flex';
+  var keys = Object.keys((window.te_file && te_file.Report) || {});
+  var first = (obj && te_file.Report && te_file.Report[obj]) ? obj : keys[0];
+  if (first) te_yre_loadChan(first);
+  else { te_currentYaObj = null; te_currentYaMode = 'auto'; te_currentYaData = null; te_yre_refreshPreview(); }
+};
+
+// Есть ли неприменённые правки в каком-либо канале
+te_yre_hasDirty = function() {
+  var d = te_yre_draft || {};
+  return Object.keys(d).some(function (k) {
+    try { return te_yre_isDirty(k); } catch (e) { return false; }
+  });
+};
+
+// ─── Closing (крестик / Отмена: черновики отбрасываются) ───
+// force=true — после «Применить», без вопроса.
+te_closeYaRepEditor = function(force) {
+  if (!force && te_yre_hasDirty()) {
+    if (!confirm('Есть неприменённые правки каналов.\nЗакрыть без применения?')) return;
+  }
   document.getElementById('te_yaRepEditorWnd').style.display = 'none';
   te_currentYaObj  = null;
   te_currentYaData = null;
+  te_currentYaMode = 'auto';
+  te_yre_draft = null;
 };
 
-// ─── Set none ───
+// ─── Режим канала: скрыть (none) ───
 te_setYaRepNone = function() {
-  const obj = te_currentYaObj;
-  if (!obj) return;
-  te_file.Report[obj].ya_rep = 'none';
-  te_yre_updateView(obj, null);
-  te_syncLive(true);
-  te_closeYaRepEditor();
+  if (!te_currentYaObj) return;
+  te_currentYaMode = 'none';
+  te_currentYaData = null;
+  te_yre_refreshPreview();
+  try { te_yre_syncFlags(); } catch (e) {}
 };
 
-// ─── Set auto: убрать ya_rep, Яндекс подберёт описание по role ───
+// ─── Режим канала: авто по role (убрать ya_rep) ───
 te_setYaRepAuto = function() {
-  const obj = te_currentYaObj;
-  if (!obj || !te_file.Report[obj]) return;
-  delete te_file.Report[obj].ya_rep;
-  const el = document.getElementById(obj + '_te_ya_rep_view');
-  if (el) el.innerHTML = '<span style="color:#5ac8fa">авто</span>';
-  te_syncLive(true);
-  te_closeYaRepEditor();
+  if (!te_currentYaObj || !te_file.Report[te_currentYaObj]) return;
+  te_currentYaMode = 'auto';
+  te_currentYaData = null;
+  te_yre_refreshPreview();
+  try { te_yre_syncFlags(); } catch (e) {}
 };
 
 // ─── Clear (the ✖ button in the table): сброс в авто ───
@@ -816,26 +1203,28 @@ te_clearYaRep = function(obj) {
   te_syncLive(true);
 };
 
-// ─── Apply ───
+// ─── Apply: записать черновики ВСЕХ изменённых каналов в устройство ───
 te_applyYaRepEditor = function() {
-  const obj = te_currentYaObj;
-  if (!obj) return;
-  const d = te_currentYaData;
-  if (!d) {
-    // Ничего не выбрано — оставить как было (не ставить none молча).
-    te_closeYaRepEditor();
-    return;
-  }
-  te_file.Report[obj].ya_rep = d;
-  te_yre_updateView(obj, d);
-  te_syncLive(true);
-  te_closeYaRepEditor();
+  var d = te_yre_draft || {};
+  Object.keys(d).forEach(function (k) {
+    if (!window.te_file || !te_file.Report || !te_file.Report[k]) return;
+    if (typeof te_yre_isDirty === 'function' && !te_yre_isDirty(k)) return;
+    var e = d[k];
+    if (e.mode === 'none') te_file.Report[k].ya_rep = 'none';
+    else if (e.mode === 'obj' && e.data) te_file.Report[k].ya_rep = e.data;
+    else delete te_file.Report[k].ya_rep;
+    te_yre_updateView(k, e.mode === 'obj' ? e.data : null, e.mode);
+  });
+  try { te_syncLive(true); } catch (e) {}
+  te_closeYaRepEditor(true);
 };
 
 // ─── Table row preview update ───
-te_yre_updateView = function(obj, d) {
+te_yre_updateView = function(obj, d, mode) {
   const el = document.getElementById(obj + '_te_ya_rep_view');
   if (!el) return;
+  if (mode === 'none') { el.innerHTML = '<span style="color:#bbb">none</span>'; return; }
+  if (mode === 'auto' || (!d && mode !== 'obj')) { el.innerHTML = '<span style="color:#5ac8fa">авто</span>'; return; }
   if (!d) { el.innerHTML = '<span style="color:#bbb">none</span>'; return; }
   try {
     var parts = [];
@@ -845,14 +1234,5 @@ te_yre_updateView = function(obj, d) {
     });
     el.textContent = parts.join(', ') || JSON.stringify(d).substring(0, 50);
   } catch(e) { el.textContent = '?'; }
-};
-
-// ─── Разворот модалки во весь рост (кнопка ⛶ в шапке) ───
-te_yre_expand = function() {
-  var w = document.getElementById('te_yaRepEditorWnd');
-  if (!w) return;
-  var box = w.querySelector('.ce-modal');
-  if (!box) return;
-  box.classList.toggle('yre-full');
 };
 

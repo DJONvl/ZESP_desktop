@@ -81,8 +81,11 @@ te_parseFile=function(file)
 		}
 		return;
 	}
-	window.te_fileLoaded = true;
-	if (window.te_retryIv) { clearInterval(window.te_retryIv); window.te_retryIv = null; }
+window.te_fileLoaded = true;
+  window.te_stat = {};
+  window.te_cfgPending = null;
+  window.te_bindPending = null;
+  if (window.te_retryIv) { clearInterval(window.te_retryIv); window.te_retryIv = null; }
 	if (window.te_retryHdl && window.eventE) { eventE.off("updateDeviceList", window.te_retryHdl); window.te_retryHdl = null; }
 	te_file={ ...src };
 
@@ -188,8 +191,16 @@ te_setObjAttr=function(ep,id,atr) {
 		document.getElementById('DataType').value = atEntry.t.toString(16).toUpperCase();
 	} catch(e) { console.warn("te_setObjAttr: нет в cl.js", id, atr); document.getElementById('DataType').value=""; }
 }
+// Выход из режима добавления объектов обратно к списку объектов устройства.
+// Раньше обратного перехода не было: из панели EP можно было выйти только
+// пересоздав файл или кликнув по шапке виджета.
+te_backToObjects = function() {
+	try { if (typeof te_stopSniff === 'function') te_stopSniff(); } catch(e) {}
+	try { te_drawJson(te_file); } catch(e) { console.warn('te_backToObjects', e); }
+	try { te_syncLive(true); } catch(e) {}
+};
+
 te_drawJsonEp = function() {
-      console.log("new obj");
 
       function listAttr(id,ep) {
 		  //debugger 
@@ -218,6 +229,15 @@ te_drawJsonEp = function() {
       document.getElementById("te_DeviceJson").innerHTML = '';
       jsonData = te_file;
       let html = `<div id='obj_mnu'>
+  <div class="obj-mnu-section">
+    <div class="obj-mnu-row">
+      <button class="obj-mnu-btn obj-mnu-btn-primary" onclick="te_backToObjects()" title="Вернуться к списку объектов устройства">← Объекты устройства</button>
+      <span class="obj-mnu-prev">объектов: ${Object.keys((window.te_file && te_file.Report) || {}).length}</span>
+    </div>
+  </div>
+
+  <div class="obj-mnu-divider"></div>
+
   <div class="obj-mnu-section">
     <div class="obj-mnu-row">
       <label class="obj-mnu-label">Object</label>
@@ -325,7 +345,9 @@ te_drawJson = function(js, obj) {
     const container = document.createDocumentFragment();
     const deviceDiv = document.createElement("div");
     deviceDiv.id = "Device_objects";
-    const btnAdd = (!obj) ? "<tr><td><button onclick='te_drawJsonEp()'> + object</button></td><td></td><td></td></tr>" : "";
+    const btnAdd = (!obj) ? "<tr><td><button onclick='te_drawJsonEp()'> + object</button></td>" +
+    "<td><button onclick='te_openYaRepEditor()' title='Редактор Яндекс: как каналы устройства уйдут в Алисе (ya_rep)'>Редактор Яндекс</button></td>" +
+    "<td></td></tr>" : "";
     
     // Build the table with deviceDiv
     deviceDiv.innerHTML = `
@@ -445,12 +467,15 @@ te_drawJson = function(js, obj) {
                     <div class="class-prop-preview" id="${obj}_te_classprop_view">${(()=>{try{let c=ro.class||{};delete c._dc;return Object.entries(c).map(([k,v])=>`${k}: ${v}`).join(', ')}catch(e){return ''}})()}</div>
                 </td>
             </tr>
-            <tr>
-                <td>cfg_report</td>
+<tr>
+                <td title="Настроить отчёт у устройства сейчас (ZCL Configure Reporting)">cfg_report</td>
                 <td colspan="2">
                     <div style="display:flex;align-items:center;gap:3px;">
-                        <div class="cfg-rpt-preview" id="${obj}_te_cfg_report_view">${(()=>{try{if(!ro.cfg_report)return '<span style=\"color:#bbb\">—</span>';const c=(typeof ro.cfg_report==='object')?ro.cfg_report:JSON.parse(ro.cfg_report);return `Dt:<b>${c.DataType}</b> ${parseInt(c.MinInterval,16)}..${parseInt(c.MaxInterval,16)}s Δ${parseInt(c.Change,16)}`}catch(e){return '<span style=\"color:#bbb\">—</span>'}})()}</div>
+                        <div class="cfg-rpt-preview" id="${obj}_te_cfg_report_view">${(()=>{try{if(!ro.cfg_report)return '<span style=\"color:#bbb\">—</span>';const c=(typeof ro.cfg_report==='object')?ro.cfg_report:JSON.parse(ro.cfg_report);return `Dt:<b>${c.DataType}</b> ${parseInt(c.MinInterval,16)}..${parseInt(c.MaxInterval,16)}s ?${parseInt(c.Change,16)}`}catch(e){return '<span style=\"color:#bbb\">—</span>'}})()}</div>
+                        <span class="cfg-rpt-status" id="${obj}_te_cfg_status">${te_statHtml('cfg', obj)}</span>
                         <button class="obj-mnu-btn" style="padding:1px 5px" onclick="te_openCfgReportEditor('${obj}')">✏️</button>
+                        <button class="obj-mnu-btn" style="padding:1px 5px" onclick="te_testCfgReport('${obj}')" title="Отправить подписку устройству сейчас — проверить, принимает ли">▶</button>
+                        <button class="obj-mnu-btn" style="padding:1px 5px" onclick="te_stopCfgReport('${obj}')" title="Отключить репорты устройства (Min=0000, Max=FFFF по ZCL)">⏹</button>
                         <button class="obj-mnu-btn" style="padding:1px 5px" onclick="te_clearCfgReport('${obj}')">✖</button>
                     </div>
                 </td>
@@ -472,8 +497,10 @@ te_drawJson = function(js, obj) {
                 <td colspan="2">
                     <div style="display:flex;align-items:center;gap:3px;">
                         <div class="cfg-rpt-preview" id="${obj}_te_bind_view">${te_bindPreview(obj)}</div>
+                        <span class="cfg-rpt-status" id="${obj}_te_bind_status">${te_statHtml('bind', obj)}</span>
                         <button class="obj-mnu-btn" style="padding:1px 5px" onclick="te_openBindEditor('${obj}')">✏️</button>
-                        <button class="obj-mnu-btn" style="padding:1px 5px" onclick="te_testBind('${obj}',true)" title="Проверить живьём">🔗</button>
+                        <button class="obj-mnu-btn" style="padding:1px 5px" onclick="te_testBind('${obj}',true)" title="Связать сейчас (BIND)">🔗</button>
+                        <button class="obj-mnu-btn" style="padding:1px 5px;color:var(--red)" onclick="te_testBind('${obj}',false)" title="Отвязать сейчас (UNBIND)">⛓</button>
                         <button class="obj-mnu-btn" style="padding:1px 5px" onclick="te_clearBind('${obj}')">✖</button>
                     </div>
                 </td>
@@ -1670,7 +1697,8 @@ te_closeBindEditor = function() {
     te_currentBindObj = null;
 };
 
-// Проверить бинд живьём (не сохраняет — только шлёт BIND/UNBIND)
+// Связать/отвязать живьём (не сохраняет — только шлёт BIND/UNBIND).
+// bind=true — BIND, false — UNBIND. Ответ приходит как status|BIND_REQUEST|…
 te_testBind = function(obj, bind) {
     if (!obj || !window.te_file || !te_file.Report[obj] || !te_file.Report[obj].bind) return;
     var b = te_file.Report[obj].bind;
@@ -1684,31 +1712,9 @@ te_testBind = function(obj, bind) {
             if (zc) dst = zc.IEEE;
         } catch(e) {}
     }
-    var req = {};
-    req[bind ? 'BIND_REQUEST' : 'UNBIND_REQUEST'] = {
-        _u64TargetExtAddr: te_file.IEEE,
-        u8TargetEndPoint: ep,
-        u16ClusterID: cl,
-        _u64DstAddr: dst,
-        u8DstEndPoint: b.dstEP || '',
-        u8DstAddrMode: parseInt(b.dstMode || '3', 10)
-    };
-    WSsend(JSON.stringify(req));
-};
-
-// Проверить бинд живьём (не сохраняет — только шлёт BIND/UNBIND)
-te_testBind = function(obj, bind) {
-    if (!obj || !window.te_file || !te_file.Report[obj] || !te_file.Report[obj].bind) return;
-    var b = te_file.Report[obj].bind;
-    var ep = obj.substring(0, 2).toUpperCase(), cl = obj.substring(2, 6).toUpperCase();
-    var dst = b.dst === 'COORD' ? '' : b.dst;
-    var m = /^GROUP:(.+)$/i.exec(dst || '');
-    if (m) dst = m[1];
     if (!dst) {
-        try {
-            var zc = (window.deviceList || []).find(function(z) { return z.DevType === 'ZC'; });
-            if (zc) dst = zc.IEEE;
-        } catch(e) {}
+        te_bindStatus(obj, '❌ нет адреса приёмника', 'err');
+        return;
     }
     var req = {};
     req[bind ? 'BIND_REQUEST' : 'UNBIND_REQUEST'] = {
@@ -1719,7 +1725,16 @@ te_testBind = function(obj, bind) {
         u8DstEndPoint: b.dstEP || '',
         u8DstAddrMode: parseInt(b.dstMode || '3', 10)
     };
+    var pend = { obj: obj, when: Date.now() };
+    te_bindStatus(obj, '⏳ ' + (bind ? 'bind' : 'unbind') + '…', 'wait');
+    window.te_bindPending = pend;
     WSsend(JSON.stringify(req));
+    setTimeout(function () {
+        if (window.te_bindPending === pend) {
+            window.te_bindPending = null;
+            te_bindStatus(obj, '❌ нет ответа 6 с', 'err');
+        }
+    }, 6500);
 };
 
 // ---------- GROUPS (поле groups записи 0004; EP — из ключа объекта) ----------
@@ -1852,6 +1867,115 @@ te_testWrite = function(obj) {
         u8DataLen: '01'
     };
     WSsend('writeAtribute|' + JSON.stringify(json));
+};
+
+// ---------- RECORD: проверка подписки cfg_report и bind/unbind живьём ----------
+// Состояние статусов — window.te_stat[kind][obj], функциям здесь нельзя давать
+// имя te_stat: сброс при смене устройства затирал бы функцию объектом.
+window.te_stat = window.te_stat || {};
+window.te_cfgPending = null;
+window.te_bindPending = null;
+
+te_statHtml = function(kind, obj) {
+    var m = (window.te_stat[kind] || {})[obj];
+    return m ? '<b class="' + m.c + '">' + m.t + '</b>' : '';
+};
+
+// Показать/запомнить результат последней отправки (text = null — очистить)
+te_setStat = function(kind, obj, text, cls) {
+    if (!obj) return;
+    if (!window.te_stat[kind]) window.te_stat[kind] = {};
+    if (text) window.te_stat[kind][obj] = { t: text, c: cls || '' };
+    else delete window.te_stat[kind][obj];
+    var el = document.getElementById(obj + '_te_' + kind + '_status');
+    if (el) el.innerHTML = te_statHtml(kind, obj);
+};
+
+te_cfgStatus = function(obj, text, cls) { te_setStat('cfg', obj, text, cls); };
+te_bindStatus = function(obj, text, cls) { te_setStat('bind', obj, text, cls); };
+
+// Разбор «BIND_REQUEST/UNBIND_REQUEST/CONFIG_REPORT» из события bindStatus:
+// socket.js эмитит его на любой status| — фильтруем по имени операции.
+te_onCfgStatus = function(txt) {
+    txt = txt || '';
+    var isCfg = txt.indexOf('CONFIG_REPORT') !== -1;
+    var isBind = /(UN)?BIND_REQUEST/.test(txt);
+    if (!isCfg && !isBind) return;
+    var p = isCfg ? window.te_cfgPending : window.te_bindPending;
+    if (isCfg) window.te_cfgPending = null; else window.te_bindPending = null;
+    if (!p) return;
+    var err = (txt.split('Status:')[1] || txt).replace('→', '').trim();
+    var bad = /error|timeout|not\s+connected|unreachable|unsupported|invalid|fail/i.test(err);
+    var mark = bad ? '❌ ' : '✅ ';
+    if (isCfg) te_cfgStatus(p.obj, mark + err, bad ? 'err' : 'ok');
+    else te_bindStatus(p.obj, mark + err, bad ? 'err' : 'ok');
+};
+
+// Собрать запрос подписки из записи объекта. off=true — отключение репортов.
+te_cfgRequest = function(obj, off) {
+    if (!window.te_file || !te_file.Device || !te_file.Report[obj]) return null;
+    var ro = te_file.Report[obj];
+    var cfg = {};
+    try {
+        if (ro.cfg_report) cfg = (typeof ro.cfg_report === 'object') ? ro.cfg_report : JSON.parse(ro.cfg_report);
+    } catch (e) {}
+    var ep = obj.substring(0, 2), cl = obj.substring(2, 6), at = obj.substring(6, 10);
+    // Тип: cfg_report → запись объекта → cl.js. Молчаливый дефолт означал бы
+    // Configure Reporting с чужим типом, и устройство отвечает 0x87.
+    var dt = String(cfg.DataType || ro.dataType || '').replace(/^0x/i, '');
+    if (!/^[0-9a-f]{1,2}$/i.test(dt)) {
+        dt = '';
+        try {
+            var e = clusters[parseInt(cl, 16)] && clusters[parseInt(cl, 16)].a[parseInt(at, 16)];
+            if (e && e.t !== undefined && e.t !== null) dt = Number(e.t).toString(16);
+        } catch (e2) {}
+    }
+    if (!/^[0-9a-f]{1,2}$/i.test(dt)) {
+        te_cfgStatus(obj, '❌ нет ZCL-типа (' + cl + '/' + at + ') — укажи DataType', 'err');
+        return null;
+    }
+    var hx = function (v, d) {
+        var s = String(v == null ? '' : v).replace(/^0x/i, '');
+        if (/^[0-9a-f]{1,4}$/i.test(s)) return s.toUpperCase().padStart(4, '0');
+        return d;
+    };
+    return {
+        u16ShortAddr: te_file.Device,
+        u8SrcEndPoint: '01',
+        u8DstEndPoint: ep,
+        u16ClusterID: cl,
+        u16AttribID: at,
+        u8AttribType: dt.toUpperCase().padStart(2, '0'),
+        u8ReportDirection: '00',
+        u8AttribDirection: '00',
+        u8DstAddrMode: '02',
+        // Отмена подписки по ZCL: Min=0x0000, Max=0xFFFF (не FFFF/FFFF —
+        // часть прошивок на 0xFFFF в Min отвечает 0x87/0x8C).
+        u16MinInterval: off ? '0000' : hx(cfg.MinInterval, '0001'),
+        u16MaxInterval: off ? 'FFFF' : hx(cfg.MaxInterval, '012C'),
+        u16TimeOut: hx(cfg.TimeOut, '0000'),
+        u8Change: hx(cfg.Change, '01').slice(2)
+    };
+};
+
+te_testCfgReport = function(obj, off) {
+    var req = te_cfgRequest(obj, off);
+    if (!req) return;
+    var pend = { obj: obj, when: Date.now() };
+    te_cfgStatus(obj, '⏳ отправляю…', 'wait');
+    window.te_cfgPending = pend;
+    WSsend('ConfigReportReg|' + JSON.stringify(req));
+    // Страховка: ответа может не быть вовсе (устройство вне сети, драйвер промолчал)
+    setTimeout(function () {
+        if (window.te_cfgPending === pend) {
+            window.te_cfgPending = null;
+            te_cfgStatus(obj, '❌ нет ответа 6 с', 'err');
+        }
+    }, 6500);
+};
+
+te_stopCfgReport = function(obj) {
+    te_testCfgReport(obj, true);
 };
 
 // ============================================================
@@ -2669,16 +2793,10 @@ var TE_CSS="\n\
 .cre-divider { height: 1px; background: var(--border2); margin: 6px 0; }\n\
 .cre-hint { font-size: 10px; color: var(--text-muted); margin-top: 4px; text-align: center; }\n\
 \n\
-/* === YA REP шапка как у окон + разворот на всю площадь === */\n\
-#te_yaRepEditorWnd .ce-header.yre-head{background:var(--bg3);color:var(--text);border-bottom:1px solid var(--border2);padding:8px 12px;font-weight:700;font-size:14px;}\n\
-#te_yaRepEditorWnd .yre-wbtns{display:flex;gap:2px;align-items:center;}\n\
-#te_yaRepEditorWnd .yre-wbtn{background:transparent;border:none;color:var(--muted);font-size:15px;cursor:pointer;padding:2px 7px;border-radius:6px;line-height:1;}\n\
-#te_yaRepEditorWnd .yre-wbtn:hover{background:var(--hover);color:var(--text);}\n\
-#te_yaRepEditorWnd .ce-modal.yre-full{width:100%!important;height:100%!important;max-height:100%!important;border-radius:0;border:none;}\n\
-#te_yaRepEditorWnd .ce-modal.yre-full .ce-body{display:flex;flex-direction:column;}\n\
-#te_yaRepEditorWnd .ce-modal.yre-full .yre-tall{flex:1;min-height:220px;height:auto!important;}\n\
-#te_yaRepEditorWnd .ce-modal.yre-full #te_yre_device{max-height:32vh;}\n\
-#te_yaRepEditorWnd .ce-modal.yre-full #te_yre_preview,#te_yaRepEditorWnd .ce-modal.yre-full #te_yre_preview_full{max-height:40vh;}\n\
+/* === YA REP: панель во всю площадь окна (не модалка) === */\n\#te_yaRepEditorWnd .ce-body{flex:1;min-height:0;}\n\
+#te_yaRepEditorWnd .yre-tall{flex:1;min-height:220px;height:auto!important;}\n\
+#te_yaRepEditorWnd #te_yre_device{max-height:32vh;}\n\
+#te_yaRepEditorWnd #te_yre_preview,#te_yaRepEditorWnd #te_yre_preview_full{max-height:40vh;}\n\
 \n\
 /* ya_rep preview в строке таблицы */\n\
 .ya-rep-preview {\n\
@@ -2705,6 +2823,16 @@ var TE_CSS="\n\
     text-overflow: ellipsis;\n\
     white-space: nowrap;\n\
 }\n\
+\n\
+/* результат живой отправки подписки (кнопки ▶/⏹ в строке cfg_report) */\n\
+.cfg-rpt-status {\n\
+    font-size: 10px;\n\
+    white-space: nowrap;\n\
+    flex-shrink: 0;\n\
+}\n\
+.cfg-rpt-status b.ok { color: #2e7d32; }\n\
+.cfg-rpt-status b.err { color: var(--red); }\n\
+.cfg-rpt-status b.wait { color: var(--muted); }\n\
 \n\
 /* ========== DEVICE INFO PANEL ========== */\n\
 #te_d {\n\
@@ -3265,7 +3393,7 @@ var TE_CSS="\n\
    Жёсткая привязка к краям body делает геометрию детерминированной. */\n\
 #te_d{top:0;left:0;right:0;bottom:0;}\n\
 ";
-var TE_BODY="\n\n\n<div style='position:absolute;display:flex; align-items: flex-start;' id='te_d'>\n<div id=\"te_leftCol\" style=\"flex-shrink:0; display:flex; flex-direction:column; overflow-y:auto;\">\n  <div id=\"te_DeviceWidget\" style=\"flex-shrink:0;\"></div>\n  <!-- SNIFF PANEL — постоянная левая колонка, не пропадает при навигации -->\n  <div id=\"te_sniffPanel\" style=\"display:none; flex-shrink:0;\">\n    <div class=\"sniff-header\">\n      <span>🎧 Sniff</span>\n      <div style=\"display:flex;gap:5px;align-items:center;\">\n        <span id=\"te_sniffCount\" class=\"sniff-count\">0</span>\n        <button class=\"sniff-add-all-btn\" onclick=\"te_sniffAddAll()\" title=\"Добавить все объекты\">+ All</button>\n        <button class=\"sniff-clear-btn\" onclick=\"te_clearSniff()\" title=\"Очистить\">🗑</button>\n      </div>\n    </div>\n    <div id=\"te_sniffList\" class=\"sniff-list\"></div>\n  </div>\n</div>\n<div id=\"te_DeviceJson\"></div>\t\n</div>\n\n<!-- CFG REPORT EDITOR MODAL -->\n<div id=\"te_cfgReportEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal cre-modal\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>⚙️ Конфигурация репорта</span>\n      <button class=\"ce-close\" onclick=\"te_closeCfgReportEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body cre-body\">\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">DataType</label>\n        <select class=\"cre-select\" id=\"te_cre_DataType\" onchange=\"te_cre_syncType()\">\n          <option value=\"\">— выбрать —</option>\n          <option value=\"10\">10h · BOOLEAN</option>\n          <option value=\"18\">18h · BITMAP8</option>\n          <option value=\"19\">19h · BITMAP16</option>\n          <option value=\"20\">20h · UINT8</option>\n          <option value=\"21\">21h · UINT16</option>\n          <option value=\"22\">22h · UINT24</option>\n          <option value=\"23\">23h · UINT32</option>\n          <option value=\"28\">28h · INT8</option>\n          <option value=\"29\">29h · INT16</option>\n          <option value=\"2a\">2Ah · INT24</option>\n          <option value=\"30\">30h · ENUM8</option>\n          <option value=\"31\">31h · ENUM16</option>\n          <option value=\"41\">41h · OCTSTR</option>\n          <option value=\"42\">42h · STRING</option>\n        </select>\n        <input class=\"cre-input cre-hex\" id=\"te_cre_DataType_hex\" placeholder=\"hex\" maxlength=\"4\" title=\"hex вручную\" oninput=\"te_cre_syncSel()\">\n      </div>\n      <div class=\"cre-divider\"></div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">MinInterval</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_MinInterval\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"1\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_MinInterval_hex\">0001</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">MaxInterval</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_MaxInterval\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"300\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_MaxInterval_hex\">012C</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">TimeOut</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_TimeOut\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"0\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_TimeOut_hex\">0000</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Change</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_Change\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"порог (дес)\" value=\"1\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_Change_hex\">0001</span>\n      </div>\n      <div class=\"cre-hint\">Ввод в десятичных · hex рассчитывается автоматически</div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeCfgReportEditor()\">Отмена</button>\n      <button class=\"ce-btn-cancel\" onclick=\"te_clearCfgReport(te_currentCfgObj);te_closeCfgReportEditor();\" style=\"background:#f8d8d8;border-color:var(--red);\">✖ Очистить</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyCfgReportEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- BIND EDITOR MODAL -->\n<div id=\"te_bindEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal cre-modal\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>🔗 Бинд кластера</span>\n      <button class=\"ce-close\" onclick=\"te_closeBindEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body cre-body\">\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Объект</label>\n        <span class=\"cre-hex-preview\" id=\"te_be_obj\" style=\"min-width:90px\">—</span>\n      </div>\n      <div class=\"cre-divider\"></div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Получатель</label>\n        <select class=\"cre-select\" id=\"te_be_dst\" onchange=\"te_be_syncEp()\"></select>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Dst EP</label>\n        <input class=\"cre-input cre-dec\" id=\"te_be_dstep\" placeholder=\"01\" maxlength=\"2\">\n      </div>\n      <div class=\"cre-hint\">Координатор / устройство / группа (GROUP:0001). Пустой Dst EP = бинд на группу. Сохраняется в поле bind записи</div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeBindEditor()\">Отмена</button>\n      <button class=\"ce-btn-cancel\" onclick=\"te_clearBind(te_currentBindObj);te_closeBindEditor();\" style=\"background:#f8d8d8;border-color:var(--red);\">✖ Очистить</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyBindEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- YA REP EDITOR MODAL -->\n<div id=\"te_yaRepEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal\" style=\"width:680px;max-height:90vh;\">\n    <div class=\"ce-header yre-head\">\n      <span>🏠 Редактор Яндекс</span>\n      <span class=\"yre-wbtns\"><button class=\"yre-wbtn\" title=\"Во весь рост\" onclick=\"te_yre_expand()\">⛶</button><button class=\"yre-wbtn\" title=\"Закрыть\" onclick=\"te_closeYaRepEditor()\">✕</button></span>\n    </div>\n    <div class=\"ce-body\" style=\"padding:0;display:flex;flex-direction:column;gap:0;\">\n      <div style=\"padding:6px 12px;background:var(--bg2);border-bottom:1px solid var(--border);font-size:11px;\" id=\"te_yre_status\"></div>\n\n      <!-- Список шаблонов -->\n      <div class=\"yre-tall\" style=\"display:flex;height:260px;border-bottom:1px solid var(--border);\">\n        <!-- Левая панель: категории + элементы -->\n        <div style=\"width:200px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border);\">\n          <div style=\"padding:4px 6px;border-bottom:1px solid var(--border);display:flex;gap:4px;align-items:center;flex-shrink:0;\">\n            <button id=\"te_yre_btn_replace\" class=\"obj-mnu-btn\" style=\"padding:1px 6px;background:var(--accent);color:#fff;border-color:var(--accent)\" onclick=\"te_yre_setAddMode(false)\" title=\"Клик по шаблону заменит описание канала\">Заменить</button>\n            <button id=\"te_yre_btn_add\" class=\"obj-mnu-btn\" style=\"padding:1px 6px\" onclick=\"te_yre_setAddMode(true)\" title=\"Клик по шаблону добавит умение к каналу (напр. mode + on_off на SystemMode)\">+ Добавить</button>\n          </div>\n          <div id=\"te_yre_list\" style=\"flex:1;overflow-y:auto;padding:4px 0;font-size:12px;\"></div>\n        </div>\n        <!-- Правая панель: описание выбранного -->\n        <div style=\"flex:1;padding:8px;overflow-y:auto;font-size:11px;color:var(--muted);\">\n          <div class=\"ce-section-title\">Канал — <button id=\"te_yre_tab_human\" class=\"obj-mnu-btn\" style=\"padding:1px 8px;background:var(--accent);color:#fff;border-color:var(--accent)\" onclick=\"te_yre_tab('human')\">Понятно</button> <button id=\"te_yre_tab_json\" class=\"obj-mnu-btn\" style=\"padding:1px 8px\" onclick=\"te_yre_tab('json')\">JSON канала</button> <button id=\"te_yre_tab_full\" class=\"obj-mnu-btn\" style=\"padding:1px 8px\" onclick=\"te_yre_tab('full')\">Устройство JSON</button></div>\n          <div id=\"te_yre_human\" style=\"font-size:11px;color:var(--text);background:var(--bg2);border-radius:4px;padding:6px;min-height:60px;\"></div>\n          <pre id=\"te_yre_preview\" style=\"display:none;font-size:10px;color:var(--text);white-space:pre-wrap;word-break:break-all;margin:0;background:var(--bg2);border-radius:4px;padding:6px;min-height:60px;max-height:300px;overflow-y:auto;\"></pre>\n          <pre id=\"te_yre_preview_full\" style=\"display:none;font-size:10px;color:var(--text);white-space:pre-wrap;word-break:break-all;margin:0;background:var(--bg2);border-radius:4px;padding:6px;min-height:60px;max-height:300px;overflow-y:auto;\"></pre>\n          <div id=\"te_yre_live\" style=\"font-size:11px;color:var(--muted);margin-top:4px;\"></div>\n          <div id=\"te_yre_modebox\" style=\"display:none;font-size:11px;margin-top:4px;background:var(--bg3);border-radius:4px;padding:6px;\"></div>\n          <div class=\"ce-divider\"></div>\n          <div class=\"ce-section-title\">Проверка по чек-листу</div>\n          <div id=\"te_yre_warn\" style=\"font-size:11px;margin-bottom:4px;\"></div>\n          <div class=\"ce-divider\"></div>\n          <div class=\"ce-section-title\">Как увидит Яндекс — устройство целиком</div>\n          <div id=\"te_yre_device\" style=\"font-size:11px;color:var(--text);background:var(--bg2);border-radius:4px;padding:6px;max-height:220px;overflow-y:auto;\"></div>\n          <div class=\"ce-divider\"></div>\n          <div class=\"ce-section-title\">Опции <span style=\"font-weight:normal;text-transform:none;letter-spacing:0;color:var(--faint);font-size:10px;\">— применяются к первому умению/свойству канала</span></div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Retrievable</label>\n            <input type=\"checkbox\" id=\"te_yre_retrievable\" class=\"ce-check\" onchange=\"te_yre_updateFlags()\">\n          </div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Reportable</label>\n            <input type=\"checkbox\" id=\"te_yre_reportable\" class=\"ce-check\" onchange=\"te_yre_updateFlags()\">\n          </div>\n          <div class=\"ce-divider\"></div>\n          <div class=\"ce-section-title\">Multi-device</div>\n          <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n            <label class=\"ce-label\" style=\"min-width:90px;\">Включить</label>\n            <input type=\"checkbox\" id=\"te_yre_multi\" class=\"ce-check\" onchange=\"te_yre_toggleMulti()\">\n          </div>\n          <div id=\"te_yre_multi_fields\" style=\"display:none;\">\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Name</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mname\" oninput=\"te_yre_updateMulti()\">\n            </div>\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Room</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mroom\" oninput=\"te_yre_updateMulti()\">\n            </div>\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Type</label>\n              <input type=\"text\" class=\"ce-input\" id=\"te_yre_mtype\" list=\"te_yre_types\" oninput=\"te_yre_updateMulti()\">\n              <datalist id=\"te_yre_types\">\n                <option value=\"devices.types.light\">\n                <option value=\"devices.types.socket\">\n                <option value=\"devices.types.switch\">\n                <option value=\"devices.types.thermostat\">\n                <option value=\"devices.types.thermostat.ac\">\n                <option value=\"devices.types.media_device\">\n                <option value=\"devices.types.media_device.tv\">\n                <option value=\"devices.types.media_device.tv_box\">\n                <option value=\"devices.types.media_device.receiver\">\n                <option value=\"devices.types.openable\">\n                <option value=\"devices.types.openable.curtain\">\n                <option value=\"devices.types.humidifier\">\n                <option value=\"devices.types.purifier\">\n                <option value=\"devices.types.vacuum_cleaner\">\n                <option value=\"devices.types.cooking.kettle\">\n                <option value=\"devices.types.cooking.coffee_maker\">\n                <option value=\"devices.types.cooking.multicooker\">\n                <option value=\"devices.types.sensor\">\n                <option value=\"devices.types.sensor.motion\">\n                <option value=\"devices.types.sensor.door\">\n                <option value=\"devices.types.sensor.water_leak\">\n                <option value=\"devices.types.sensor.smoke\">\n                <option value=\"devices.types.sensor.gas\">\n                <option value=\"devices.types.sensor.vibration\">\n                <option value=\"devices.types.sensor.button\">\n                <option value=\"devices.types.other\">\n              </datalist>\n            </div>\n          </div>\n        </div>\n      </div>\n\n      <!-- none режим -->\n      <div style=\"padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;\">\n        <span style=\"font-size:11px;color:var(--muted);\">Канал в Яндексе:</span>\n        <button class=\"ce-btn-cancel\" style=\"font-size:11px;padding:2px 10px;\" title=\"Скрыть канал из Яндекса\" onclick=\"te_setYaRepNone()\">🚫 none</button>\n        <button class=\"ce-btn-cancel\" style=\"font-size:11px;padding:2px 10px;\" title=\"Убрать ya_rep — Яндекс подберёт описание по role\" onclick=\"te_setYaRepAuto()\">🤖 авто</button>\n      </div>\n\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeYaRepEditor()\">Отмена</button>\n      <button class=\"ce-btn-apply\" title=\"Записать в редактор (в базу/шаблон — кнопкой Save/Tpl в шапке Device editor)\" onclick=\"te_applyYaRepEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- CLASS EDITOR MODAL -->\n<div id=\"te_classEditorWnd\" style=\"display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:9999; align-items:center; justify-content:center; background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal\">\n    <div class=\"ce-header\">\n      <span>🏷️ Редактор класса</span>\n      <button class=\"ce-close\" onclick=\"te_closeClassEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body\">\n      <div class=\"ce-row\">\n        <label class=\"ce-label\">Role</label>\n        <select class=\"ce-select ce-select-role\" id=\"ce_role_sel\" onchange=\"te_onCeRoleChange(this.value)\"></select>\n      </div>\n      <div class=\"ce-divider\"></div>\n      <div id=\"ce_dc_wrap\"></div>\n      <div class=\"ce-section-title\">Свойства</div>\n      <div id=\"ce_props\"></div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeClassEditor()\">Отмена</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyClassEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n";
+var TE_BODY="\n\n\n<div style='position:absolute;display:flex; align-items: flex-start;' id='te_d'>\n<div id=\"te_leftCol\" style=\"flex-shrink:0; display:flex; flex-direction:column; overflow-y:auto;\">\n  <div id=\"te_DeviceWidget\" style=\"flex-shrink:0;\"></div>\n  <!-- SNIFF PANEL — постоянная левая колонка, не пропадает при навигации -->\n  <div id=\"te_sniffPanel\" style=\"display:none; flex-shrink:0;\">\n    <div class=\"sniff-header\">\n      <span>🎧 Sniff</span>\n      <div style=\"display:flex;gap:5px;align-items:center;\">\n        <span id=\"te_sniffCount\" class=\"sniff-count\">0</span>\n        <button class=\"sniff-add-all-btn\" onclick=\"te_sniffAddAll()\" title=\"Добавить все объекты\">+ All</button>\n        <button class=\"sniff-clear-btn\" onclick=\"te_clearSniff()\" title=\"Очистить\">🗑</button>\n      </div>\n    </div>\n    <div id=\"te_sniffList\" class=\"sniff-list\"></div>\n  </div>\n</div>\n<div id=\"te_DeviceJson\"></div>\t\n</div>\n\n<!-- CFG REPORT EDITOR MODAL -->\n<div id=\"te_cfgReportEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal cre-modal\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>⚙️ Конфигурация репорта</span>\n      <button class=\"ce-close\" onclick=\"te_closeCfgReportEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body cre-body\">\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">DataType</label>\n        <select class=\"cre-select\" id=\"te_cre_DataType\" onchange=\"te_cre_syncType()\">\n          <option value=\"\">— выбрать —</option>\n          <option value=\"10\">10h · BOOLEAN</option>\n          <option value=\"18\">18h · BITMAP8</option>\n          <option value=\"19\">19h · BITMAP16</option>\n          <option value=\"20\">20h · UINT8</option>\n          <option value=\"21\">21h · UINT16</option>\n          <option value=\"22\">22h · UINT24</option>\n          <option value=\"23\">23h · UINT32</option>\n          <option value=\"28\">28h · INT8</option>\n          <option value=\"29\">29h · INT16</option>\n          <option value=\"2a\">2Ah · INT24</option>\n          <option value=\"30\">30h · ENUM8</option>\n          <option value=\"31\">31h · ENUM16</option>\n          <option value=\"41\">41h · OCTSTR</option>\n          <option value=\"42\">42h · STRING</option>\n        </select>\n        <input class=\"cre-input cre-hex\" id=\"te_cre_DataType_hex\" placeholder=\"hex\" maxlength=\"4\" title=\"hex вручную\" oninput=\"te_cre_syncSel()\">\n      </div>\n      <div class=\"cre-divider\"></div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">MinInterval</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_MinInterval\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"1\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_MinInterval_hex\">0001</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">MaxInterval</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_MaxInterval\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"300\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_MaxInterval_hex\">012C</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">TimeOut</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_TimeOut\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"сек (дес)\" value=\"0\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_TimeOut_hex\">0000</span>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Change</label>\n        <input class=\"cre-input cre-dec\" id=\"te_cre_Change\" type=\"number\" min=\"0\" max=\"65535\" placeholder=\"порог (дес)\" value=\"1\">\n        <span class=\"cre-hex-preview\" id=\"te_cre_Change_hex\">0001</span>\n      </div>\n      <div class=\"cre-hint\">Ввод в десятичных · hex рассчитывается автоматически</div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeCfgReportEditor()\">Отмена</button>\n      <button class=\"ce-btn-cancel\" onclick=\"te_clearCfgReport(te_currentCfgObj);te_closeCfgReportEditor();\" style=\"background:#f8d8d8;border-color:var(--red);\">✖ Очистить</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyCfgReportEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- BIND EDITOR MODAL -->\n<div id=\"te_bindEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal cre-modal\">\n    <div class=\"ce-header\" style=\"background:var(--accent);\">\n      <span>🔗 Бинд кластера</span>\n      <button class=\"ce-close\" onclick=\"te_closeBindEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body cre-body\">\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Объект</label>\n        <span class=\"cre-hex-preview\" id=\"te_be_obj\" style=\"min-width:90px\">—</span>\n      </div>\n      <div class=\"cre-divider\"></div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Получатель</label>\n        <select class=\"cre-select\" id=\"te_be_dst\" onchange=\"te_be_syncEp()\"></select>\n      </div>\n      <div class=\"cre-row\">\n        <label class=\"cre-label\">Dst EP</label>\n        <input class=\"cre-input cre-dec\" id=\"te_be_dstep\" placeholder=\"01\" maxlength=\"2\">\n      </div>\n      <div class=\"cre-hint\">Координатор / устройство / группа (GROUP:0001). Пустой Dst EP = бинд на группу. Сохраняется в поле bind записи</div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeBindEditor()\">Отмена</button>\n      <button class=\"ce-btn-cancel\" onclick=\"te_clearBind(te_currentBindObj);te_closeBindEditor();\" style=\"background:#f8d8d8;border-color:var(--red);\">✖ Очистить</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyBindEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- YA REP EDITOR MODAL -->\n<div id=\"te_yaRepEditorWnd\" style=\"display:none;position:absolute!important;top:0;left:0;width:100%;height:100%;z-index:9999;background:var(--bg);\">\n  <div style=\"display:flex;flex-direction:column;width:100%;height:100%;min-height:0;\">\n    \n    <div class=\"ce-body\" style=\"padding:0;display:flex;flex-direction:column;gap:0;flex:1;min-height:0;\">\n      <div style=\"padding:6px 12px;background:var(--bg2);border-bottom:1px solid var(--border);font-size:11px;\" id=\"te_yre_status\"></div>\n\n      <div class=\"yre-tall\" style=\"display:flex;flex:1;min-height:0;border-bottom:1px solid var(--border);\">\n        <div id=\"te_yre_left\" style=\"width:240px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border);min-height:0;\">\n          <div id=\"te_yre_list\"></div>\n        </div>\n        <div style=\"flex:1;display:flex;gap:10px;padding:8px;min-width:0;min-height:0;\">\n          <div style=\"flex:1;min-width:0;overflow-y:auto;font-size:11px;\">\n            <div class=\"ce-section-title\">Канал — <button id=\"te_yre_tab_human\" class=\"obj-mnu-btn\" style=\"padding:1px 8px;background:var(--accent);color:#fff;border-color:var(--accent)\" onclick=\"te_yre_tab('human')\">Описание</button> <button id=\"te_yre_tab_json\" class=\"obj-mnu-btn\" style=\"padding:1px 8px\" onclick=\"te_yre_tab('json')\">JSON</button> <button id=\"te_yre_tab_full\" class=\"obj-mnu-btn\" style=\"padding:1px 8px\" onclick=\"te_yre_tab('full')\">Всё устройство</button></div>\n            <div id=\"te_yre_human\" style=\"font-size:11px;color:var(--text);background:var(--bg2);border-radius:4px;padding:6px;min-height:60px;\"></div>\n            <pre id=\"te_yre_preview\" style=\"display:none;font-size:10px;color:var(--text);white-space:pre-wrap;word-break:break-all;margin:0;background:var(--bg2);border-radius:4px;padding:6px;min-height:60px;max-height:300px;overflow-y:auto;\"></pre>\n            <pre id=\"te_yre_preview_full\" style=\"display:none;font-size:10px;color:var(--text);white-space:pre-wrap;word-break:break-all;margin:0;background:var(--bg2);border-radius:4px;padding:6px;min-height:60px;max-height:300px;overflow-y:auto;\"></pre>\n            <div id=\"te_yre_live\" style=\"font-size:11px;color:var(--muted);margin-top:4px;\"></div>\n            <div id=\"te_yre_modebox\" style=\"display:none;font-size:11px;margin-top:4px;background:var(--bg3);border-radius:4px;padding:6px;\"></div>\n          </div>\n          <div style=\"width:330px;flex-shrink:0;overflow-y:auto;font-size:11px;color:var(--muted);\">\n            <div class=\"ce-section-title\">Проверка по чек-листу</div>\n            <div id=\"te_yre_warn\" style=\"font-size:11px;margin-bottom:4px;\"></div>\n            <div class=\"ce-divider\"></div>\n            <div class=\"ce-section-title\">Опции <span style=\"font-weight:normal;text-transform:none;letter-spacing:0;color:var(--faint);font-size:10px;\">- применяются к первому умению/свойству канала</span></div>\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Retrievable</label>\n              <input type=\"checkbox\" id=\"te_yre_retrievable\" class=\"ce-check\" onchange=\"te_yre_updateFlags()\">\n            </div>\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Reportable</label>\n              <input type=\"checkbox\" id=\"te_yre_reportable\" class=\"ce-check\" onchange=\"te_yre_updateFlags()\">\n            </div>\n            <div class=\"ce-divider\"></div>\n            <div class=\"ce-section-title\">Отдельное устройство (multi)</div>\n            <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n              <label class=\"ce-label\" style=\"min-width:90px;\">Включить</label>\n              <input type=\"checkbox\" id=\"te_yre_multi\" class=\"ce-check\" onchange=\"te_yre_toggleMulti()\">\n            </div>\n            <div id=\"te_yre_multi_fields\" style=\"display:none;\">\n              <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n                <label class=\"ce-label\" style=\"min-width:90px;\">Name</label>\n                <input type=\"text\" class=\"ce-input\" id=\"te_yre_mname\" oninput=\"te_yre_updateMulti()\">\n              </div>\n              <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n                <label class=\"ce-label\" style=\"min-width:90px;\">Room</label>\n                <input type=\"text\" class=\"ce-input\" id=\"te_yre_mroom\" oninput=\"te_yre_updateMulti()\">\n              </div>\n              <div class=\"ce-row\" style=\"margin-bottom:4px;\">\n                <label class=\"ce-label\" style=\"min-width:90px;\">Type</label>\n                <input type=\"text\" class=\"ce-input\" id=\"te_yre_mtype\" list=\"te_yre_types\" oninput=\"te_yre_updateMulti()\">\n                <datalist id=\"te_yre_types\">\n                  <option value=\"devices.types.light\">\n                  <option value=\"devices.types.socket\">\n                  <option value=\"devices.types.switch\">\n                  <option value=\"devices.types.thermostat\">\n                  <option value=\"devices.types.thermostat.ac\">\n                  <option value=\"devices.types.media_device\">\n                  <option value=\"devices.types.media_device.tv\">\n                  <option value=\"devices.types.media_device.tv_box\">\n                  <option value=\"devices.types.media_device.receiver\">\n                  <option value=\"devices.types.openable\">\n                  <option value=\"devices.types.openable.curtain\">\n                  <option value=\"devices.types.humidifier\">\n                  <option value=\"devices.types.purifier\">\n                  <option value=\"devices.types.vacuum_cleaner\">\n                  <option value=\"devices.types.cooking.kettle\">\n                  <option value=\"devices.types.cooking.coffee_maker\">\n                  <option value=\"devices.types.cooking.multicooker\">\n                  <option value=\"devices.types.sensor\">\n                  <option value=\"devices.types.sensor.motion\">\n                  <option value=\"devices.types.sensor.door\">\n                  <option value=\"devices.types.sensor.water_leak\">\n                  <option value=\"devices.types.sensor.smoke\">\n                  <option value=\"devices.types.sensor.gas\">\n                  <option value=\"devices.types.sensor.vibration\">\n                  <option value=\"devices.types.sensor.button\">\n                  <option value=\"devices.types.other\">\n                </datalist>\n              </div>\n            </div>\n            <div class=\"ce-divider\"></div>\n            <div class=\"ce-section-title\">Устройство целиком — что уйдёт в Яндекс</div>\n            <div id=\"te_yre_device\" style=\"font-size:11px;color:var(--text);background:var(--bg2);border-radius:4px;padding:6px;\"></div>\n          </div>\n        </div>\n      </div>\n\n      <div style=\"padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;\">\n        <span style=\"font-size:11px;color:var(--muted);\">Режим канала:</span>\n        <button class=\"ce-btn-cancel\" style=\"font-size:11px;padding:2px 10px;\" title=\"Канал не уйдёт в Яндекс совсем\" onclick=\"te_setYaRepNone()\">Скрыть канал (none)</button>\n        <button class=\"ce-btn-cancel\" style=\"font-size:11px;padding:2px 10px;\" title=\"Убрать ya_rep - Яндекс подберёт описание по role\" onclick=\"te_setYaRepAuto()\">Авто по role</button>\n      </div>\n\n    </div>\n    <div class=\"ce-footer\">\n      <span style=\"font-size:11px;color:var(--faint);margin-right:auto;\">Применение записывает умения изменённых каналов в устройство — дальше Save или Tpl в редакторе устройства</span>\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeYaRepEditor()\" title=\"Закрыть без применения правок\">Отмена</button> <button class=\"ce-btn-apply\" title=\"Записать и закрыть\" onclick=\"te_applyYaRepEditor()\">Применить</button>\n    </div>\n  </div>\n</div>\n\n<!-- CLASS EDITOR MODAL -->\n<div id=\"te_classEditorWnd\" style=\"display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:9999; align-items:center; justify-content:center; background:rgba(0,0,0,0.45);\">\n  <div class=\"ce-modal\">\n    <div class=\"ce-header\">\n      <span>🏷️ Редактор класса</span>\n      <button class=\"ce-close\" onclick=\"te_closeClassEditor()\">✕</button>\n    </div>\n    <div class=\"ce-body\">\n      <div class=\"ce-row\">\n        <label class=\"ce-label\">Role</label>\n        <select class=\"ce-select ce-select-role\" id=\"ce_role_sel\" onchange=\"te_onCeRoleChange(this.value)\"></select>\n      </div>\n      <div class=\"ce-divider\"></div>\n      <div id=\"ce_dc_wrap\"></div>\n      <div class=\"ce-section-title\">Свойства</div>\n      <div id=\"ce_props\"></div>\n    </div>\n    <div class=\"ce-footer\">\n      <button class=\"ce-btn-cancel\" onclick=\"te_closeClassEditor()\">Отмена</button>\n      <button class=\"ce-btn-apply\" onclick=\"te_applyClassEditor()\">✅ Применить</button>\n    </div>\n  </div>\n</div>\n";
 
 // ── Template server request (moved here from the join window) ──
 // No-template devices arrive via window.tePendingGen = {ieee, model, manuf}
@@ -3480,6 +3608,7 @@ window.WinEngine && window.WinEngine.register({
       eventE.on("genTemplateResult", te_onGenResult);
       eventE.on("genTemplateCandidates", te_onGenCandidates);
       eventE.on("teGenLog", te_onGenLog);
+      eventE.on("bindStatus", te_onCfgStatus);
     }
     var p=(opts&&opts.params)||"";
     var parts=p.split("#");
@@ -3509,7 +3638,7 @@ window.WinEngine && window.WinEngine.register({
     if(node._state&&node._state.ro) node._state.ro.disconnect();
     if(window.te_retryIv){ clearInterval(window.te_retryIv); window.te_retryIv=null; }
     if(window.te_retryHdl && window.eventE){ try{window.eventE.off("updateDeviceList", window.te_retryHdl);}catch(e){} window.te_retryHdl=null; }
-    if(window.eventE){ try{eventE.off("genTemplateResult", te_onGenResult);}catch(e){} try{eventE.off("genTemplateCandidates", te_onGenCandidates);}catch(e){} try{eventE.off("teGenLog", te_onGenLog);}catch(e){} }
+    if(window.eventE){ try{eventE.off("genTemplateResult", te_onGenResult);}catch(e){} try{eventE.off("genTemplateCandidates", te_onGenCandidates);}catch(e){} try{eventE.off("teGenLog", te_onGenLog);}catch(e){} try{eventE.off("bindStatus", te_onCfgStatus);}catch(e){} }
     try{te_genHide();}catch(e){}
     window.te_fileLoaded=false; window.te_retryOnce=false;
     te_reset();

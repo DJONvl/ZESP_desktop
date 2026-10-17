@@ -466,7 +466,10 @@ function getWidget(IEEE) {
 				
 				}
 				if (dev.DevType === "HAD" && ownLightPart === 'onoff') {
-					var supportedFeatures = attr.supported_features
+					// class бывает отсутствует (импорт без display-полей) — тогда
+					// attr === undefined, и чтение свойства роняло весь объект
+					// в catch с ⚠️. Отсутствие признаков = 0, не ошибка.
+					var supportedFeatures = (attr && attr.supported_features) || 0;
 					const SUPPORT_BRIGHTNESS = 1;
 					const SUPPORT_COLOR_TEMP = 2;
 					const SUPPORT_EFFECT = 4;
