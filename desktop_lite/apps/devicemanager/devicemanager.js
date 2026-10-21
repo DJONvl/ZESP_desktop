@@ -24,18 +24,18 @@ body.light .dm-table .parent-row{background:#e4e9f2}
 .dm-table .parent-row:hover{background:var(--hover)}
 .dm-table .child-row{background:var(--bg)}
 .dm-table .child-row:hover{background:var(--hover)}
-.col-dt{width:80px;white-space:nowrap}
-.col-name{min-width:120px}
-.col-state{min-width:190px}
-.col-location{min-width:110px;white-space:nowrap}
-.col-ieee{width:140px;white-space:nowrap;color:var(--faint);font-size:12px}
-.expand-icon{display:inline-block;width:16px;cursor:pointer;font-size:12px;margin-right:4px;user-select:none;color:var(--accent)}
-.editable-cell{cursor:pointer;position:relative}
-.editable-cell:hover{background:rgba(59,130,246,.08)}
-.cell-value{display:inline-block;word-break:break-word}
-.edit-input{position:absolute;left:0;top:0;margin:0;padding:4px 6px;width:100%;height:100%;border:2px solid var(--accent);border-radius:2px;background:var(--bg2);font-size:13px;outline:none;color:var(--text);box-sizing:border-box}
-.menu-dots{cursor:pointer;display:inline-block;padding:0 6px;font-size:16px;line-height:1;color:var(--faint)}
-.menu-dots:hover{color:var(--accent)}
+.dm-table .col-dt{width:80px;white-space:nowrap}
+.dm-table .col-name{min-width:120px}
+.dm-table .col-state{min-width:190px}
+.dm-table .col-location{min-width:110px;white-space:nowrap}
+.dm-table .col-ieee{width:140px;white-space:nowrap;color:var(--faint);font-size:12px}
+.dm .expand-icon{display:inline-block;width:16px;cursor:pointer;font-size:12px;margin-right:4px;user-select:none;color:var(--accent)}
+.dm .editable-cell{cursor:pointer;position:relative}
+.dm .editable-cell:hover{background:rgba(59,130,246,.08)}
+.dm .cell-value{display:inline-block;word-break:break-word}
+.dm .edit-input{position:absolute;left:0;top:0;margin:0;padding:4px 6px;width:100%;height:100%;border:2px solid var(--accent);border-radius:2px;background:var(--bg2);font-size:13px;outline:none;color:var(--text);box-sizing:border-box}
+.dm .menu-dots{cursor:pointer;display:inline-block;padding:0 6px;font-size:16px;line-height:1;color:var(--faint)}
+.dm .menu-dots:hover{color:var(--accent)}
 .dm-th-sort{cursor:pointer;user-select:none;white-space:nowrap}
 .dm-th-sort:hover{color:var(--accent)}
 .dm-th-sort .arr{font-size:9px;margin-left:3px;opacity:.75}
@@ -46,11 +46,44 @@ body.light .dm-table .parent-row{background:#e4e9f2}
 .dm-dot.left{background:var(--red)}
 .dm-status .txt{font-size:12px;color:var(--muted)}
 .dm-status .cnt{font-size:11px;color:var(--faint)}
-.toggle-input{display:none!important}
-.toggle-switch{display:inline-flex;align-items:center;width:36px;height:18px;background:var(--bg3);border-radius:12px;position:relative;cursor:pointer;flex-shrink:0;border:1px solid var(--border2);vertical-align:middle;transition:background .2s,border-color .2s}
-.toggle-switch span{position:absolute;top:2px;left:2px;width:12px;height:12px;background:var(--text);border-radius:50%;transition:left .15s ease}
-.toggle-input:checked + label .toggle-switch{background:rgba(34,197,94,.35);border-color:var(--green)}
-.toggle-input:checked + label .toggle-switch span{left:20px;background:var(--green)}
+.dm .toggle-input{display:none!important}
+.dm .toggle-switch{display:inline-flex;align-items:center;width:36px;height:18px;background:var(--bg3);border-radius:12px;position:relative;cursor:pointer;flex-shrink:0;border:1px solid var(--border2);vertical-align:middle;transition:background .2s,border-color .2s}
+.dm .toggle-switch span{position:absolute;top:2px;left:2px;width:12px;height:12px;background:var(--text);border-radius:50%;transition:left .15s ease}
+.dm .toggle-input:checked + label .toggle-switch{background:rgba(34,197,94,.35);border-color:var(--green)}
+.dm .toggle-input:checked + label .toggle-switch span{left:20px;background:var(--green)}
+.dm-row{display:flex;align-items:center;gap:4px}
+.dm-row5{display:flex;align-items:center;gap:5px}
+.dm-row3{display:flex;align-items:center;gap:3px;flex-wrap:wrap}
+.dm-row-wrap{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.dm-row-mt{display:flex;align-items:center;gap:4px;margin-top:2px}
+.dm-lamp-col{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.dm-lamp-row{display:inline-flex;align-items:center;gap:8px;min-height:28px}
+.dm-lamp-min{min-height:28px}
+.dm-step-row{display:inline-flex;align-items:center;gap:3px}
+.dm-step-btn{cursor:pointer;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:0 7px;color:var(--text);font-size:13px}
+.dm-step-ok{cursor:pointer;background:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:0 7px;color:#fff;font-size:12px}
+.dm-fan-row{display:flex;align-items:center;gap:2px;flex-wrap:wrap;margin-top:2px}
+.dm-chip{cursor:pointer;border-radius:8px;padding:1px 4px;font-size:10px;color:#fff}
+.dm-val-strong{font-size:13px;font-weight:bold}
+.dm-val-bold{font-size:11px;font-weight:bold}
+.dm-toolrow{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center}
+.dm-toolrow-mt{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center}
+.dm-section{margin:8px 0 4px}
+.dm-mb6{margin-bottom:6px}
+.dm-row8{display:flex;align-items:center;gap:8px}
+.dm-listrow-plain{padding:6px 4px;border-bottom:1px solid var(--border)}
+.dm-center{text-align:center;margin-top:12px}
+.dm-text-center{text-align:center}
+.dm-join-list{height:220px;overflow-y:auto}
+.dm-dim{font-size:11px;color:var(--faint)}
+.dm-sub{color:var(--faint);font-size:11px}
+.dm-val{font-size:11px;color:var(--faint);min-width:26px}
+.dm-grow{flex:1;min-width:0}
+.dm-listrow{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border)}
+.dm-mini-btn{cursor:pointer;font-size:12px;padding:0 4px;background:var(--bg3);border-radius:3px}
+.dm-slider-s{width:80px}
+.dm-slider-m{width:110px}
+.dm-slider-t{width:70px}
 .dm-table input[type=range]{-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;background:var(--border2);border:none;outline:none;cursor:pointer;vertical-align:middle;flex-shrink:0}
 .dm-table input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--text);border:2px solid var(--accent);cursor:pointer}
 .dm-table select,.dm-table input{background:var(--bg);color:var(--text);border:1px solid var(--border2);border-radius:4px;padding:3px 6px;font-size:12px;outline:none}
@@ -135,18 +168,23 @@ body.light .dm-table .parent-row{background:#e4e9f2}
   }
 
   // parent row status: online/offline/left the network + sensor count + last-seen
-  function statusHtml(d) {
+  function statusInfo(d) {
     var cnt = d.Report ? Object.keys(d.Report).length : 0;
     var cls = 'offline', lbl = t('st.offline', 'Офлайн');
     if (d.DevType === 'GRP') { cls = 'online'; lbl = t('st.online', 'Онлайн'); cnt = (d.Members || []).length; }
     if (d.Leave && d.Leave !== 0) { cls = 'left'; lbl = t('st.left', 'Покинуло сеть'); }
     else if (d.lastSeen && (Date.now() / 1000 - tsSec(d.lastSeen)) < 300) { cls = 'online'; lbl = t('st.online', 'Онлайн'); }
-    var out = '<span class="dm-dot ' + cls + '" title="' + lbl + '"></span>';
+    return { cls: cls, lbl: lbl, cnt: cnt, ago: d.lastSeen ? agoStr(d.lastSeen) : '' };
+  }
+
+  function statusHtml(d) {
+    var si = statusInfo(d);
+    var out = '<span class="dm-dot ' + si.cls + '" title="' + si.lbl + '"></span>';
     // Текст статуса не показываем (точка + title): надписи Онлайн/Офлайн
     // только шумят. Исключение — «Покинуло сеть»: это важное состояние.
-    if (cls === 'left') out += '<span class="txt">' + lbl + '</span>';
-    if (cnt) out += '<span class="cnt">· ' + cnt + ' ' + t('st.sensors', 'датч.') + '</span>';
-    if (d.lastSeen) out += '<span class="cnt ago">· ' + agoStr(d.lastSeen) + '</span>';
+    if (si.cls === 'left') out += '<span class="txt">' + si.lbl + '</span>';
+    if (si.cnt) out += '<span class="cnt">· ' + si.cnt + ' ' + t('st.sensors', 'датч.') + '</span>';
+    if (si.ago) out += '<span class="cnt ago">· ' + si.ago + '</span>';
     return out;
   }
 
@@ -253,24 +291,24 @@ body.light .dm-table .parent-row{background:#e4e9f2}
             var lvRep = device.Report[lvKey] || {};
             var lvId = device.IEEE + '#' + lvKey;
             var lvPct = Math.round((parseFloat(lvRep.parsed) || 0) * 100 / 255);
-            return '<span style="display:inline-flex;align-items:center;gap:8px;min-height:28px;">' + window.getIconSvg('brightness', 14, '#ffd54f') +
+            return '<span class="dm-lamp-row">' + window.getIconSvg('brightness', 14, '#ffd54f') +
               '<input class="' + lvId + ' level" type="range" id="level|' + lvId + '" style="width:110px" min="0" max="100" step="2" value="' + lvPct + '" onchange="evm(\'level|' + lvId + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
-              '<span class="' + lvId + '" style="font-size:11px;color:var(--faint);min-width:26px">' + lvPct + '%</span></span>';
+              '<span class="' + lvId + ' dm-val">' + lvPct + '%</span></span>';
           };
           var dmCtRow = function (ctKey) {
             var ctRep = device.Report[ctKey] || {};
             var ctId = device.IEEE + '#' + ctKey;
             var ctPct = Math.round(((parseFloat(ctRep.parsed) || 153) - 153) * 100 / 347);
-            return '<span style="display:inline-flex;align-items:center;gap:8px;min-height:28px;">' + window.getIconSvg('sun_temp', 14, '#ff9800') +
+            return '<span class="dm-lamp-row">' + window.getIconSvg('sun_temp', 14, '#ff9800') +
               '<input class="' + ctId + ' color-temp" type="range" id="colorT|' + ctId + '" style="width:110px" min="0" max="100" step="2" value="' + ctPct + '" onchange="evm(\'colorT|' + ctId + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
-              '<span class="' + ctId + '" style="font-size:11px;color:var(--faint);min-width:26px">' + ctPct + '%</span></span>';
+              '<span class="' + ctId + ' dm-val">' + ctPct + '%</span></span>';
           };
           var dmColRow = function (clKey) {
             var clRep = device.Report[clKey] || {};
             var clId = device.IEEE + '#' + clKey;
-            return '<span style="display:inline-flex;align-items:center;gap:8px;min-height:28px;">' + window.getIconSvg('palette', 14, '#ff9800') +
+            return '<span class="dm-lamp-row">' + window.getIconSvg('palette', 14, '#ff9800') +
               '<input class="' + clId + ' color-range" type="range" id="color|' + clId + '" style="width:110px" min="0" max="100" step="2" value="75" onchange="var hue=((this.value/100)*360).toFixed(0);evm(\'color|' + clId + '\',hsl2Hex(hue,100,50))" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
-              '<span class="' + clId + '" style="font-size:11px;color:var(--faint);min-width:26px">' + (clRep.parsed != null ? clRep.parsed : '?') + '</span></span>';
+              '<span class="' + clId + ' dm-val">' + (clRep.parsed != null ? clRep.parsed : '?') + '</span></span>';
           };
           var isOnOff = (ownLightPart === 'onoff');
           var isLevel = (ownLightPart === 'level');
@@ -280,12 +318,12 @@ body.light .dm-table .parent-row{background:#e4e9f2}
             var litOn = [1, '1', true, 'on', 'ON'].indexOf(value.parsed) !== -1;
             // Вертикальный пазл: каждый юнит с новой строки + тач-зазоры
             // (на широкой таблице flex-wrap складывал всё в одну строку).
-            html += '<div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;">' +
-              '<div style="display:flex;align-items:center;gap:5px;min-height:28px;">' + window.getIconSvg('light_bulb', 18, litOn ? '#ffd54f' : '#666') +
+            html += '<div class="dm-lamp-col">' +
+              '<div class="dm-row5 dm-lamp-min">' + window.getIconSvg('light_bulb', 18, litOn ? '#ffd54f' : '#666') +
               '<input type="checkbox" class="' + id + ' input toggle-input" id="lt_' + idw + '"' + (litOn ? ' checked' : '') +
               ' onchange="evm(\'on_off|' + id + '\',this.checked?1:0)"/>' +
               '<label for="lt_' + idw + '"><div class="toggle-switch ' + id + '"><span></span></div></label>' +
-              '<span class="' + id + '" style="font-size:11px;color:var(--faint)">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
+              '<span class="' + id + ' dm-dim">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
             // anchor row carries the sibling sliders, so the lamp is driven
             // from one place (same commands as widgets.js)
             try {
@@ -301,41 +339,41 @@ body.light .dm-table .parent-row{background:#e4e9f2}
           } else if (isLevel) {
             // parsed 0-255 → show percent, send percent (as widgets do).
             var lvlPct = Math.round((parseFloat(value.parsed) || 0) * 100 / 255);
-            html += '<div style="display:flex;align-items:center;gap:4px;">' + window.getIconSvg('brightness', 16, '#ffd54f') +
+            html += '<div class="dm-row">' + window.getIconSvg('brightness', 16, '#ffd54f') +
               '<input class="' + id + ' level" type="range" id="level|' + id + '" style="width:80px" min="0" max="100" step="2" value="' + lvlPct + '" onchange="evm(\'level|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
-              '<span class="' + id + '" style="font-size:11px;color:var(--faint);min-width:26px">' + lvlPct + '%</span></div>';
+              '<span class="' + id + ' dm-val">' + lvlPct + '%</span></div>';
           } else if (isCt) {
             // mireds 153-500 → percent, send percent (as widgets do).
             var ctPct = Math.round(((parseFloat(value.parsed) || 153) - 153) * 100 / 347);
-            html += '<div style="display:flex;align-items:center;gap:4px;">' + window.getIconSvg('sun_temp', 16, '#ff9800') +
+            html += '<div class="dm-row">' + window.getIconSvg('sun_temp', 16, '#ff9800') +
               '<input class="' + id + ' color-temp" type="range" id="colorT|' + id + '" style="width:80px" min="0" max="100" step="2" value="' + ctPct + '" onchange="evm(\'colorT|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
-              '<span class="' + id + '" style="font-size:11px;color:var(--faint);min-width:26px">' + ctPct + '%</span></div>';
+              '<span class="' + id + ' dm-val">' + ctPct + '%</span></div>';
           } else if (isColor) {
             // hue 0-100 → send hex (as widgets do, hsl2Hex is global).
-            html += '<div style="display:flex;align-items:center;gap:4px;">' + window.getIconSvg('palette', 16, '#ff9800') +
+            html += '<div class="dm-row">' + window.getIconSvg('palette', 16, '#ff9800') +
               '<input class="' + id + ' color-range" type="range" id="color|' + id + '" style="width:80px" min="0" max="100" step="2" value="75" onchange="var hue=((this.value/100)*360).toFixed(0);evm(\'color|' + id + '\',hsl2Hex(hue,100,50))" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
-              '<span class="' + id + '" style="font-size:11px;color:var(--faint);min-width:26px">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
+              '<span class="' + id + ' dm-val">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
           } else {
-            html += '<span class="' + id + '" style="font-size:11px;color:var(--faint)">' + (value.parsed != null ? value.parsed : '?') + '</span>';
+            html += '<span class="' + id + ' dm-dim">' + (value.parsed != null ? value.parsed : '?') + '</span>';
           }
           break;
         }
         case 'switch': {
           var swOn = [1, '1', true, 'on', 'ON', 'вкл'].indexOf(value.parsed) !== -1;
-          html += '<div style="display:flex;align-items:center;gap:5px;">' + window.getIconSvg(device_class || 'switch', 18, swOn ? '#66bb6a' : '#666') +
+          html += '<div class="dm-row5">' + window.getIconSvg(device_class || 'switch', 18, swOn ? '#66bb6a' : '#666') +
             '<input type="checkbox" class="' + id + ' input toggle-input" id="sw_' + idw + '"' + (swOn ? ' checked' : '') +
             ' onchange="evm(\'on_off|' + id + '\',this.checked?1:0)"/>' +
             '<label for="sw_' + idw + '"><div class="toggle-switch ' + id + '"><span></span></div></label>' +
-            '<span class="' + id + '" style="font-size:11px;color:var(--faint)">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
+            '<span class="' + id + ' dm-dim">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
           break;
         }
         case 'range': {
           var rMin = (attr && attr.min != null) ? attr.min : 0;
           var rMax = (attr && attr.max != null) ? attr.max : 100;
           var rStep = (attr && attr.precision != null) ? attr.precision : 1;
-          html += '<div style="display:flex;align-items:center;gap:4px;">' + window.getIconSvg('number', 16, '#90caf9') +
+          html += '<div class="dm-row">' + window.getIconSvg('number', 16, '#90caf9') +
             '<input type="range" id="level|' + id + '" class="' + id + ' level" style="width:80px" min="' + rMin + '" max="' + rMax + '" step="' + rStep + '" value="' + (value.parsed != null ? value.parsed : rMin) + '" onchange="evm(\'level|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value">' +
-            '<span class="' + id + '" style="font-size:11px;color:var(--faint);min-width:26px">' + (value.parsed != null ? value.parsed : rMin) + '</span></div>';
+            '<span class="' + id + ' dm-val">' + (value.parsed != null ? value.parsed : rMin) + '</span></div>';
           break;
         }
         case 'number': {
@@ -344,26 +382,26 @@ body.light .dm-table .parent-row{background:#e4e9f2}
           var nStep = (attr && attr.step != null) ? attr.step : 1;
           var nMode = (attr && attr.mode) ? String(attr.mode) : 'slider';
           var nVal = (value.parsed != null ? value.parsed : nMin);
-          html += '<div style="display:flex;align-items:center;gap:4px;">' + window.getIconSvg('number', 16, '#90caf9');
+          html += '<div class="dm-row">' + window.getIconSvg('number', 16, '#90caf9');
           if (nMode === 'box') {
             var nValNum = parseFloat(nVal);
             if (!isFinite(nValNum)) nValNum = parseFloat(nMin) || 0;
-            html += '<span style="display:inline-flex;align-items:center;gap:3px;">' +
-              '<button type="button" title="-" style="cursor:pointer;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:0 7px;color:var(--text);font-size:13px;" onclick="var el=this.parentNode.querySelector(\'input\');var st=parseFloat(el.step)||1;var v=(parseFloat(el.value)||0)-st;var mn=parseFloat(el.min);if(isFinite(mn)&&v<mn)v=mn;el.value=v;">&#8249;</button>' +
+            html += '<span class="dm-step-row">' +
+              '<button type="button" title="-" class="dm-step-btn" onclick="var el=this.parentNode.querySelector(\'input\');var st=parseFloat(el.step)||1;var v=(parseFloat(el.value)||0)-st;var mn=parseFloat(el.min);if(isFinite(mn)&&v<mn)v=mn;el.value=v;">&#8249;</button>' +
               '<input class="' + id + '" type="number" style="width:52px" min="' + nMin + '" max="' + nMax + '" step="' + nStep + '" value="' + nValNum + '" onkeydown="if(event.key===\'Enter\'){evm(\'number|' + id + '\',this.value)}">' +
-              '<button type="button" title="+" style="cursor:pointer;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:0 7px;color:var(--text);font-size:13px;" onclick="var el=this.parentNode.querySelector(\'input\');var st=parseFloat(el.step)||1;var v=(parseFloat(el.value)||0)+st;var mx=parseFloat(el.max);if(isFinite(mx)&&v>mx)v=mx;el.value=v;">&#8250;</button>' +
-              '<button type="button" title="Send" style="cursor:pointer;background:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:0 7px;color:#fff;font-size:12px;" onclick="evm(\'number|' + id + '\',this.parentNode.querySelector(\'input\').value)">OK</button></span>' +
-              '<span class="' + id + '" style="font-size:11px;color:var(--faint);min-width:26px">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
+              '<button type="button" title="+" class="dm-step-btn" onclick="var el=this.parentNode.querySelector(\'input\');var st=parseFloat(el.step)||1;var v=(parseFloat(el.value)||0)+st;var mx=parseFloat(el.max);if(isFinite(mx)&&v>mx)v=mx;el.value=v;">&#8250;</button>' +
+              '<button type="button" title="Send" class="dm-step-ok" onclick="evm(\'number|' + id + '\',this.parentNode.querySelector(\'input\').value)">OK</button></span>' +
+              '<span class="' + id + ' dm-val">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
           } else {
             html += '<input class="' + id + ' level" type="range" id="number|' + id + '" style="width:80px" min="' + nMin + '" max="' + nMax + '" step="' + nStep + '" value="' + nVal + '" onchange="evm(\'number|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value">' +
-              '<span class="' + id + '" style="font-size:11px;color:var(--faint);min-width:26px">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
+              '<span class="' + id + ' dm-val">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
           }
           break;
         }
         case 'select': {
           var rawOpts = (attr && attr.options) ? attr.options : [];
           var selOpts = Array.isArray(rawOpts) ? rawOpts : String(rawOpts).split(',').map(function (s) { return s.trim(); });
-          html += '<div style="display:flex;align-items:center;gap:4px;">' + window.getIconSvg('info', 16, '#90caf9') +
+          html += '<div class="dm-row">' + window.getIconSvg('info', 16, '#90caf9') +
             '<select id="' + id + '" class="select ' + id + '" onchange="evm(\'select|' + id + '\',this.value)" style="font-size:11px;max-width:120px">';
           selOpts.forEach(function (opt) { var sel = (opt === value.parsed) ? ' selected' : ''; html += '<option value="' + opt + '"' + sel + '>' + opt + '</option>'; });
           html += '</select></div>';
@@ -375,10 +413,10 @@ body.light .dm-table .parent-row{background:#e4e9f2}
         case 'cover': {
           var cPos = parseInt(value.parsed) || 0;
           var cDC = device_class || 'curtain';
-          html += '<div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap;">' + window.getIconSvg(cDC, 16, cPos > 0 ? '#90caf9' : '#607d8b') +
-            '<span onclick="evm(\'cover_open|' + id + '\',1)" style="cursor:pointer;font-size:12px;padding:0 4px;background:var(--bg3);border-radius:3px">▲</span>' +
-            '<span onclick="evm(\'cover_stop|' + id + '\',1)" style="cursor:pointer;font-size:12px;padding:0 4px;background:var(--bg3);border-radius:3px">⏹</span>' +
-            '<span onclick="evm(\'cover_close|' + id + '\',0)" style="cursor:pointer;font-size:12px;padding:0 4px;background:var(--bg3);border-radius:3px">▼</span>' +
+          html += '<div class="dm-row3">' + window.getIconSvg(cDC, 16, cPos > 0 ? '#90caf9' : '#607d8b') +
+            '<span onclick="evm(\'cover_open|' + id + '\',1)" class="dm-mini-btn">▲</span>' +
+            '<span onclick="evm(\'cover_stop|' + id + '\',1)" class="dm-mini-btn">⏹</span>' +
+            '<span onclick="evm(\'cover_close|' + id + '\',0)" class="dm-mini-btn">▼</span>' +
             '<input class="' + id + ' level" type="range" id="cover_pos|' + id + '" style="width:65px" min="0" max="100" value="' + cPos + '" onchange="evm(\'cover_pos|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
             '<span class="' + id + '" style="font-size:11px;color:#90caf9;min-width:26px">' + cPos + '%</span></div>';
           break;
@@ -386,7 +424,7 @@ body.light .dm-table .parent-row{background:#e4e9f2}
         case 'fan': {
           var fanOn = [1, '1', true, 'on', 'ON'].indexOf(value.parsed) !== -1;
           var fanSpd = (value.speed != null) ? value.speed : 0;
-          html += '<div style="display:flex;align-items:center;gap:5px;">' +
+          html += '<div class="dm-row5">' +
             '<div style="animation:' + (fanOn ? 'dmSpin 1.5s linear infinite' : 'none') + '">' + window.getIconSvg('fan', 18, fanOn ? '#29b6f6' : '#607d8b') + '</div>' +
             '<input type="checkbox" class="' + id + ' input toggle-input" id="fn_' + idw + '"' + (fanOn ? ' checked' : '') + ' onchange="evm(\'on_off|' + id + '\',this.checked?1:0)"/>' +
             '<label for="fn_' + idw + '"><div class="toggle-switch ' + id + '"><span></span></div></label>' +
@@ -407,21 +445,6 @@ body.light .dm-table .parent-row{background:#e4e9f2}
             try { if (r && r.class && typeof r.class === 'object') return r.class; } catch (eC) {}
             return {};
           };
-          var dmPairs = function (m) {
-            try { if (typeof window.parseModePairs === 'function') return window.parseModePairs(m); } catch (eP) {}
-            var list = Array.isArray(m) ? m.map(function (x) { return (x && typeof x === 'object') ? (x.value || x.name || x.mode || '') : String(x); }) : String(m || '').split(',');
-            var names = [], codeOf = {};
-            list.forEach(function (s) {
-              s = String(s == null ? '' : s).trim();
-              if (!s) return;
-              var nm = s, code = null, ci = s.lastIndexOf(':');
-              if (ci > 0 && ci < s.length - 1) { nm = s.slice(0, ci).trim().toLowerCase(); var hx = s.slice(ci + 1).trim(); if (/^[0-9a-fA-F]+$/.test(hx)) code = parseInt(hx, 16); }
-              else nm = s.toLowerCase();
-              if (!nm) return;
-              names.push(nm); codeOf[nm] = code;
-            });
-            return { names: names, codeOf: codeOf };
-          };
           var dmSysMap = { 0: 'off', 1: 'auto', 2: 'auto', 3: 'cool', 4: 'heat', 5: 'heat', 6: 'cool', 7: 'fan_only', 8: 'dry', 9: 'auto' };
           var dmModeVal = function (raw, pairs) {
             if (raw === undefined || raw === null || raw === '') return 'off';
@@ -439,7 +462,7 @@ body.light .dm-table .parent-row{background:#e4e9f2}
               var act = (m === cur);
               var send = ((pairs.codeOf[m] === null || pairs.codeOf[m] === undefined) ? ("'" + m + "'") : pairs.codeOf[m]);
               var bg = act ? (cMCols[m] || '#888') : 'var(--bg3)';
-              h += '<span onclick="evm(\'climate_mode|' + mId + '\',' + send + ')" style="cursor:pointer;border-radius:8px;padding:1px 4px;font-size:10px;color:#fff;background:' + bg + ';border:1px solid ' + (cMCols[m] || '#888') + '">' + (cMIcos[m] || '') + m + '</span>';
+              h += '<span onclick="evm(\'climate_mode|' + mId + '\',' + send + ')" class="dm-chip" style="background:' + bg + ';border:1px solid ' + (cMCols[m] || '#888') + '">' + (cMIcos[m] || '') + m + '</span>';
             });
             return h;
           };
@@ -453,9 +476,9 @@ body.light .dm-table .parent-row{background:#e4e9f2}
             var sVal = (sRep.parsed !== undefined && sRep.parsed !== null && sRep.parsed !== '') ? sRep.parsed : 20;
             var col = cool ? '#42a5f5' : '#ff9800';
             var ico = cool ? '❄️' : '🎯';
-            return '<div style="display:flex;align-items:center;gap:4px;margin-top:2px;"><span style="font-size:10px;color:var(--faint)">' + ico + '</span>' +
+            return '<div class="dm-row dm-row-mt"><span class="dm-note">' + ico + '</span>' +
               '<input class="' + sId + ' level" type="range" id="climate_temp|' + sId + '" style="width:70px" min="' + sMin + '" max="' + sMax + '" step="' + sStep + '" value="' + sVal + '" onchange="evm(\'climate_temp|' + sId + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'°\'">' +
-              '<span style="font-size:11px;color:' + col + ';min-width:26px">' + sVal + '°</span></div>';
+              '<span class="dm-val" style="color:' + col + '">' + sVal + '°</span></div>';
           };
           // puzzle scan
           var dmCP = { temp: null, heat: null, cool: null, mode: null, fan: null, hum: null, humSet: null };
@@ -481,14 +504,14 @@ body.light .dm-table .parent-row{background:#e4e9f2}
             if ((ownCPart === 'relative_humidity' || ownCPart === 'humidity_setpoint') && !dmCP.temp) {
               if (ownCPart === 'relative_humidity') {
                 var huV = (value.parsed !== undefined && value.parsed !== null && value.parsed !== '') ? value.parsed : '—';
-                html += '<div style="display:flex;align-items:center;gap:4px;">💧<span class="' + id + '" style="font-size:11px;color:#29b6f6;">' + huV + '</span><span style="font-size:10px;color:var(--faint)">%</span></div>';
+                html += '<div class="dm-row">💧<span class="' + id + '" style="font-size:11px;color:#29b6f6;">' + huV + '</span><span class="dm-note">%</span></div>';
               } else {
                 var hsC = dmCCls(value);
                 var hsMn = (hsC.min_humidity != null && hsC.min_humidity !== '') ? Number(hsC.min_humidity) : 0;
                 var hsMx = (hsC.max_humidity != null && hsC.max_humidity !== '') ? Number(hsC.max_humidity) : 100;
                 var hsSt = (hsC.humidity_step != null && hsC.humidity_step !== '') ? Number(hsC.humidity_step) : 1;
                 var hsV = (value.parsed !== undefined && value.parsed !== null && value.parsed !== '') ? value.parsed : hsMn;
-                html += '<div style="display:flex;align-items:center;gap:4px;">💧🎯' +
+                html += '<div class="dm-row">💧🎯' +
                   '<input class="' + id + ' level" type="range" id="number|' + id + '" style="width:70px" min="' + hsMn + '" max="' + hsMx + '" step="' + hsSt + '" value="' + hsV + '" onchange="evm(\'number|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'%\'">' +
                   '<span class="' + id + '" style="font-size:11px;color:#29b6f6;min-width:26px">' + hsV + '%</span></div>';
               }
@@ -499,14 +522,14 @@ body.light .dm-table .parent-row{background:#e4e9f2}
             var pT = device.Report[dmCP.temp] || {};
             var pCur = (pT.parsed !== undefined && pT.parsed !== null && pT.parsed !== '') ? pT.parsed : '—';
             var pM = dmCP.mode ? device.Report[dmCP.mode] : null;
-            var pMP = dmPairs(pM ? dmCCls(pM).modes : (attr && attr.modes));
+            var pMP = parseModePairs(pM ? dmCCls(pM).modes : (attr && attr.modes));
             var pModes = pMP.names.length ? pMP.names : ['off', 'auto', 'heat', 'cool', 'dry', 'fan_only', 'eco'];
             if (pModes.indexOf('off') === -1) pModes.unshift('off');
             var pMVal = pM ? dmModeVal(pM.parsed, pMP) : 'off';
             var pMId = dmCP.mode ? (device.IEEE + '#' + dmCP.mode) : id;
             var pMCol = cMCols[pMVal] || '#888';
-            html += '<div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap;">' + window.getIconSvg('climate', 18, pMCol) +
-              '<span class="' + id + '" style="color:' + pMCol + ';font-size:13px;font-weight:bold">' + pCur + '°</span>';
+            html += '<div class="dm-row3">' + window.getIconSvg('climate', 18, pMCol) +
+              '<span class="' + id + ' dm-val-strong" style="color:' + pMCol + '">' + pCur + '°</span>';
             if (pM) html += dmModeBtns(pMId, pModes, pMP, pMVal);
             html += '</div>';
             if (dmCP.heat) html += dmSetSlider(dmCP.heat, false);
@@ -522,10 +545,10 @@ body.light .dm-table .parent-row{background:#e4e9f2}
               var pFCur = String((pF && pF.parsed !== undefined && pF.parsed !== null) ? pF.parsed : '').toLowerCase().trim();
               var pFFM = { 0: 'off', 1: 'low', 2: 'medium', 3: 'high', 4: 'on', 5: 'auto', 6: 'smart' };
               if (/^[0-9]+$/.test(pFCur) && pFFM[parseInt(pFCur, 10)]) pFCur = pFFM[parseInt(pFCur, 10)];
-              html += '<div style="display:flex;align-items:center;gap:2px;flex-wrap:wrap;margin-top:2px;">💨';
+              html += '<div class="dm-fan-row">💨';
               pFP.forEach(function (fp) {
                 var fa = (fp === pFCur);
-                html += '<span onclick="evm(\'fan_speed|' + pFId + '\',\'' + fp + '\')" style="cursor:pointer;border-radius:8px;padding:1px 4px;font-size:10px;color:#fff;background:' + (fa ? '#29b6f6' : 'var(--bg3)') + ';border:1px solid #29b6f6">' + fp + '</span>';
+                html += '<span onclick="evm(\'fan_speed|' + pFId + '\',\'' + fp + '\')" class="dm-chip" style="background:' + (fa ? '#29b6f6' : 'var(--bg3)') + ';border:1px solid #29b6f6">' + fp + '</span>';
               });
               html += '</div>';
             }
@@ -535,7 +558,7 @@ body.light .dm-table .parent-row{background:#e4e9f2}
           // but modes as pairs with numeric codes and off ensured for 001C
           var cTemp = value.parsed || '—';
           var cSet = (attr && attr.target_temp != null) ? attr.target_temp : (value.set_temp || (value.temperature || '—'));
-          var cPairs = dmPairs(attr && attr.modes);
+          var cPairs = parseModePairs(attr && attr.modes);
           var cModes = cPairs.names.length ? cPairs.names.slice() : ['off', 'heat', 'cool', 'auto'];
           try {
             var dmYa = value && value.ya_rep;
@@ -544,7 +567,7 @@ body.light .dm-table .parent-row{background:#e4e9f2}
             for (var cmi = 0; cmi < dmCaps.length; cmi++) {
               var dmCp = dmCaps[cmi] && dmCaps[cmi].parameters;
               if (dmCp && dmCp.modes) {
-                var ym = dmPairs(dmCp.modes);
+                var ym = parseModePairs(dmCp.modes);
                 if (ym.names.length) { cModes = ym.names; cPairs = ym; break; }
               }
             }
@@ -560,17 +583,17 @@ body.light .dm-table .parent-row{background:#e4e9f2}
           } catch (e3) {}
           var cMode = dmModeVal((attr && attr.hvac_mode) || value.mode || 'off', cPairs);
           var cMCol = cMCols[cMode] || '#888';
-          html += '<div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap;">' + window.getIconSvg('climate', 18, cMCol) +
-            '<span class="' + id + '" style="color:' + cMCol + ';font-size:13px;font-weight:bold">' + cTemp + '°</span>';
+          html += '<div class="dm-row3">' + window.getIconSvg('climate', 18, cMCol) +
+            '<span class="' + id + ' dm-val-strong" style="color:' + cMCol + '">' + cTemp + '°</span>';
           html += dmModeBtns(id, cModes, cPairs, cMode);
-          html += '</div><div style="display:flex;align-items:center;gap:4px;margin-top:2px;">' +
-            '<span style="font-size:10px;color:var(--faint)">🎯</span>';
+          html += '</div><div class="dm-row dm-row-mt">' +
+            '<span class="dm-note">🎯</span>';
           var cMinT = (attr && attr.min_temp) ? Number(attr.min_temp) : 5;
           var cMaxT = (attr && attr.max_temp) ? Number(attr.max_temp) : 35;
           var cTStep = (attr && attr.temp_step) ? Number(attr.temp_step) : 0.5;
           var cSetVal = (cSet !== '—') ? cSet : 20;
           html += '<input class="' + id + ' level" type="range" id="climate_temp|' + id + '" style="width:70px" min="' + cMinT + '" max="' + cMaxT + '" step="' + cTStep + '" value="' + cSetVal + '" onchange="evm(\'climate_temp|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'°\'">' +
-            '<span style="font-size:11px;color:#ff9800;min-width:26px">' + cSetVal + '°</span></div>';
+            '<span class="dm-val" style="color:#ff9800">' + cSetVal + '°</span></div>';
           break;
         }
         case 'climate_temp': {
@@ -583,7 +606,7 @@ body.light .dm-table .parent-row{background:#e4e9f2}
           var stMax = (stC.max_temp != null && stC.max_temp !== '') ? Number(stC.max_temp) : 35;
           var stStep = (stC.temp_step != null && stC.temp_step !== '') ? Number(stC.temp_step) : 0.5;
           var stVal = (value.parsed !== undefined && value.parsed !== null && value.parsed !== '') ? value.parsed : 20;
-          html += '<div style="display:flex;align-items:center;gap:4px;">' + (stCool ? '❄️' : '🎯') +
+          html += '<div class="dm-row">' + (stCool ? '❄️' : '🎯') +
             '<input class="' + id + ' level" type="range" id="climate_temp|' + id + '" style="width:80px" min="' + stMin + '" max="' + stMax + '" step="' + stStep + '" value="' + stVal + '" onchange="evm(\'climate_temp|' + id + '\',this.value)" oninput="this.nextElementSibling.textContent=this.value+\'°\'">' +
             '<span class="' + id + '" style="font-size:11px;color:' + (stCool ? '#42a5f5' : '#ff9800') + ';min-width:26px">' + stVal + '°</span></div>';
           break;
@@ -593,21 +616,7 @@ body.light .dm-table .parent-row{background:#e4e9f2}
           var cmC = {};
           try { var cmT = String((value && value.role) || '').split('&'); if (cmT[1]) cmC = JSON.parse(cmT[1]); } catch (eMT) {}
           try { if (value && value.class && typeof value.class === 'object') { for (var cmK in value.class) if (cmC[cmK] === undefined) cmC[cmK] = value.class[cmK]; } } catch (eMC) {}
-          var cmP = (function (m) {
-            try { if (typeof window.parseModePairs === 'function') return window.parseModePairs(m); } catch (eP) {}
-            var list = Array.isArray(m) ? m : String(m || '').split(',');
-            var names = [], codeOf = {};
-            list.forEach(function (s) {
-              s = String(s == null ? '' : s).trim();
-              if (!s) return;
-              var nm = s, code = null, ci = s.lastIndexOf(':');
-              if (ci > 0 && ci < s.length - 1) { nm = s.slice(0, ci).trim().toLowerCase(); var hx = s.slice(ci + 1).trim(); if (/^[0-9a-fA-F]+$/.test(hx)) code = parseInt(hx, 16); }
-              else nm = s.toLowerCase();
-              if (!nm) return;
-              names.push(nm); codeOf[nm] = code;
-            });
-            return { names: names, codeOf: codeOf };
-          })(cmC.modes);
+          var cmP = parseModePairs(cmC.modes);
           var cmModes = cmP.names.length ? cmP.names : ['off', 'auto', 'heat', 'cool', 'dry', 'fan_only', 'eco'];
           var cmRaw = value.parsed;
           var cmNum = /^[0-9]+$/.test(String(cmRaw)) ? parseInt(String(cmRaw), 10) : null;
@@ -620,13 +629,13 @@ body.light .dm-table .parent-row{background:#e4e9f2}
           } else cmVal = String(cmRaw || 'off');
           cmVal = String(cmVal).toLowerCase().trim();
           var cmCol = { heat: '#ff7043', cool: '#42a5f5', auto: '#ab47bc', fan_only: '#29b6f6', dry: '#ffca28', eco: '#66bb6a', off: '#616161' }[cmVal] || '#888';
-          html += '<div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap;">' + window.getIconSvg('climate', 16, cmCol) +
-            '<span class="' + id + '" style="color:' + cmCol + ';font-size:11px;font-weight:bold">' + cmVal + '</span>';
+          html += '<div class="dm-row3">' + window.getIconSvg('climate', 16, cmCol) +
+            '<span class="' + id + ' dm-val-bold" style="color:' + cmCol + '">' + cmVal + '</span>';
           cmModes.forEach(function (m) {
             var act = (m === cmVal);
             var send = ((cmP.codeOf[m] === null || cmP.codeOf[m] === undefined) ? ("'" + m + "'") : cmP.codeOf[m]);
             var bg = act ? ({ heat: '#ff7043', cool: '#42a5f5', auto: '#ab47bc', fan_only: '#29b6f6', dry: '#ffca28', eco: '#66bb6a', off: '#616161' }[m] || '#888') : 'var(--bg3)';
-            html += '<span onclick="evm(\'climate_mode|' + id + '\',' + send + ')" style="cursor:pointer;border-radius:8px;padding:1px 4px;font-size:10px;color:#fff;background:' + bg + ';border:1px solid ' + (bg === 'var(--bg3)' ? '#888' : bg) + '">' + m + '</span>';
+            html += '<span onclick="evm(\'climate_mode|' + id + '\',' + send + ')" class="dm-chip" style="background:' + bg + ';border:1px solid ' + (bg === 'var(--bg3)' ? '#888' : bg) + '">' + m + '</span>';
           });
           html += '</div>';
           break;
@@ -635,9 +644,9 @@ body.light .dm-table .parent-row{background:#e4e9f2}
           var lkd = ['locked', '1', 1, true].indexOf(value.parsed) !== -1;
           var lkCol = lkd ? '#ef5350' : '#66bb6a';
           var lkCmd = lkd ? 'unlock' : 'lock';
-          html += '<div style="display:flex;align-items:center;gap:5px;">' + window.getIconSvg('lock', 18, lkCol) +
+          html += '<div class="dm-row5">' + window.getIconSvg('lock', 18, lkCol) +
             '<span onclick="evm(\'lock_toggle|' + id + '\',\'' + lkCmd + '\')" style="cursor:pointer;font-size:18px;color:' + lkCol + '">' + (lkd ? '🔒' : '🔓') + '</span>' +
-            '<span class="' + id + '" style="font-size:11px;color:var(--faint)">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
+            '<span class="' + id + ' dm-dim">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
           break;
         }
         case 'alarm_control_panel': {
@@ -645,8 +654,8 @@ body.light .dm-table .parent-row{background:#e4e9f2}
           var alCols = { disarmed: '#66bb6a', armed_home: '#ff9800', armed_away: '#ef5350', triggered: '#e53935', arming: '#ffca28' };
           var alLabls = { disarmed: t('al.disarmed', 'Снято'), armed_home: t('al.arm_home', 'Дома'), armed_away: t('al.arm_away', 'Вне дома'), triggered: t('al.triggered', '⚠️ ТРЕВОГА'), arming: t('al.arming', 'Взводится') };
           var alCol = alCols[alSt] || '#888';
-          html += '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">' + window.getIconSvg('alarm_control_panel', 16, alCol) +
-            '<span style="color:' + alCol + ';font-size:11px;font-weight:bold">' + (alLabls[alSt] || alSt) + '</span>';
+          html += '<div class="dm-row-wrap">' + window.getIconSvg('alarm_control_panel', 16, alCol) +
+            '<span class="dm-val-bold" style="color:' + alCol + '">' + (alLabls[alSt] || alSt) + '</span>';
           [['disarm', t('al.disarm', 'Снять'), '#66bb6a'], ['arm_home', t('al.home', 'Дома'), '#ff9800'], ['arm_away', t('al.away', 'Уйти'), '#ef5350']].forEach(function (cmd) {
             html += '<span onclick="evm(\'alarm|' + id + '\',\'' + cmd[0] + '\')" style="cursor:pointer;border-radius:6px;padding:1px 5px;font-size:10px;color:#fff;background:' + cmd[2] + '">' + cmd[1] + '</span>';
           });
@@ -656,19 +665,19 @@ body.light .dm-table .parent-row{background:#e4e9f2}
         case 'binary_sensor': {
           var bOn = [1, '1', true, 'on', 'ON', 'true', 'detected', 'open'].indexOf(value.parsed) !== -1;
           var bCol = bOn ? '#ef5350' : '#66bb6a';
-          html += '<div style="display:flex;align-items:center;gap:4px;">' + window.getIconSvg(device_class || 'sensor', 18, bCol) +
-            '<span class="' + id + '" style="font-size:11px;color:' + bCol + '">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
+          html += '<div class="dm-row">' + window.getIconSvg(device_class || 'sensor', 18, bCol) +
+            '<span class="' + id + ' dm-dim" style="color:' + bCol + '">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
           break;
         }
         case 'sensor': {
           var sNum = parseFloat(value.parsed);
-          html += '<div style="display:flex;align-items:center;gap:4px;">' + window.getIconSvg(device_class || 'sensor', 18, 'silver', sNum) +
+          html += '<div class="dm-row">' + window.getIconSvg(device_class || 'sensor', 18, 'silver', sNum) +
             '<span class="' + id + '" style="font-size:11px;color:var(--text)">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
           break;
         }
         default:
-          html += '<div style="display:flex;align-items:center;gap:4px;">' + window.getIconSvg(device_class || 'sensor', 18, 'silver', parseFloat(value.parsed)) +
-            '<span class="' + id + '" style="font-size:11px;color:var(--faint)">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
+          html += '<div class="dm-row">' + window.getIconSvg(device_class || 'sensor', 18, 'silver', parseFloat(value.parsed)) +
+            '<span class="' + id + ' dm-dim">' + (value.parsed != null ? value.parsed : '?') + '</span></div>';
           break;
       }
       return html;
@@ -696,6 +705,7 @@ body.light .dm-table .parent-row{background:#e4e9f2}
       thSort('col-ieee', 'IEEE', t('th.ieee', 'IEEE')) + '</tr></thead><tbody>';
     var f = st.filter.toLowerCase();
     var list = deviceList.slice();
+    var visible = 0;
     if (st.sort && st.sort.key) {
       var k = st.sort.key, dir = st.sort.dir;
       list.sort(function (a, b) {
@@ -710,6 +720,7 @@ body.light .dm-table .parent-row{background:#e4e9f2}
         if (!(d.Name || '').toLowerCase().includes(f) && !(d.Location || '').toLowerCase().includes(f) &&
             !(d.IEEE || '').toLowerCase().includes(f) && !(d.DevType || '').toLowerCase().includes(f)) continue;
       }
+      visible++;
       var ex = !!st.expanded[d.IEEE];
       html += '<tr class="parent-row" data-ieee="' + escapeHtml(d.IEEE) + '">' +
         '<td class="col-dt"><span class="expand-icon" data-ieee="' + escapeHtml(d.IEEE) + '">' + (ex ? '▼' : '▶') + '</span> <strong>' + escapeHtml(d.DevType || '—') + '</strong></td>' +
@@ -718,7 +729,7 @@ body.light .dm-table .parent-row{background:#e4e9f2}
         '<div onclick="dm.cmMnu(this.id)" id="cm_' + escapeHtml(d.IEEE) + '" class="menu-dots" title="' + t('cm.hint', 'Меню устройства') + '">...</div></div></td>' +
         '<td class="col-location editable-cell" data-ieee="' + escapeHtml(d.IEEE) + '" data-key="~" data-field="location"><span class="cell-value">' + escapeHtml(d.Location || '—') + '</span></td>' +
         '<td class="col-ieee">' + escapeHtml(d.IEEE) + '</td></tr>';
-      if (d.Report) {
+      if (d.Report && ex) {
         for (var key in d.Report) {
           if (!d.Report.hasOwnProperty(key)) continue;
           var v = d.Report[key];
@@ -726,7 +737,7 @@ body.light .dm-table .parent-row{background:#e4e9f2}
           var objLoc = v.location || '';
           var locDisp = objLoc || d.Location || '—';
           var locStyle = objLoc ? 'color:#90caf9;font-style:italic;' : '';
-          html += '<tr class="child-row" data-parent="' + escapeHtml(d.IEEE) + '" style="display:' + (ex ? 'table-row' : 'none') + ';">' +
+          html += '<tr class="child-row" data-parent="' + escapeHtml(d.IEEE) + '">' +
             '<td class="col-dt"><span style="display:inline-block;width:8px"></span>' + window.getIconSvg(iconType, 18, '#666666') + '</td>' +
             '<td class="col-name editable-cell" data-ieee="' + escapeHtml(d.IEEE) + '" data-key="' + escapeHtml(key) + '" data-field="name"><span class="cell-value">' + escapeHtml(v.label) + '</span></td>' +
             '<td class="col-state widget-cell">' + widgetHtml(d, key, v) + '</td>' +
@@ -736,25 +747,16 @@ body.light .dm-table .parent-row{background:#e4e9f2}
       }
     }
     html += '</tbody></table>';
-    return html;
+    return { html: html, visible: visible };
   }
 
   function renderTable() {
     var wrap = document.getElementById('dm_table_wrap');
     if (!wrap) return;
-    wrap.innerHTML = genTable();
+    var res = genTable();
+    wrap.innerHTML = res.html;
     var stc = document.getElementById('dm_st_count');
-    if (stc) {
-      var visible = deviceList.length;
-      if (st.filter) {
-        var f = st.filter.toLowerCase();
-        visible = deviceList.filter(function (d) {
-          return (d.Name || '').toLowerCase().includes(f) || (d.Location || '').toLowerCase().includes(f) ||
-            (d.IEEE || '').toLowerCase().includes(f) || (d.DevType || '').toLowerCase().includes(f);
-        }).length;
-      }
-      stc.textContent = t('st.devices', 'Устройств: {a} / {b}', { a: visible, b: deviceList.length });
-    }
+    if (stc) stc.textContent = t('st.devices', 'Устройств: {a} / {b}', { a: res.visible, b: deviceList.length });
   }
 
   // Лёгкий 5-секундный тик: только статусы parent-row (точка + ago),
@@ -772,11 +774,33 @@ body.light .dm-table .parent-row{background:#e4e9f2}
       if (!d) continue;
       var stEl = rows[i].querySelector('.dm-status');
       if (!stEl) continue;
-      // Точки меню живут внутри .dm-status — сохраняем узел, иначе тик
-      // стирает вызов контекстного меню (inline onclick переживает перенос).
+      var si = statusInfo(d);
       var dots = stEl.querySelector('.menu-dots');
-      stEl.innerHTML = statusHtml(d);
-      if (dots) stEl.appendChild(dots);
+      var dot = stEl.querySelector('.dm-dot');
+      if (dot) { dot.className = 'dm-dot ' + si.cls; dot.title = si.lbl; }
+      var txt = stEl.querySelector('.txt');
+      if (si.cls === 'left') {
+        if (!txt) {
+          txt = document.createElement('span');
+          txt.className = 'txt';
+          if (dot && dot.parentNode) dot.parentNode.insertBefore(txt, dot.nextSibling);
+          else stEl.insertBefore(txt, stEl.firstChild);
+        }
+        txt.textContent = si.lbl;
+      } else if (txt && txt.parentNode) {
+        txt.parentNode.removeChild(txt);
+      }
+      var ago = stEl.querySelector('.ago');
+      if (si.ago) {
+        if (!ago) {
+          ago = document.createElement('span');
+          ago.className = 'cnt ago';
+          stEl.insertBefore(ago, dots);
+        }
+        ago.textContent = '· ' + si.ago;
+      } else if (ago && ago.parentNode) {
+        ago.parentNode.removeChild(ago);
+      }
     }
   }
 
@@ -1075,10 +1099,10 @@ dm.setBleTpl = function (dev, adr, name) {
     setJoinTab('dm_tab_had');
     dm.updateHadTab();
     var box = document.querySelector('#dm_modal_join .dm-join-scroll');
-    if (box) box.innerHTML = '<div style="margin-bottom:6px"><b>' + t('had.found', 'Найдено') + '</b> ' +
+    if (box) box.innerHTML = '<div class="dm-mb6"><b>' + t('had.found', 'Найдено') + '</b> ' +
       '<button class="dm-btn" onclick="dm.hadAllowAll()">' + t('had.addall', 'Добавить всё') + '</button></div>' +
       '<div id="had_list"><i>' + t('had.loading', 'Загрузка...') + '</i></div>' +
-      '<div style="margin:8px 0 4px"><b>' + t('had.inbase', 'В базе') + '</b></div><div id="had_base"></div>';
+      '<div class="dm-section"><b>' + t('had.inbase', 'В базе') + '</b></div><div id="had_base"></div>';
     eventE.off('haddisc', dm.onHadDisc); eventE.on('haddisc', dm.onHadDisc);
     dm.renderHadBase();
     WSsend('had_list');
@@ -1092,9 +1116,9 @@ dm.setBleTpl = function (dev, adr, name) {
     }
     var html = '';
     data.forEach(function (d) {
-      html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border)">' +
-        '<div style="flex:1;min-width:0"><b>' + hadEsc(d.name || d.ieee) + '</b>' +
-        '<div style="color:var(--faint);font-size:11px">' + hadEsc(d.model || '') + ' · ' + hadEsc((d.components || []).join(', ')) + ' · ' + hadEsc(d.ieee) + '</div></div>' +
+      html += '<div class="dm-listrow">' +
+        '<div class="dm-grow"><b>' + hadEsc(d.name || d.ieee) + '</b>' +
+        '<div class="dm-sub">' + hadEsc(d.model || '') + ' · ' + hadEsc((d.components || []).join(', ')) + ' · ' + hadEsc(d.ieee) + '</div></div>' +
         '<button class="dm-btn" onclick="dm.hadAllow(\'' + hadEsc(d.ieee) + '\')">' + t('had.add', 'Добавить') + '</button>' +
         '<button class="dm-btn" onclick="dm.hadHide(\'' + hadEsc(d.ieee) + '\')">' + t('had.hide', 'Игнорировать') + '</button></div>';
     });
@@ -1112,9 +1136,9 @@ dm.setBleTpl = function (dev, adr, name) {
     if (!list.length) { box.innerHTML = '<i>—</i>'; return; }
     var html = '';
     list.forEach(function (d) {
-      html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border)">' +
-        '<div style="flex:1;min-width:0"><b>' + hadEsc(d.Name || d.IEEE) + '</b>' +
-        '<div style="color:var(--faint);font-size:11px">' + hadEsc(d.ModelId || '') + ' · ' + hadEsc(d.IEEE) + '</div></div>' +
+      html += '<div class="dm-listrow">' +
+        '<div class="dm-grow"><b>' + hadEsc(d.Name || d.IEEE) + '</b>' +
+        '<div class="dm-sub">' + hadEsc(d.ModelId || '') + ' · ' + hadEsc(d.IEEE) + '</div></div>' +
         '<button class="dm-btn" onclick="dm.hadDel(\'' + hadEsc(d.IEEE) + '\')">' + t('had.del', 'Удалить') + '</button></div>';
     });
     box.innerHTML = html;
@@ -1127,16 +1151,16 @@ dm.setBleTpl = function (dev, adr, name) {
     setJoinTab('dm_tab_lgtv');
     var box = document.querySelector('#dm_modal_join .dm-join-scroll');
     if (!box) return;
-    box.innerHTML = '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">' +
+    box.innerHTML = '<div class="dm-toolrow">' +
       '<button class="dm-scan-btn" id="lgtv_scan_btn" onclick="dm.lgtvScan()">' + t('lgtv.scan', '🔍 Найти в сети') + '</button>' +
       '<span id="lgtv_status" style="font-size:12px;color:var(--faint)"></span></div>' +
-      '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center"><b>' + t('lgtv.manual', 'Адрес вручную') + ':</b>' +
+      '<div class="dm-toolrow"><b>' + t('lgtv.manual', 'Адрес вручную') + ':</b>' +
       '<input id="lgtv_ip" style="width:120px" value="192.168.1.125" placeholder="192.168.1.x">' +
       '<input id="lgtv_port" style="width:60px" value="8080">' +
       '<button class="dm-btn" onclick="dm.lgtvCheckManual()">✓ ' + t('lgtv.check', 'Проверить') + '</button>' +
       '<button class="dm-btn" onclick="dm.lgtvAddManual()">' + t('lgtv.add', 'Добавить') + '</button></div>' +
-      '<div style="margin:8px 0 4px"><b>' + t('lgtv.found', 'Найдено') + '</b></div><div id="lgtv_list"><i>—</i></div>' +
-      '<div style="margin:8px 0 4px"><b>' + t('lgtv.inbase', 'В базе') + '</b></div><div id="lgtv_base"></div>';
+      '<div class="dm-section"><b>' + t('lgtv.found', 'Найдено') + '</b></div><div id="lgtv_list"><i>—</i></div>' +
+      '<div class="dm-section"><b>' + t('lgtv.inbase', 'В базе') + '</b></div><div id="lgtv_base"></div>';
     eventE.off('lgtvScan', dm.onLgtvScan); eventE.on('lgtvScan', dm.onLgtvScan);
     eventE.off('lgtvCheck', dm.onLgtvCheck); eventE.on('lgtvCheck', dm.onLgtvCheck);
     eventE.off('lgtvAdd', dm.onLgtvAdd); eventE.on('lgtvAdd', dm.onLgtvAdd);
@@ -1161,9 +1185,9 @@ dm.setBleTpl = function (dev, adr, name) {
       var ip = hadEsc(f.ip || ''), port = f.port || 8080;
       var srv = f.server ? ' · ' + hadEsc(f.server) : '';
       var inBase = (typeof deviceList !== 'undefined') && deviceList.some(function (d) { return d && d.DevType === 'LGT' && d.Device === f.ip; });
-      html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border)">' +
-        '<div style="flex:1;min-width:0"><b>' + ip + ':' + port + '</b>' +
-        '<div style="color:var(--faint);font-size:11px">NetCast' + srv + '</div></div>' +
+      html += '<div class="dm-listrow">' +
+        '<div class="dm-grow"><b>' + ip + ':' + port + '</b>' +
+        '<div class="dm-sub">NetCast' + srv + '</div></div>' +
         (inBase ? '<i style="font-size:12px;color:var(--faint)">✓</i>'
           : '<button class="dm-btn" onclick="dm.lgtvAdd(\'' + ip + '\',' + port + ')">' + t('lgtv.add', 'Добавить') + '</button>') + '</div>';
     });
@@ -1219,12 +1243,12 @@ dm.setBleTpl = function (dev, adr, name) {
     var html = '';
     list.forEach(function (d) {
       var ieee = hadEsc(d.IEEE);
-      html += '<div style="padding:6px 4px;border-bottom:1px solid var(--border)">' +
-        '<div style="display:flex;align-items:center;gap:8px">' +
-        '<div style="flex:1;min-width:0"><b>' + hadEsc(d.Name || d.IEEE) + '</b>' +
-        '<div style="color:var(--faint);font-size:11px">' + hadEsc(d.Device || '') + ' · ' + ieee + '</div></div>' +
+      html += '<div class="dm-listrow-plain">' +
+        '<div class="dm-row8">' +
+        '<div class="dm-grow"><b>' + hadEsc(d.Name || d.IEEE) + '</b>' +
+        '<div class="dm-sub">' + hadEsc(d.Device || '') + ' · ' + ieee + '</div></div>' +
         '<button class="dm-btn" onclick="dm.lgtvDel(\'' + ieee + '\')">' + t('lgtv.del', 'Удалить') + '</button></div>' +
-        '<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">' +
+        '<div class="dm-toolrow-mt">' +
         '<button class="dm-btn" onclick="dm.lgtvCode(\'' + ieee + '\')">' + t('lgtv.showcode', 'Показать код') + '</button>' +
         '<input id="lgtv_code_' + ieee + '" style="width:110px" maxlength="6" placeholder="' + t('lgtv.codeph', '6 цифр с экрана') + '">' +
         '<button class="dm-btn" onclick="dm.lgtvPair(\'' + ieee + '\')">' + t('lgtv.pair', 'Войти') + '</button></div></div>';
@@ -1239,7 +1263,7 @@ dm.setBleTpl = function (dev, adr, name) {
     root.innerHTML = '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><b>' + t('scan.channel', 'Канал') + ':</b><input id="scan_ch" style="width:70px" list="scan_channels">' +
       '<button id="dm_scan_btn" class="dm-scan-btn" onclick="dm.zigbeeScan()">' + t('scan.btn', 'Сканировать') + '</button></div>' +
       '<datalist id="scan_channels"></datalist>' +
-      '<div style="height:220px;overflow-y:auto" id="joinstatus"></div>';
+      '<div class="dm-join-list" id="joinstatus"></div>';
     var dl = document.getElementById('scan_channels');
     [11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26].forEach(function (c) { var o = document.createElement('option'); o.value = c; dl.appendChild(o); });
     var fillChan = function () {
@@ -1317,9 +1341,8 @@ dm.setBleTpl = function (dev, adr, name) {
       bindRow('dst_Adr', 'dst_Adr_list', 'Actuator Adr', dstAllOpts(), 'dm.fDEP(this.value)') +
       bindRow('dst_ep', 'dst_ep_list', 'Dst EP', '', '') +
       '</table>' +
-      '<div style="text-align:center;margin-top:12px"><button id="dm_bind_btn" onclick="dm.bind()">Bind</button>&nbsp;<button id="dm_unbind_btn" onclick="dm.unbind()">UnBind</button>' +
+      '<div class="dm-center"><button id="dm_bind_btn" onclick="dm.bind()">Bind</button>&nbsp;<button id="dm_unbind_btn" onclick="dm.unbind()">UnBind</button>' +
       '<span id="dm_bind_wait" style="display:none">⏳ Выполнение...</span></div>';
-    c.innerHTML = li;
     dm.bindBusy(!!st.bindBusy);
   };
   // the cross clears its own field and everything below along src→ep→cluster→dst→dstep
@@ -1465,7 +1488,7 @@ dm.setBleTpl = function (dev, adr, name) {
 
       '<div class="dm-modal" id="dm_modal_confirm"><div class="dm-modal-box">' +
         '<div class="dm-modal-head"><span data-i18n="modal.confirm">Инициализация Zigbee</span><span class="dm-modal-close" onclick="dm.confirmNo()">✕</span></div>' +
-        '<div class="dm-modal-body" style="text-align:center"><div style="font-size:44px;margin:8px 0">⚠️</div>' +
+        '<div class="dm-modal-body dm-text-center"><div style="font-size:44px;margin:8px 0">⚠️</div>' +
           '<div style="font-weight:700;font-size:15px;margin-bottom:8px" data-i18n="confirm.msg">Инициализировать zigbee-сеть?</div>' +
           '<div style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:16px" data-i18n="confirm.desc">Все устройства будут исключены из сети, сеть будет пересоздана заново.</div>' +
           '<div style="display:flex;gap:8px;justify-content:center">' +
@@ -1491,10 +1514,16 @@ dm.setBleTpl = function (dev, adr, name) {
       if (!node._dmDelegated) {
         node._dmDelegated = true;
         node.addEventListener('click', function (e) {
-          var ex = e.target && e.target.closest ? e.target.closest('.expand-icon') : null;
+          var target = e.target;
+          var ex = target && target.closest ? target.closest('.expand-icon') : null;
           if (ex && node.contains(ex)) { toggleExpand(e); return; }
-          var th = e.target && e.target.closest ? e.target.closest('.dm-th-sort') : null;
-          if (th && node.contains(th)) { dm.sortBy(th.getAttribute('data-sort')); }
+          var th = target && target.closest ? target.closest('.dm-th-sort') : null;
+          if (th && node.contains(th)) { dm.sortBy(th.getAttribute('data-sort')); return; }
+          if (!target || !target.closest) return;
+          if (!target.closest('#dmContextMenu') && !target.closest('.menu-dots')) {
+            var m = document.getElementById('dmContextMenu');
+            if (m) m.style.display = 'none';
+          }
         });
         node.addEventListener('dblclick', function (e) {
           var cell = e.target && e.target.closest ? e.target.closest('.editable-cell') : null;
@@ -1505,11 +1534,6 @@ dm.setBleTpl = function (dev, adr, name) {
       if (window.eventE) eventE.on('joinNoTemplate', dm.onJoinNoTemplate);
       if (window.websocket && websocket.readyState === 1) window.WSsend('getDeviceList');
       renderTable();
-      node.addEventListener('click', function (e) {
-        if (!e.target.closest('#dmContextMenu') && !e.target.closest('.menu-dots')) {
-          var m = document.getElementById('dmContextMenu'); m.style.display = 'none';
-        }
-      });
       node.addEventListener('contextmenu', function (e) {
         var dots = e.target.closest('.menu-dots');
         if (dots) { e.preventDefault(); dm.cmMnu(dots.id); return; }
@@ -1534,6 +1558,8 @@ dm.setBleTpl = function (dev, adr, name) {
       eventE.off('lgtvPair', dm.onLgtvPair);
       eventE.off('bindStatus', dm.onBindStatus);
       eventE.off('joinNoTemplate', dm.onJoinNoTemplate);
+      if (window.eventE) eventE.off('haddisc', dm.onHadDisc);
+      try { if (typeof WSsend === 'function') { WSsend('addDeviceDone'); WSsend('BLEscan|"false"'); } } catch (e) {}
       stopAddTimer();
       stopSecTimer();
       st.editing = null;
