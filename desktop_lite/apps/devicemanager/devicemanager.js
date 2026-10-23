@@ -7,6 +7,10 @@
 .dm{display:flex;flex-direction:column;height:100%;min-height:0;position:relative;overflow:hidden;background:var(--bg);color:var(--text)}
 .dm *{box-sizing:border-box}
 .dm-toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 8px;border-bottom:1px solid var(--border);background:var(--bg3);flex-shrink:0}
+.dm-head-actions .dm-btn{padding:3px 8px;line-height:18px;white-space:nowrap}
+.tb-more-menu .dm-btn{display:flex;width:100%;justify-content:flex-start;text-align:left;padding:6px 10px;border-radius:5px;border:1px solid transparent;background:transparent}
+.tb-more-menu .dm-btn.tb-hidden{display:flex}
+.tb-more-menu .dm-btn:hover{background:var(--hover);border-color:var(--border2)}
 .dm-search-wrap{position:relative;flex:1;min-width:110px;display:flex}
 .dm-search{flex:1;min-width:0;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:6px 26px 6px 10px;font-size:13px;outline:none}
 .dm-search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--faint);font-size:14px;line-height:1;display:none;user-select:none}
@@ -1454,15 +1458,17 @@ dm.setBleTpl = function (dev, adr, name) {
     template: '<div class="window hidden" data-x="120" data-y="60" data-w="900" data-h="580">' +
       '<style>' + CSS + '</style>' +
       '<div class="window-head"><span class="wtitle title">Менеджер устройств</span>' +
+      '<div class="ops-tools dm-head-actions">' +
+        '<button class="dm-btn" data-i18n="tb.add" onclick="dm.zigbeeUI()">➕ Добавить</button>' +
+        '<button class="dm-btn" data-i18n="tb.groups" onclick="dm.groupUI()">🗄 Группы</button>' +
+        '<button class="dm-btn" data-i18n="tb.bind" onclick="dm.bindUI()">🔗 Bind</button>' +
+        '<button class="dm-btn" data-i18n="tb.init" onclick="dm.reset()">♻️ Инит</button>' +
+      '</div>' +
       '<div class="wbtns"><button class="wbtn min" data-waction="min">–</button>' +
       '<button class="wbtn max" data-waction="max">▢</button>' +
       '<button class="wbtn" data-waction="close">✕</button></div></div>' +
       '<div class="window-body" style="padding:0;overflow:hidden"><div class="dm">' +
         '<div class="dm-toolbar">' +
-          '<button class="dm-btn" data-i18n="tb.add" onclick="dm.zigbeeUI()">➕ Добавить</button>' +
-          '<button class="dm-btn" data-i18n="tb.groups" onclick="dm.groupUI()">🗄 Группы</button>' +
-          '<button class="dm-btn" data-i18n="tb.bind" onclick="dm.bindUI()">🔗 Bind</button>' +
-          '<button class="dm-btn" data-i18n="tb.init" onclick="dm.reset()">♻️ Инит</button>' +
           '<span class="dm-search-wrap"><input class="dm-search" id="dm_search" placeholder="Поиск..." data-i18n-ph="tb.search" oninput="dm.search(this.value)">' +
           '<span class="dm-search-clear" id="dm_search_clear" title="Очистить" onclick="dm.clearSearch()">✕</span></span>' +
           '<button class="dm-btn" id="dm_expand_btn" data-i18n="tb.expand" onclick="dm.toggleAll()">⤢ Все</button>' +

@@ -148,6 +148,7 @@ window.WinEngine = (function () {
       const onHeader = e.target.closest('.window-head');
       const nearEdge = e.clientX < r.left + edgeZone || e.clientX > r.right - edgeZone || e.clientY > r.bottom - edgeZone;
       if (!onHeader && !nearEdge) return;
+      if (mrOverFixedLayer(win, e.clientX, e.clientY)) return;
       win.style.touchAction = 'none';
       const restore = () => { win.style.touchAction = ''; cleanup() };
       const cleanup = () => {
@@ -422,6 +423,23 @@ window.WinEngine = (function () {
     return h ? 'ew-resize' : 'ns-resize';
   }
 
+  // True if the topmost element under the point is a position:fixed layer of
+  // this window (widget modal, overlay, popups). Such layers are still DOM
+  // children of .window, so their pointer events bubble to the window and an
+  // edge press would resize the window through an open modal instead of
+  // reaching its controls.
+  function mrOverFixedLayer(win, x, y) {
+    let el = null;
+    try { el = document.elementFromPoint(x, y); } catch (e) { return false; }
+    for (let n = el; n && n !== win; n = n.parentElement) {
+      if (n.nodeType !== 1) continue;
+      try {
+        if (getComputedStyle(n).position === 'fixed') return true;
+      } catch (e) {}
+    }
+    return false;
+  }
+
   // True if the point is over a native (non-overlay) scrollbar of the window
   // content. Walks up from the hit-tested element, so nested scroll areas
   // (tables, lists) are covered too.
@@ -460,6 +478,8 @@ window.WinEngine = (function () {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       const edge = mrEdgeAt(win, e.clientX, e.clientY);
       if (!edge) return;
+      // An open modal/overlay wins over resize: its controls must get the click.
+      if (mrOverFixedLayer(win, e.clientX, e.clientY)) return;
       // Scrollbar wins over resize: leave the press to the browser.
       if (mrOverScrollbar(win, e.clientX, e.clientY)) return;
       e.preventDefault();
@@ -507,7 +527,8 @@ window.WinEngine = (function () {
     win.addEventListener('pointermove', (e) => {
       if (e.buttons) return;
       const edge = mrEdgeAt(win, e.clientX, e.clientY);
-      if (edge && !mrOverScrollbar(win, e.clientX, e.clientY)) {
+      if (edge && !mrOverFixedLayer(win, e.clientX, e.clientY) &&
+          !mrOverScrollbar(win, e.clientX, e.clientY)) {
         win.style.cursor = mrCursor(edge);
       } else if (win.style.cursor !== '') {
         win.style.cursor = '';
