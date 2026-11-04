@@ -225,6 +225,12 @@ function parseSocket(msg) {
 		if (z[0] === "logHist") { try { eventE.emit('logHist', JSON.parse(z.slice(1).join('|'))); } catch (e) {} }
 		if (z[0] === "logCtl") { eventE.emit('logCtl', z.slice(1).join('|')); }
 
+		// Локал Алиса: текст, распознанный Яндексом в режиме mixed/transit.
+		// aliceAsr|{"text":"...","final":true}
+		if (z[0] === "aliceAsr") {
+			try { eventE.emit('aliceAsr', JSON.parse(z.slice(1).join('|'))); } catch (e) {}
+		}
+
 		if (z[0] === "join") {
 			var jsbox = document.getElementById("joinstatus");
 			if (!jsbox) return;

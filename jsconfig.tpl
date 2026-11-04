@@ -9,6 +9,7 @@
     },
     "agent": {
       "list": [
+        "Alice",
         "Bonzi",
         "Clippy",
         "F1",
@@ -141,5 +142,48 @@
     "ollama_url": "http://localhost:11434/v1/chat/completions",
     "ollama_model": "llama3",
     "system_prompt": "Ты — ассистент умного дома. Отвечай кратко. Инструменты ZESP доступны."
+  },
+  "Alice": {
+    "Alice_Mode": {
+      "val": "off",
+      "list": ["off", "local", "transit", "mixed"]
+    },
+    "Alice_UniproxyPort": "443",
+    "Alice_BackendPort": "18080",
+    "Alice_PortHosts": ":18080=quasar.yandex.net,:443=uniproxy.alice.yandex.net,:18081=uniproxy.alice.yandex.net,:18082=rpc.alice.yandex.net,:18087=time.local,:18088=netcheck.local",
+    "Alice_NTPAddr": "",
+    "Alice_STT": "",
+    "Alice_VAD": "",
+    "Alice_TTS": "",
+    "Alice_TTS_Model": "",
+    "Alice_TTS_Voice": "",
+    "Alice_TTS_Format": "opus",
+    "Alice_STT_Model": "",
+    "Alice_VoiceKey": "",
+    "Alice_BRAIN": "",
+    "Alice_DeepSeekKey": "",
+    "Alice_MusicPublic": "",
+    "Alice_MusicCacheMB": "10",
+    "Alice_Navidrome_URL": "",
+    "Alice_Navidrome_User": "",
+    "Alice_Navidrome_Password": "",
+    "Alice_AudioMuse_URL": "",
+    "Alice_API_Token": "",
+    "Alice_ABS_URL": "",
+    "Alice_ABS_Token": "",
+    "Alice_ABS_Root": "",
+    "Alice_FFMPEG": "ffmpeg",
+    "Alice_YTDLP": "yt-dlp",
+    "Alice_Trace": "0",
+    "Alice_Trace_Audio": "0",
+    "Alice_ASRCapture": "0",
+    "Alice_ASRDir": "",
+    "Alice_ASRPCM": "0",
+    "Alice_FallbackSound": "",
+    "Alice_Rate_Alt_User": "",
+    "Alice_Rate_Alt_Names": "",
+    "Alice_BrainURL": "",
+    "Alice_BrainModel": "",
+    "Alice_BrainMCP": "0"
   }
 }

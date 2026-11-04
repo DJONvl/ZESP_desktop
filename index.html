@@ -242,18 +242,23 @@ tr:hover td{background:rgba(59,130,246,.05)}
 #shortcuts{position:absolute;left:8px;top:8px;width:0;height:0;z-index:2}
 .shortcut{position:absolute;display:flex;flex-direction:column;align-items:center;gap:4px;width:80px;margin-left:-6px;padding:6px 4px;border-radius:6px;cursor:pointer;user-select:none;text-align:center;border:1px solid transparent;touch-action:none}
 .shortcut:hover{background:var(--hover);border-color:var(--border)}
-.shortcut .ico{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:13px;background:linear-gradient(145deg,rgba(125,184,252,.92),rgba(43,108,237,.94) 60%,rgba(30,80,200,.94));border:1px solid rgba(255,255,255,.45);box-shadow:inset 0 1px 1px rgba(255,255,255,.55),inset 0 -6px 11px rgba(8,30,90,.35),0 3px 9px rgba(10,40,120,.45);font-size:22px;line-height:1}
-.shortcut .ico::after{content:'';position:absolute;left:5px;right:5px;top:2px;height:45%;border-radius:8px;background:linear-gradient(rgba(255,255,255,.35),rgba(255,255,255,0));pointer-events:none}
-.shortcut .ico img{width:25px;height:25px;object-fit:contain;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));pointer-events:none;-webkit-user-drag:none;user-select:none;-webkit-user-select:none}
-.shortcut .lbl{font-size:10.5px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);word-break:break-word;line-height:1.25}
+.shortcut .ico{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:13px;background:linear-gradient(158deg,var(--sc-a,#5b9cff) 0%,var(--sc-b,#2f74ee) 48%,var(--sc-c,#1b51c7) 100%);border:1px solid rgba(255,255,255,.30);box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -10px 16px -8px rgba(6,26,80,.55),0 5px 12px -3px rgba(7,30,86,.55),0 1px 2px rgba(7,30,86,.35);font-size:22px;line-height:1;transition:transform .14s ease,box-shadow .14s ease}
+.shortcut .ico::after{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.24),rgba(255,255,255,0) 36%);pointer-events:none}
+.shortcut .ico img{position:relative;z-index:1;width:25px;height:25px;object-fit:contain;filter:drop-shadow(0 1px 1px rgba(5,20,60,.55));pointer-events:none;-webkit-user-drag:none;user-select:none;-webkit-user-select:none}
+.shortcut .lbl{font-size:11px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.85),0 0 10px rgba(0,0,0,.35);word-break:break-word;line-height:1.25}
+.shortcut:hover .ico{transform:translateY(-2px);box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -10px 16px -8px rgba(6,26,80,.55),0 9px 18px -4px rgba(7,30,86,.6),0 2px 4px rgba(7,30,86,.4)}
+.shortcut:active .ico{transform:translateY(0) scale(.96)}
+.shortcut.selected .ico{box-shadow:0 0 0 2px rgba(255,255,255,.95),0 0 0 4px var(--sc-b,#2f74ee),0 6px 14px -4px rgba(7,30,86,.55)}
 .shortcut.selected{background:rgba(59,130,246,.15);border-color:var(--accent)}
 .shortcut.dragging{opacity:.75;z-index:100}
 .rb-band{position:absolute;border:1px solid var(--accent);background:rgba(59,130,246,.12);z-index:3;pointer-events:none;border-radius:2px}
 .trash{position:absolute;left:16px;bottom:16px;display:flex;flex-direction:column;align-items:center;gap:0;width:70px;padding:0;border:none;border-radius:0;background:transparent;color:var(--text);user-select:none;pointer-events:none;z-index:4;transition:transform .15s}
-.trash .ico img{width:32px;height:32px;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,.35))}
-.trash .lbl{font-size:10.5px;line-height:1.4;text-align:center;color:var(--text);text-shadow:0 1px 3px rgba(0,0,0,.5);margin-top:2px}
+.trash .ico{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:13px;background:linear-gradient(158deg,#8b96a4 0%,#5b6675 48%,#39424d 100%);border:1px solid rgba(255,255,255,.28);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 -10px 16px -8px rgba(0,0,0,.5),0 5px 12px -3px rgba(7,30,86,.5)}
+.trash .ico::after{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,0) 36%);pointer-events:none}
+.trash .ico img{position:relative;z-index:1;width:25px;height:25px;object-fit:contain;filter:drop-shadow(0 1px 1px rgba(5,20,60,.55))}
+.trash .lbl{font-size:11px;line-height:1.4;text-align:center;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.85),0 0 10px rgba(0,0,0,.35);margin-top:2px}
 .trash.hover{transform:scale(1.1)}
-.trash.hover .ico img{filter:drop-shadow(0 0 8px rgba(239,68,68,.9))}
+.trash.hover .ico img{filter:drop-shadow(0 1px 1px rgba(5,20,60,.55)) drop-shadow(0 0 8px rgba(239,68,68,.9))}
 
 /* ---------- Free-floating windows ---------- */
 #desktop{position:relative;flex:1;min-height:0;overflow:auto;background:var(--bg);overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:url('/static/wallpapers/wall1.jpg') center/cover no-repeat}
@@ -309,7 +314,7 @@ body.light .start-menu{box-shadow:0 12px 34px rgba(0,0,0,.16)}
 .start-menu-item{display:flex;align-items:center;gap:12px;padding:9px 14px;cursor:pointer;font-size:13px;color:var(--text)}
 .start-menu-item:hover{background:var(--hover)}
 .start-menu-item .ico{font-size:15px;width:26px;text-align:center;flex-shrink:0}
-.start-menu-item .ico img{width:26px;height:26px;padding:4px;box-sizing:border-box;object-fit:contain;background:#3b82f6;border-radius:50%}
+.start-menu-item .ico img{width:26px;height:26px;padding:4px;box-sizing:border-box;object-fit:contain;border-radius:50%;background:linear-gradient(160deg,var(--sc-a,#5c9dff) 0%,var(--sc-b,#2f74ee) 55%,var(--sc-c,#1b51c7) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -4px 7px -3px rgba(0,0,0,.35),0 2px 5px -1px rgba(7,30,86,.45)}
 .start-menu-item.danger{color:var(--red)}
 .start-menu-item.danger:hover{background:rgba(239,68,68,.08)}
 .start-menu-sep{height:1px;background:var(--border);margin:4px 0}
@@ -415,14 +420,21 @@ body.light .tb-win-menu{box-shadow:0 12px 34px rgba(0,0,0,.16)}
 #i18nBox .btns button{background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:5px 12px;border-radius:4px;cursor:pointer}
 #i18nBox .btns button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
 #i18nBox .btns button:hover{background:var(--hover)}
+/* ---------- Локал Алиса: плашка распознанного текста ---------- */
+#aliceAsr{position:fixed;left:50%;top:50%;z-index:99999;display:flex;align-items:center;gap:18px;max-width:min(760px,88vw);padding:22px 32px;border-radius:22px;background:linear-gradient(135deg,rgba(13,15,26,.97),rgba(46,25,76,.93));backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%);border:1px solid rgba(150,130,255,.42);box-shadow:0 24px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.06) inset,0 0 70px rgba(124,92,255,.35);color:#fff;opacity:0;pointer-events:none;transform:translate(-50%,-50%) scale(.94);transition:opacity .22s ease,transform .22s cubic-bezier(.2,.9,.3,1.2)}
+#aliceAsr.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#aliceAsr .pulse{flex:0 0 auto;width:14px;height:14px;border-radius:50%;background:linear-gradient(135deg,#7c5cff,#25d0ff);box-shadow:0 0 18px rgba(124,92,255,.9);animation:alicePulse 1.4s ease-in-out infinite}
+#aliceAsr .txt{font-size:clamp(20px,2.6vw,34px);line-height:1.22;font-weight:600;letter-spacing:.2px;text-shadow:0 2px 18px rgba(0,0,0,.35);word-break:break-word}
+@keyframes alicePulse{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.35);opacity:1}}
 </style>
 </head>
 <body>
+<div id="aliceAsr" role="status" aria-live="polite"><span class="pulse"></span><span class="txt"></span></div>
 
 <div class="main">
   <div id="desktop">
     <div id="shortcuts"></div>
-    <div class="trash" id="trash" title="Корзина"><span class="ico"><img src="/static/icons/user-trash.png" alt=""></span><span class="lbl" id="trashLbl"></span></div>
+    <div class="trash" id="trash" title="Корзина"><span class="ico"><img src="/static/icons/trash.svg" alt=""></span><span class="lbl" id="trashLbl"></span></div>
   </div>
 </div>
 
@@ -589,9 +601,11 @@ document.getElementById('notifi_btn').addEventListener('click', function () {
 function bootAssistant() {
   var cfg = window.jsconfig;
   if (typeof loadAgent !== 'function' || !cfg) return; // событие ещё не пришло — сработает слушатель
-  if (window._agentReady) return; // агент уже создан — не плодим копии при повторном jsconfig
+  if (window._agentReady) return; // агент уже создан или грузится — не плодим копии при повторном jsconfig
+  // Флаг ставим ДО async-загрузки: loadConfig + retry каждые 3 с + SaveJson дают
+  // несколько jsconfig подряд, и в окне загрузки успевало стартовать по агенту.
+  window._agentReady = true;
   loadAgent(cfg.APP && cfg.APP.agent && cfg.APP.agent.val || 'Merlin', function (a) {
-    window._agentReady = true;
     if (a && a.speak) a.speak("Привет, я буду помогать тебе. По информационным вопросам обращайся в телеграм.");
   });
 }
@@ -723,6 +737,24 @@ if (typeof eventE !== 'undefined') {
   eventE.on('jsconfig', bootAssistant); // повторный loadConfig/реконнект — не плодим копии (guard внутри)
   bootAssistant(); // если jsconfig уже пришёл (socket.js сохраняет window.jsconfig) — запускаем сразу
 }
+</script>
+<script>
+// Плашка «что услышал Яндекс» (mixed/transit): текст приходит из Go,
+// скрывается через 5 секунд после последнего кадра.
+(function () {
+  var box = document.getElementById('aliceAsr');
+  if (!box || typeof eventE === 'undefined') return;
+  var txt = box.querySelector('.txt');
+  var timer = null;
+  eventE.on('aliceAsr', function (d) {
+    if (!d) return;
+    if (d.text) txt.textContent = d.text;
+    else if (!box.classList.contains('on')) txt.textContent = 'Слушаю…';
+    box.classList.add('on');
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(function () { box.classList.remove('on'); }, 5000);
+  });
+})();
 </script>
 </body>
 </html>
