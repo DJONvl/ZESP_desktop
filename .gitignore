@@ -13,3 +13,10 @@ workspace.xml
 *.bak
 *.tmp
 _devicesjs.txt
+
+# локальные данные и бэкапы (не в git)
+jsconfig.txt.bak*
+alice/
+_shortcuts_crop.png
+_trash_on_grass.png
+_trash_x8.png

@@ -222,7 +222,7 @@
     id: 'logviewer',
     title: 'Логи',
     label: 'Логи',
-    icon: '📜',
+    icon: '<img src="/static/icons/logs.svg" alt="">',
     single: true,
     template: '<div class="window hidden" data-x="120" data-y="40" data-w="760" data-h="520">' +
       '<style>' + LOGV_CSS + '</style>' +

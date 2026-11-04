@@ -12,7 +12,11 @@
     if (typeof str !== 'string') return String(str || '');
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
-  function markDirty() { st._editorDirty = true; }
+  function markDirty() {
+    st.editorDirty = true;
+    var b = $('sc_dirty_badge');
+    if (b) b.style.display = '';
+  }
 
   // ── состояние ──
   var st = {
@@ -27,6 +31,8 @@
     keyAttached: false,
     editorScene: null,
     draggedItem: null,
+    dragOverEl: null,
+    dropBefore: false,
     fireTargetEl: null,
     fireTargetIdx: undefined,
     exiting: false
@@ -410,6 +416,7 @@
 
   function renderEntryCond(idx, c, triggerIeee) {
     var html = '<div class="sc-ent-cond-item' + (c.negate ? ' sc-cond-negated' : '') + '" data-saved-attr="' + escHtml(c.attribute || '') + '">';
+    html += '<span class="sc-drag-handle sc-drag-handle-sm" draggable="true" title="Потяните — перенести; правый клик — меню">⋮</span>';
     html += '<label class="sc-checkbox-label" title="Инвертировать условие (NOT)"><input type="checkbox" class="sc-ent-cond-negate" ' + (c.negate ? 'checked' : '') + ' onchange="scCondNegateToggle(this)"><span>¬</span></label>';
     html += '<select class="sc-ent-cond-type" onchange="scCondTypeChange(this)">';
     html += '<option value="device"' + (c.type === 'device' ? ' selected' : '') + ' title="Проверить текущее состояние атрибута другого устройства">🔧 устройство</option>';
@@ -478,6 +485,7 @@
 
   function renderEntryAction(idx, a) {
     var html = '<div class="sc-ent-action-item' + (a.type === 'group' ? ' sc-ent-action-group' : '') + (a.enabled === false ? ' sc-ent-action-disabled' : '') + '">';
+    html += '<span class="sc-drag-handle sc-drag-handle-sm" draggable="true" title="Потяните — перенести; правый клик — меню">⋮</span>';
     html += '<label class="sc-enable-label"><input type="checkbox" class="sc-ent-action-enable" ' + (a.enabled !== false ? 'checked' : '') + ' onchange="scToggleActionEnable(this)"></label>';
     html += '<select class="sc-ent-action-type sc-act-type-' + (a.type || 'send_cmd') + '" onchange="scActionTypeChange(this)">';
     for (var ati = 0; ati < ACTION_TYPES.length; ati++) {
@@ -576,9 +584,12 @@
     var t = e.trigger || {};
     var type = t.type || 'on_event';
     var html = '';
-    html += '<div class="sc-entry" data-idx="' + idx + '" draggable="true">';
+    html += '<div class="sc-entry" data-idx="' + idx + '">';
     html += '<div class="sc-entry-header">';
+    html += '<span class="sc-drag-handle" draggable="true" title="Потяните, чтобы изменить порядок записей">⋮⋮</span>';
+    html += '<button type="button" class="sc-collapse-btn" onclick="scToggleEntry(this)" title="Свернуть/развернуть запись">▾</button>';
     html += '<span class="sc-entry-num">#' + (idx + 1) + '</span>';
+    html += '<span class="sc-entry-summary"></span>';
     html += '<span class="sc-entry-title">Триггер</span>';
     html += '<select class="sc-ent-trig-type" onchange="scTrigTypeChange(this)">';
     for (var i = 0; i < TRIGGER_TYPES.length; i++) {
@@ -586,6 +597,7 @@
     }
     html += '</select>';
     html += '</div>';
+    html += '<div class="sc-entry-body">';
     html += '<div class="sc-entry-trigger">' + renderTriggerFields(t) + '</div>';
     html += '<div class="sc-entry-conditions">';
     html += '<div class="sc-entry-subheader"><span>📋 Доп. проверки для записи</span><select class="sc-ent-cond-mode" onchange="scMarkDirty()" title="«И» — все условия должны выполняться; «ИЛИ» — достаточно любого одного"><option value="AND"' + ((e.conditionsMode || 'AND') === 'AND' ? ' selected' : '') + '>И (все)</option><option value="OR"' + (e.conditionsMode === 'OR' ? ' selected' : '') + '>ИЛИ (любое)</option></select><button class="sc-btn sc-btn-sm" onclick="scAddCond(this)">+</button></div>';
@@ -610,7 +622,37 @@
     html += '<button class="sc-btn sc-btn-sm" onclick="scDuplicateEntry(this)" title="Создать копию этой записи сразу после">⧉ Дублировать</button>';
     html += '<button class="sc-btn sc-btn-sm sc-btn-del sc-entry-del" onclick="scRemoveEntry(this)">✕ удалить запись</button>';
     html += '</div>';
+    html += '</div>';
     return html;
+  }
+
+  function toggleEntry(el) {
+    var entry = el.closest('.sc-entry');
+    if (!entry) return;
+    var collapsed = entry.classList.toggle('sc-entry-collapsed');
+    el.textContent = collapsed ? '▸' : '▾';
+    if (collapsed) updateEntrySummary(entry);
+  }
+
+  function updateEntrySummary(entry) {
+    var el = entry.querySelector('.sc-entry-summary');
+    if (!el) return;
+    var t = readEntryTrigger(entry);
+    var condCnt = entry.querySelectorAll('.sc-entry-conditions .sc-ent-cond-item').length;
+    var actions = [];
+    var list = entry.querySelector('.sc-entry-actions .sc-ent-action-list');
+    if (list) {
+      var items = list.children;
+      for (var i = 0; i < items.length; i++) {
+        if (!items[i].classList || !items[i].classList.contains('sc-ent-action-item')) continue;
+        var a = readEntryAction(items[i]);
+        if (a) actions.push(a);
+      }
+    }
+    var txt = describeTrigger(t);
+    if (condCnt > 0) txt += ' ⚑' + condCnt;
+    txt += ' → ' + describeActions(actions);
+    el.textContent = txt;
   }
 
   // ── editor: entries ──
@@ -662,7 +704,7 @@
   function readEntry(entryEl) {
     var trigger = readEntryTrigger(entryEl);
     var conditions = [];
-    var condItems = entryEl.querySelectorAll('.sc-ent-cond-item');
+    var condItems = entryEl.querySelectorAll(':scope .sc-entry-conditions .sc-ent-cond-item');
     for (var j = 0; j < condItems.length; j++) {
       var c = readEntryCond(condItems[j]);
       if (c) conditions.push(c);
@@ -684,8 +726,7 @@
       var e = entries[i];
       var trigger = readEntryTrigger(e);
       var conditions = [];
-      var condItems = e.querySelectorAll(':scope > .sc-entry-conditions .sc-ent-cond-item');
-      if (condItems.length === 0) condItems = e.querySelectorAll('.sc-ent-cond-item');
+      var condItems = e.querySelectorAll(':scope .sc-entry-conditions .sc-ent-cond-item');
       for (var j = 0; j < condItems.length; j++) {
         var c = readEntryCond(condItems[j]);
         if (c) conditions.push(c);
@@ -1162,6 +1203,10 @@
     var editor = $('sc_editor');
     if (!overlay || !editor) return;
     $('sc_edit_name').value = scene.name || '';
+    var ttl = $('sc_edit_title');
+    if (ttl) ttl.textContent = '✏️ ' + (scene.name || 'Новый сценарий');
+    var badge = $('sc_dirty_badge');
+    if (badge) badge.style.display = 'none';
     renderEntries(scene.entries || []);
     renderSceneConditions(scene.conditions || [], scene.conditionsMode || 'AND');
     var cd = $('sc_cooldown');
@@ -1172,6 +1217,56 @@
     st.editorDirty = false;
     editor.addEventListener('input', markDirty);
     editor.addEventListener('change', markDirty);
+    editor.addEventListener('input', clearInvalidMark);
+    editor.addEventListener('change', clearInvalidMark);
+  }
+  function editNameInput(el) {
+    var ttl = $('sc_edit_title');
+    if (ttl) ttl.textContent = '✏️ ' + (el.value.trim() || 'Новый сценарий');
+  }
+  function isEditorOpen() {
+    var o = $('sc_editor_overlay');
+    return !!(o && o.style.display === 'flex');
+  }
+  function clearInvalidMark(e) {
+    var el = e.target && e.target.closest ? e.target.closest('.sc-invalid') : null;
+    if (el) el.classList.remove('sc-invalid');
+  }
+  function checkTriggerValid(entry) {
+    var t = readEntryTrigger(entry);
+    var type = t.type || 'on_event';
+    if (type === 'time') return !!t.time;
+    if (type === 'date') return !!t.date;
+    if (type === 'on_msg') return !!t.chatId;
+    if (type === 'on_topic') return !!t.topic;
+    return !!t.ieee;
+  }
+  // Помечает .sc-invalid все незаполненные строки; возвращает {bad, first}.
+  function validateEditorForm() {
+    var bad = 0;
+    var firstBad = null;
+    function flag(el, ok) {
+      if (!el) return;
+      if (ok) { el.classList.remove('sc-invalid'); return; }
+      el.classList.add('sc-invalid');
+      bad++;
+      if (!firstBad) firstBad = el;
+    }
+    var entries = document.querySelectorAll('#sc_entries .sc-entry');
+    for (var i = 0; i < entries.length; i++) {
+      var entry = entries[i];
+      flag(entry.querySelector('.sc-entry-trigger'), checkTriggerValid(entry));
+      var condItems = entry.querySelectorAll('.sc-entry-conditions .sc-ent-cond-item');
+      for (var j = 0; j < condItems.length; j++) flag(condItems[j], !!readEntryCond(condItems[j]));
+      var actItems = entry.querySelectorAll('.sc-ent-action-item');
+      for (var k = 0; k < actItems.length; k++) flag(actItems[k], !!readEntryAction(actItems[k]));
+    }
+    var sc = $('sc_scene_conds');
+    if (sc) {
+      var scItems = sc.querySelectorAll('.sc-ent-cond-item');
+      for (var m = 0; m < scItems.length; m++) flag(scItems[m], !!readEntryCond(scItems[m]));
+    }
+    return { bad: bad, first: firstBad };
   }
   function newScene() {
     st.editingIdx = -1;
@@ -1198,6 +1293,8 @@
     if (editor) editor.style.display = 'none';
     st.editorScene = null;
     st.editorDirty = false;
+    var badge = $('sc_dirty_badge');
+    if (badge) badge.style.display = 'none';
   }
   function readSceneConditions() {
     var container = $('sc_scene_conds');
@@ -1210,9 +1307,17 @@
     }
     return out;
   }
-  function saveEditor() {
+  async function saveEditor() {
     var scene = st.editorScene;
     if (!scene) return;
+    var v = validateEditorForm();
+    if (v.bad > 0) {
+      var ok = await window.zespConfirm('Строк с незаполненными полями: ' + v.bad + '. При сохранении они будут удалены. Продолжить?', { title: 'Незаполненные поля', okText: 'Сохранить', danger: true });
+      if (!ok) {
+        if (v.first) v.first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        return;
+      }
+    }
     scene.name = $('sc_edit_name').value.trim() || 'Новый сценарий';
     scene.conditions = readSceneConditions();
     scene.conditionsMode = ($('sc_scene_cond_mode') || {}).value || 'AND';
@@ -1346,13 +1451,174 @@
     markDirty();
   }
 
+  // ── drag&drop записей/условий/действий + контекстное меню ──
+  var scCtxMenu = null;
+  function clearDragOver() {
+    if (st.dragOverEl) {
+      st.dragOverEl.classList.remove('sc-drag-over', 'sc-drag-over-bottom');
+      st.dragOverEl = null;
+    }
+  }
+  function endEntryDrag() {
+    if (st.draggedItem) st.draggedItem.classList.remove('sc-dragging');
+    st.draggedItem = null;
+    st.dragOverEl = null;
+    clearDragOver();
+  }
+  function dragKind(el) {
+    if (el.classList.contains('sc-entry')) return 'entry';
+    if (el.classList.contains('sc-ent-cond-item')) return 'cond';
+    return 'action';
+  }
+  function dragSel(kind) {
+    if (kind === 'entry') return '.sc-entry';
+    return kind === 'cond' ? '.sc-ent-cond-item' : '.sc-ent-action-item';
+  }
+  function hideCtxMenu() {
+    if (scCtxMenu) { scCtxMenu.remove(); scCtxMenu = null; }
+  }
+  function showCtxMenu(x, y, el) {
+    hideCtxMenu();
+    var what = el.classList.contains('sc-entry') ? 'запись'
+      : el.classList.contains('sc-ent-cond-item') ? 'условие' : 'действие';
+    var menu = document.createElement('div');
+    menu.className = 'sc-ctx-menu';
+    menu.innerHTML = '<div class="sc-ctx-title">' + what + '</div>' +
+      '<div class="sc-ctx-item" data-act="dup">⧉ Дублировать</div>' +
+      '<div class="sc-ctx-item sc-ctx-del" data-act="del">✕ Удалить</div>';
+    menu.addEventListener('click', function (e) {
+      var act = e.target.getAttribute('data-act');
+      hideCtxMenu();
+      if (act === 'dup') ctxDuplicate(el);
+      else if (act === 'del') ctxDelete(el);
+    });
+    document.body.appendChild(menu);
+    var r = menu.getBoundingClientRect();
+    menu.style.left = Math.max(4, Math.min(x, window.innerWidth - r.width - 8)) + 'px';
+    menu.style.top = Math.max(4, Math.min(y, window.innerHeight - r.height - 8)) + 'px';
+    scCtxMenu = menu;
+  }
+  // Клон теряет live-значения полей — перед клонированием синхронизируем атрибуты.
+  function syncFormAttrs(root) {
+    var els = root.querySelectorAll('input, select');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      if (el.type === 'checkbox') {
+        if (el.checked) el.setAttribute('checked', ''); else el.removeAttribute('checked');
+      } else {
+        el.setAttribute('value', el.value);
+      }
+    }
+    var opts = root.querySelectorAll('option');
+    for (var j = 0; j < opts.length; j++) {
+      if (opts[j].selected) opts[j].setAttribute('selected', ''); else opts[j].removeAttribute('selected');
+    }
+  }
+  function reattachFormHandlers(root) {
+    var i;
+    var trig = root.querySelectorAll('.sc-ent-trig-device');
+    for (i = 0; i < trig.length; i++) trig[i].onchange = function () { trigDeviceChange(this); };
+    var cond = root.querySelectorAll('.sc-ent-cond-device');
+    for (i = 0; i < cond.length; i++) cond[i].onchange = function () { condDeviceChange(this); };
+    var act = root.querySelectorAll('.sc-ent-action-device');
+    for (i = 0; i < act.length; i++) act[i].onchange = function () { actionDeviceChange(this); };
+  }
+  function ctxDuplicate(el) {
+    if (el.classList.contains('sc-entry')) { duplicateEntry(el); return; }
+    syncFormAttrs(el);
+    var clone = el.cloneNode(true);
+    clone.classList.remove('sc-invalid');
+    el.parentNode.insertBefore(clone, el.nextSibling);
+    reattachFormHandlers(clone);
+    markDirty();
+  }
+  function ctxDelete(el) {
+    el.remove();
+    if (el.classList.contains('sc-entry')) reindexAll();
+    markDirty();
+  }
+  function attachEntryDnD() {
+    if (st.dndAttached) return;
+    st.dndAttached = true;
+    document.addEventListener('dragstart', function (e) {
+      var handle = e.target && e.target.closest ? e.target.closest('.sc-drag-handle') : null;
+      if (!handle) return;
+      // строки вложены в записи — проверяем от самого внутреннего контейнера
+      var item = handle.closest('.sc-ent-cond-item') || handle.closest('.sc-ent-action-item') || handle.closest('.sc-entry');
+      if (!item) return;
+      st.draggedItem = item;
+      st.dropBefore = false;
+      item.classList.add('sc-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', 'sc-item'); } catch (err) {}
+    });
+    document.addEventListener('dragover', function (e) {
+      if (!st.draggedItem) return;
+      var over = e.target && e.target.closest ? e.target.closest(dragSel(dragKind(st.draggedItem))) : null;
+      if (!over || over === st.draggedItem || st.draggedItem.contains(over)) { clearDragOver(); return; }
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      var rect = over.getBoundingClientRect();
+      var before = (e.clientY - rect.top) < rect.height / 2;
+      var cls = before ? 'sc-drag-over' : 'sc-drag-over-bottom';
+      if (st.dragOverEl !== over) {
+        clearDragOver();
+        st.dragOverEl = over;
+        over.classList.add(cls);
+      } else if (!over.classList.contains(cls)) {
+        over.classList.remove('sc-drag-over', 'sc-drag-over-bottom');
+        over.classList.add(cls);
+      }
+      st.dropBefore = before;
+    });
+    document.addEventListener('drop', function (e) {
+      if (!st.draggedItem) return;
+      var over = e.target && e.target.closest ? e.target.closest(dragSel(dragKind(st.draggedItem))) : null;
+      if (over && over !== st.draggedItem && !st.draggedItem.contains(over)) {
+        e.preventDefault();
+        var ref = st.dropBefore ? over : over.nextSibling;
+        over.parentNode.insertBefore(st.draggedItem, ref);
+        if (st.draggedItem.classList.contains('sc-entry')) reindexAll();
+        markDirty();
+      }
+      endEntryDrag();
+    });
+    document.addEventListener('dragend', endEntryDrag);
+    // контекстное меню (кроме полей ввода — там нативное, для вставки)
+    document.addEventListener('contextmenu', function (e) {
+      if (!isEditorOpen()) { hideCtxMenu(); return; }
+      if (e.target && e.target.closest && e.target.closest('input, select, textarea, option')) return;
+      var el = e.target && e.target.closest ? e.target.closest('.sc-entry, .sc-ent-cond-item, .sc-ent-action-item') : null;
+      if (!el) { hideCtxMenu(); return; }
+      e.preventDefault();
+      showCtxMenu(e.clientX, e.clientY, el);
+    });
+    document.addEventListener('click', function (e) {
+      if (scCtxMenu && !(e.target && e.target.closest && e.target.closest('.sc-ctx-menu'))) hideCtxMenu();
+    });
+  }
+
   // ── keyboard shortcuts ──
   function attachKeyShortcuts() {
     if (st.keyAttached) return;
     st.keyAttached = true;
     document.addEventListener('keydown', function (e) {
-      if (!(e.ctrlKey || e.metaKey)) return;
       var k = (e.key || '').toLowerCase();
+      if (k === 'escape' && scCtxMenu) { hideCtxMenu(); return; }
+      var co = $('sc_confirm_overlay');
+      if (co && co.style.display === 'flex') {
+        if (k === 'escape') { e.preventDefault(); confirmCancel(); }
+        return;
+      }
+      if (isEditorOpen()) {
+        if (k === 'escape') { e.preventDefault(); closeEditor(); }
+        else if (k === 's' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveEditor(); }
+        return;
+      }
+      if (!(e.ctrlKey || e.metaKey)) return;
+      // Ctrl+Z/Y — undo списка сцен; в полях ввода оставляем нативный undo
+      var tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
       if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
       else if ((k === 'y') || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
     });
@@ -1408,6 +1674,8 @@
   window.scSceneAddCond = sceneAddCond;
   window.scCloseEditor = closeEditor;
   window.scSaveEditor = saveEditor;
+  window.scToggleEntry = toggleEntry;
+  window.scEditNameInput = editNameInput;
   window.scNewScene = newScene;
   window.scEditScene = editScene;
   window.scDeleteScene = deleteScene;
@@ -1525,9 +1793,19 @@
     '.sc-cond-negated{border-color:#7d2e2e66!important;background:rgba(125,46,46,.08);}' +
     '.sc-dragging{opacity:.4;outline:2px dashed var(--accent);}' +
     '.sc-drag-over{border-top:2px solid var(--yellow)!important;}' +
+    '.sc-drag-over-bottom{border-top:none!important;border-bottom:2px solid var(--yellow)!important;}' +
     '.sc-move-btn{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;border:1px solid #78909c;background:#607d8b;color:#ffffff;font-size:9px;cursor:pointer;padding:0;margin:0 2px 0 0;flex-shrink:0;}' +
     '.sc-move-btn:hover{background:#78909c;color:#ffffff;}' +
-    '.sc-entry[draggable=true]:hover,.sc-ent-cond-item[draggable=true]:hover,.sc-ent-action-item[draggable=true]:hover{cursor:grab;}' +
+    '.sc-drag-handle{cursor:grab;color:var(--faint);font-size:13px;font-weight:700;letter-spacing:-2px;padding:0 3px;user-select:none;flex-shrink:0;}' +
+    '.sc-drag-handle:hover{color:var(--accent);}' +
+    '.sc-drag-handle:active{cursor:grabbing;}' +
+    '.sc-drag-handle-sm{font-size:11px;letter-spacing:-1px;padding:0 1px;margin-right:2px;}' +
+    '.sc-ctx-menu{position:fixed;z-index:100000;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.5);padding:4px;min-width:170px;}' +
+    '.sc-ctx-title{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;padding:4px 12px 2px;}' +
+    '.sc-ctx-item{padding:6px 12px;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;}' +
+    '.sc-ctx-item:hover{background:rgba(61,90,254,.18);}' +
+    '.sc-ctx-del:hover{background:rgba(198,40,40,.25);color:#ef5350;}' +
+    '.sc-dnd-hint{color:var(--faint);font-size:10px;margin-left:10px;}' +
     '.sc-ent-action-children{margin:6px 0 2px 16px;padding:6px;border-left:2px solid var(--border2);border-radius:0 6px 6px 0;background:var(--bg);}' +
     '.sc-ent-action-children .sc-ent-action-item{margin-bottom:4px;}' +
     '.sc-ent-action-conds{margin:4px 0 2px 12px;padding:6px;border-left:2px solid var(--border2);border-radius:0 4px 4px 0;background:var(--bg);}' +
@@ -1547,6 +1825,15 @@
     '#sc_confirm_overlay .confirm-text{color:var(--text);font-size:14px;margin-bottom:20px;}' +
     '#sc_confirm_overlay .confirm-btns{display:flex;gap:8px;justify-content:center;}' +
     '.sc-editor-header .sc-btn-sm:hover{background:#c62828;color:#ffffff;border-color:#b71c1c;}' +
+    '.sc-editor-title-wrap{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}' +
+    '.sc-dirty-badge{color:#ffb74d;font-size:11px;font-weight:700;white-space:nowrap;}' +
+    '.sc-collapse-btn{background:var(--bg3);color:var(--muted);border:1px solid var(--border2);border-radius:4px;width:20px;height:20px;font-size:10px;cursor:pointer;padding:0;line-height:1;flex-shrink:0;}' +
+    '.sc-collapse-btn:hover{color:var(--text);border-color:var(--accent);}' +
+    '.sc-entry-summary{display:none;color:var(--muted);font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}' +
+    '.sc-entry-collapsed .sc-entry-summary{display:block;}' +
+    '.sc-entry-collapsed .sc-entry-title{display:none;}' +
+    '.sc-entry-collapsed .sc-entry-body{display:none;}' +
+    '.sc-invalid{border-color:#e53935!important;box-shadow:0 0 0 1px rgba(229,57,53,.35);border-radius:6px;}' +
     '.sc-wbody{height:calc(100% - 48px);}';
 
   // ── регистрация виджета ──
@@ -1574,16 +1861,16 @@
       '</div>' +
       '<div class="sc-list" id="sc_list"><div class="sc-empty">Загрузка...</div></div>' +
       '<div id="sc_editor_overlay"><div id="sc_editor">' +
-      '<div class="sc-editor-header"><h3>✏️ Редактор сценария</h3><button class="sc-btn sc-btn-sm" onclick="scCloseEditor()">✕</button></div>' +
+      '<div class="sc-editor-header"><div class="sc-editor-title-wrap"><h3 id="sc_edit_title">✏️ Редактор сценария</h3><span id="sc_dirty_badge" class="sc-dirty-badge" style="display:none;">● не сохранено</span></div><button class="sc-btn sc-btn-sm" onclick="scCloseEditor()">✕</button></div>' +
       '<div class="sc-editor-body">' +
-      '<div class="sc-field"><label>📝 Название сценария</label><input type="text" id="sc_edit_name" placeholder="Например: Свет по движению"></div>' +
+      '<div class="sc-field"><label>📝 Название сценария</label><input type="text" id="sc_edit_name" placeholder="Например: Свет по движению" oninput="scEditNameInput(this)"></div>' +
       '<div class="sc-field"><label>⏱ Не чаще, чем раз в (сек)</label><input type="number" id="sc_cooldown" min="0" placeholder="0 — без ограничения" value="" title="Минимальная пауза между срабатываниями сценария в секундах."></div>' +
       '<div id="sc_scene_conds" style="margin-bottom:14px;">' +
       '<div class="sc-entry-subheader"><span>🌙 Срабатывать только когда…</span><select id="sc_scene_cond_mode" onchange="scMarkDirty()" title="«И» — все условия; «ИЛИ» — любое" style="width:auto;font-size:11px;"><option value="AND" selected>И (все)</option><option value="OR">ИЛИ (любое)</option></select><button class="sc-btn sc-btn-sm" onclick="scSceneAddCond(this)">+</button></div>' +
       '<div class="sc-ent-cond-list"></div>' +
       '</div>' +
       '<div id="sc_entries"></div>' +
-      '<div style="margin-top:8px;"><button class="sc-btn sc-btn-sm" onclick="scAddEntry()">+ Добавить запись</button></div>' +
+      '<div style="margin-top:8px;"><button class="sc-btn sc-btn-sm" onclick="scAddEntry()">+ Добавить запись</button><span class="sc-dnd-hint">Порядок записей — перетаскиванием за ⋮⋮ слева в шапке</span></div>' +
       '</div>' +
       '<div class="sc-editor-footer"><button class="sc-btn" onclick="scCloseEditor()">Отмена</button><button class="sc-btn sc-btn-primary" onclick="scSaveEditor()">💾 Сохранить</button></div>' +
       '</div></div>' +
@@ -1597,6 +1884,7 @@
       loadScenes();
       renderList();
       attachKeyShortcuts();
+      attachEntryDnD();
       node._state = {};
     },
 

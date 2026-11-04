@@ -788,6 +788,26 @@ window.WinEngine = (function () {
   }
 
   const SC_STEP = 86;
+  // Цвет плитки ярлыка: у каждого приложения свой оттенок, чтобы рабочий стол не был монотонным.
+  // Порядок: верхний свет, основная заливка, нижняя тень.
+  const SC_COLORS = {
+    devicemgr:    ['#5b9cff', '#2f74ee', '#1b51c7'],
+    devices:      ['#2bb3c0', '#0e8f9c', '#0a6b76'],
+    sh3d:         ['#e0a04a', '#c07a1e', '#8f560f'],
+    yam:          ['#e2564f', '#c3332d', '#8f1f1b'],
+    zigbeemap:    ['#3fbf7f', '#12945c', '#0a6b42'],
+    scenes:       ['#9b7ae8', '#7452cc', '#52379a'],
+    blockly:      ['#e08a4a', '#c2601f', '#8f420f'],
+    settings:     ['#7b8794', '#55606e', '#39424d'],
+    groups:       ['#4f8bd6', '#2f6bcc', '#1d4b96'],
+    templateedit: ['#c98a3a', '#a86a1c', '#7d4a0e'],
+    logviewer:    ['#6b7a8f', '#4d5a6d', '#343e4d']
+  };
+  const SC_FALLBACK = ['#5b9cff', '#2f74ee', '#1b51c7'];
+  function shortcutColors(id) {
+    const c = SC_COLORS[id] || SC_FALLBACK;
+    return '--sc-a:' + c[0] + ';--sc-b:' + c[1] + ';--sc-c:' + c[2];
+  }
   let shortcutPos = {};
   let selectedShortcuts = new Set();
   let shortcutMultiSelect = false;
@@ -838,7 +858,7 @@ window.WinEngine = (function () {
       const el = document.createElement('div');
       el.className = 'shortcut';
       el.dataset.shortcut = s.id;
-      el.innerHTML = `<span class="ico">${s.icon}</span><span class="lbl">${wt(s, 'ui.label', s.label)}</span>`;
+      el.innerHTML = `<span class="ico" style="${shortcutColors(s.id)}">${s.icon}</span><span class="lbl">${wt(s, 'ui.label', s.label)}</span>`;
       el.title = tl('sc.open', 'Открыть: {title} (двойной клик)', { title: s.title });
       let p = shortcutPos[s.id];
       const fits = p && Number.isFinite(p.x) && Number.isFinite(p.y)
@@ -1051,7 +1071,7 @@ window.WinEngine = (function () {
       const el = document.createElement('div');
       el.className = 'start-menu-item';
       el.dataset.widget = def.id;
-      el.innerHTML = `<span class="ico">${def.icon}</span> ${wt(def, 'ui.label', def.label)}`;
+      el.innerHTML = `<span class="ico" style="${shortcutColors(def.id)}">${def.icon}</span> ${wt(def, 'ui.label', def.label)}`;
       el.addEventListener('click', () => {
         open(def.id);
         closeStartMenu();

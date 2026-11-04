@@ -64,14 +64,44 @@ var helpJson = {
 
 
 
+// Поколение загрузки: каждый новый loadAgent отменяет предыдущий незавершённый.
+// Без этого повторный jsconfig или смена персонажа во время загрузки вставляли
+// второго агента в тот же #assistagent — два div.clippy накладывались друг на друга.
+var _agentGen=0;
+var _agentWait=null;
+
+function _dropAgent(){
+ if(!window.agent)return;
+ try{if(window.agent.stop)window.agent.stop()}catch(e){}
+ try{if(window.agent._balloon&&window.agent._balloon._balloon)window.agent._balloon._balloon.remove()}catch(e){}
+ try{if(window.agent._el)window.agent._el.remove()}catch(e){}
+ window.agent=null;
+}
+
 loadAgent=function(aname,cb){
- if(typeof window.clippy==='undefined'){var iv=setInterval(function(){if(window.clippy){clearInterval(iv);loadAgent(aname,cb)}},50);return}
+ var gen=++_agentGen;
+ if(typeof window.clippy==='undefined'){
+  // один общий таймер ожидания модуля clippy (раньше каждый вызов создавал свой)
+  if(_agentWait)clearInterval(_agentWait);
+  _agentWait=setInterval(function(){
+   if(window.clippy){clearInterval(_agentWait);_agentWait=null;loadAgent(aname,cb)}
+  },50);
+  return;
+ }
  var trig=document.getElementById('clippyTrigger');if(trig)trig.style.display='none';
- document.querySelector('.assistagent').innerHTML = ''
+ _dropAgent();
+ var _cont=document.querySelector('.assistagent');
+ if(_cont)_cont.innerHTML=''
  clippy.load({
     name: aname,
     selector: 'assistagent',
   	successCb: (loadedAgent) => {
+    	if(gen!==_agentGen){ // эту загрузку уже перекрыл следующий loadAgent
+    		try{if(loadedAgent&&loadedAgent.stop)loadedAgent.stop()}catch(e){}
+    		try{if(loadedAgent&&loadedAgent._balloon&&loadedAgent._balloon._balloon)loadedAgent._balloon._balloon.remove()}catch(e){}
+    		try{if(loadedAgent&&loadedAgent._el)loadedAgent._el.remove()}catch(e){}
+    		return;
+    	}
     	console.log("Loaded!");
 		agent = loadedAgent;
     	agent.show();
@@ -112,7 +142,7 @@ loadAgent=function(aname,cb){
        input.addEventListener('webkitspeechchange',function(){setTimeout(zc_sendInBalloon,300)});
        input.addEventListener('focus',function(){if(window.agent)window.agent.play('CheckingSomething')});
       var zsr=zc_initSR(),isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if(zsr&&!isMobile){zsr.onresult=function(e){input.value=e.results[e.results.length-1][0].transcript;zc_sendInBalloon()};document.getElementById('zcMic').addEventListener('click',function(){if(window.agent)window.agent.play('CheckingSomething');input.focus();try{zsr.start()}catch(e){}})}else{document.getElementById('zcMic').addEventListener('click',function(){if(window.agent)window.agent.play('CheckingSomething');input.focus()});document.getElementById('zcMic').style.display=''}
+       if(zsr&&!isMobile){zsr.onresult=function(e){console.log('SR result',e);input.value=e.results[e.results.length-1][0].transcript;zc_sendInBalloon()};zsr.onerror=function(e){console.error('SR error',e);var msg=document.getElementById('zcMsgs');if(msg&&!msg.querySelector('.zc-err.network-msg')){var d=document.createElement('div');d.className='zc-err network-msg';d.textContent='Микрофон: ошибка сети (SpeechRecognition требует интернет). Попробуйте ввести текст вручную.';msg.appendChild(d);msg.scrollTop=msg.scrollHeight}};zsr.onstart=function(){console.log('SR start')};zsr.onend=function(){console.log('SR end')};document.getElementById('zcMic').addEventListener('click',function(){if(window.agent)window.agent.play('CheckingSomething');input.focus();try{zsr.start();console.log('SR start called')}catch(e){console.error('SR start exception',e)}})}else{document.getElementById('zcMic').addEventListener('click',function(){console.log('No zsr or mobile',zsr,isMobile);if(window.agent)window.agent.play('CheckingSomething');input.focus()});document.getElementById('zcMic').style.display=''}
        // double click/tap — show/hide the balloon
         function toggleBal(){if(bal.hasAttribute('hidden')){bal.removeAttribute('hidden');requestAnimationFrame(function(){var zm=(window.getZoom?window.getZoom():1),vW=window.innerWidth/zm,vH=window.innerHeight/zm,bH=bal.offsetHeight||280;bal.style.left=Math.max(4,(vW-320)/2)+'px';bal.style.top=Math.max(4,(vH-bH)/2)+'px';input.focus()})}else bal.setAttribute('hidden','true')}
        _el.addEventListener('dblclick',toggleBal);
@@ -129,6 +159,7 @@ loadAgent=function(aname,cb){
       if(typeof cb==='function')cb(agent);
     },
     failCb: (e) => {
+    	if(gen===_agentGen)window._agentReady=false; // разрешаем повторный запуск (кнопка 🤖)
     	console.error(e)
     }
   })
@@ -213,7 +244,8 @@ async function zc_askOpenCode(text,cfg){
   var sd=await zc_proxy(cfg.url+'/session','POST');
   zc_ocSession=sd.id;
  }
- var mp=cfg.model.split('/'),mobj={providerID:mp[0],modelID:mp[1]};
+ // Режем по ПЕРВОМУ слэшу: у моделей бывает свой слэш (openai/gpt-oss-20b).
+ var _mi=String(cfg.model||'').indexOf('/'),mobj={providerID:_mi<0?'':cfg.model.slice(0,_mi),modelID:_mi<0?cfg.model:cfg.model.slice(_mi+1)};
  var system=ZC.system_prompt;
  try{
   var d=await zc_mcp('tools/call',{name:'list_devices',arguments:{}});
@@ -237,12 +269,33 @@ async function zc_askOpenAI(text,cfg){
  return rd.choices&&rd.choices[0]&&rd.choices[0].message?rd.choices[0].message.content:'Нет ответа';
 }
 
+var ttsQueue = Promise.resolve();
 function zc_tts(txt){
- if(!zc_ttsOn||!window.speechSynthesis)return;
- window.speechSynthesis.cancel();
- var u=new SpeechSynthesisUtterance(txt.replace(/[^\p{L}\p{N}\s,.!?:;-]/gu,'').substring(0,300));
-  u.lang='ru-RU'; u.rate=0.9;
- window.speechSynthesis.speak(u);
+  ttsQueue = ttsQueue.then(async () => {
+    try{
+      const r = await fetch('/api/alice/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: txt })
+      });
+      if (!r.ok) throw new Error(await r.text());
+      const url = URL.createObjectURL(await r.blob());
+      const audio = new Audio(url);
+      audio.onended = () => URL.revokeObjectURL(url);
+      await audio.play();
+      console.log('TTS played:', txt);
+    } catch (e) {
+      console.error('tts error:', e);
+      // фолбек — браузерная озвучка
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        var u = new SpeechSynthesisUtterance(txt.replace(/[^\p{L}\p{N}\s,.!?:;-]/gu, '').substring(0, 300));
+        u.lang = 'ru-RU'; u.rate = 0.9;
+        window.speechSynthesis.speak(u);
+      }
+    }
+  }).catch(e => console.error('tts queue:', e));
+  return ttsQueue;
 }
 
 async function zc_switchModel(idx){
@@ -263,7 +316,7 @@ async function zc_models(){
  if(zc_provider()!=='opencode')return'Список моделей только для OpenCode. Текущая: '+zc_cfg().model;
  try{
   var d=await zc_proxy(zc_cfg().url+'/config/providers','GET');
-  var all=[],idx=0,curModel=zc_cfg().model.split('/')[1];
+  var all=[],idx=0,_cm=String(zc_cfg().model||''),curModel=_cm.indexOf('/')<0?_cm:_cm.slice(_cm.indexOf('/')+1);
   (d.providers||[]).forEach(function(p){for(var k in p.models){idx++;var m=p.models[k];all.push(idx+'. '+p.id+'/'+k+' - '+m.name+(k===curModel?' ★':''))}});
   return'Модели:\n'+all.join('\n');
  }catch(e){return'Ошибка: '+e.message}
@@ -282,10 +335,10 @@ function zc_fb(txt,devs){
 
 var zc_sr=null;
 function zc_initSR(){
- if(!('webkitSpeechRecognition' in window))return null;
- var R=window.webkitSpeechRecognition;
- var sr=new R(); sr.lang='ru-RU'; sr.continuous=false; sr.interimResults=false;
- return sr;
+  var R = (window.webkitSpeechRecognition || window.SpeechRecognition);
+  if(!R)return null;
+  var sr=new R(); sr.lang='ru-RU'; sr.continuous=true; sr.interimResults=true;
+  return sr;
 }
 
 function zc_sendInBalloon(){

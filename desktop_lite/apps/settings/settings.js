@@ -8,7 +8,7 @@
 .win-settings select,.win-settings button,.win-settings input{border-radius:4px}
 .win-settings .s-menu{width:170px;min-width:170px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;background:var(--bg3);border-radius:6px;padding:6px;border:1px solid var(--border)}
 .win-settings .s-tab{padding:8px 10px;cursor:pointer;border-radius:4px;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);transition:all .15s;border:1px solid transparent;white-space:nowrap;background:transparent}
-.win-settings .s-tab img{width:30px;height:30px;padding:4px;box-sizing:border-box;background:#3b82f6;border-radius:50%;flex-shrink:0}
+.win-settings .s-tab img{width:30px;height:30px;padding:4px;box-sizing:border-box;border-radius:50%;flex-shrink:0;background:linear-gradient(160deg,var(--sic-a,#5c9dff) 0%,var(--sic-b,#2f74ee) 55%,var(--sic-c,#1b51c7) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -5px 8px -4px rgba(0,0,0,.35),0 3px 7px -2px rgba(7,30,86,.4)}
 .win-settings .s-tab:hover{background:var(--hover);color:var(--text)}
 .win-settings .s-tab.active{background:rgba(59,130,246,.15);color:var(--accent);border-color:var(--accent)}
 .win-settings .s-content{flex:1;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px;min-width:0}
@@ -45,6 +45,24 @@
 .ya-pane input{width:100%;margin:14px 0;border:1px solid var(--green);background:var(--bg);color:var(--text);padding:8px;border-radius:4px}
 @media (max-width:640px){.win-settings{flex-direction:column}.win-settings .s-menu{width:100%;min-width:unset;flex-direction:row;overflow-x:auto;gap:4px;padding:4px}}
 `;
+
+  // цвет кружка раздела: тот же оттенок, что у приложения на рабочем столе
+  var TAB_COLORS = {
+    APP:           ['#5b9cff', '#2f74ee', '#1b51c7'],
+    Brain:         ['#a78bfa', '#7c4dd6', '#52309a'],
+    HomeAssistant: ['#3ec6d8', '#0891b2', '#066b83'],
+    MQTT:          ['#e05aa6', '#c0267a', '#8a1a55'],
+    Telegram_Bot:  ['#5fc3ea', '#2a9fd6', '#1a7099'],
+    Weather:       ['#e8b45c', '#c07a1e', '#8f560f'],
+    Ya:            ['#e2564f', '#c3332d', '#8f1f1b'],
+    ZIGBEE:        ['#4fc98c', '#12945c', '#0a6b42'],
+    ZIGBEE2MQTT:   ['#8b96a4', '#5b6675', '#39424d']
+  };
+  function tabColors(name) {
+    var c = TAB_COLORS[name];
+    if (!c) return '';
+    return ' style="--sic-a:' + c[0] + ';--sic-b:' + c[1] + ';--sic-c:' + c[2] + '"';
+  }
 
   // ---------------- helpers ----------------
   function esc(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -105,7 +123,7 @@
 
     var sections = Object.keys(st.cfg);
     menu.innerHTML = sections.map(function (s) {
-      return '<div class="s-tab" data-tab="' + s + '"><img src="/static/icons/' + s + '.svg"><span>' + s + '</span></div>';
+      return '<div class="s-tab" data-tab="' + s + '"' + tabColors(s) + '><img src="/static/icons/' + s + '.svg"><span>' + s + '</span></div>';
     }).join('');
     menu.querySelectorAll('img').forEach(function (img) {
       img.addEventListener('error', function () { img.remove(); });
