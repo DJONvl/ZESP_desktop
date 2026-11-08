@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Диктовка команд — ZESP</title>
+<style>
+  :root{--bg:#12151a;--panel:#1b2027;--line:#2a323c;--text:#e6e9ee;--muted:#8b96a5;--accent:#4c9aff;--ok:#3fb950;--warn:#d29922;--bad:#f85149;--wait:#6ea8fe}
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.4 -apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;min-height:100vh}
+  header{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  header b{font-size:17px}
+  .muted{color:var(--muted);font-size:14px}
+  main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:20px}
+  .phrase{font-size:clamp(24px,4.6vw,46px);font-weight:600;text-align:center;max-width:900px;line-height:1.25}
+  .hint{color:var(--muted);text-align:center;max-width:700px}
+  .bar{width:min(900px,100%);height:8px;background:var(--panel);border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+  .bar>i{display:block;height:100%;background:var(--accent);width:0;transition:width .25s}
+  .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  button{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:12px 18px;font-size:16px;cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  button:disabled{opacity:.4;cursor:default}
+  .result{width:min(900px,100%);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:15px}
+  .result div{margin:4px 0}
+  .k{color:var(--muted)}
+  .ok{color:var(--ok)} .warn{color:var(--warn)} .wait{color:var(--wait)} .bad{color:var(--bad)}
+  .state{font-weight:600}
+  .align{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .w{border-radius:6px;padding:2px 7px;font-size:14px;border:1px solid transparent}
+  .w.match{background:#16281b;border-color:#24452c;color:#7ee787}
+  .w.sub{background:#2b2413;border-color:#4a3c17;color:#e3b341}
+  .w.del{background:#2d1618;border-color:#4c2226;color:#ff7b72;text-decoration:line-through}
+  .w.ins{background:#1a1e26;border-color:#2f3742;color:#8b96a5;font-style:italic}
+  .legend{margin-top:8px;font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <b>Диктовка команд</b>
+  <span class="muted" id="prog"></span>
+  <span class="muted" id="ws">соединение…</span>
+</header>
+<main>
+  <div class="bar"><i id="barfill"></i></div>
+  <div class="phrase" id="phrase">—</div>
+  <div class="hint">Скажите в колонку: «Алиса, <span id="inline"></span>»</div>
+  <div class="hint state" id="state">ждём запись…</div>
+  <div class="btns">
+    <button id="back">← Назад</button>
+    <button id="skip">Пропустить →</button>
+    <button id="clear">Сбросить метку</button>
+  </div>
+  <div class="btns">
+    <button id="dumpSave">⭳ Скачать архив</button>
+    <button id="dumpClear">Очистить дампы</button>
+    <span class="muted" id="dump">дамп: —</span>
+  </div>
+  <div class="result" id="result"><span class="muted">Здесь появится, что услышала ASR</span></div>
+</main>
+<script>
+const PHRASES = ["включи свет в спальне","свет на кухне выключи","в гостиной свет включи","выключи свет в коридоре","в ванной свет выключи","включи свет в детской","свет в кабинете включи","выключи свет на балконе","в прихожей свет выключи","включи свет в туалете","свет в гараже включи","выключи свет во дворе","включи свет на веранде","выключи свет в кладовке","включи ночник в детской","ночник в спальне выключи","включи гирлянду на балконе","гирлянду выключи","включи лампу в гостиной","лампу на кухне выключи","свет в спальне на тридцать процентов","яркость света на кухне пятьдесят процентов","приглуши свет в гостиной до двадцати процентов","сделай свет в кабинете ярче на десять процентов","выключи весь свет","включи свет во всей квартире","свет в коридоре на пять минут","выключи свет в детской через десять минут","сделай свет теплее в гостиной","свет на кухне холоднее","поставь тёплый свет в спальне","включи холодный свет в кабинете","цветовая температура три тысячи кельвинов","свет в детской четыре тысячи кельвинов","сделай свет в ванной нейтральным","сделай свет красным в гостиной","лампа на кухне пусть будет синяя","поставь зелёный свет в детской","цвет лампы в спальне оранжевый","сделай гирлянду розовой","свет в кабинете фиолетовый","включи жёлтый свет на кухне","бирюзовый свет в ванной","включи музыку на кухне","поставь музыку в гостиной","музыку в спальне включи","выключи музыку в детской","следующий трек","предыдущая песня","пауза","продолжи музыку","какая музыка играет","включи радио в спальне","радио на кухне выключи","громкость колонки на пять","сделай громкость семь","громче на два","тише на три","громкость телевизора на двадцать","звук в гостиной на десять","прибавь громкость на кухне","убавь звук в спальне","какая температура в спальне","температура на кухне какая","влажность в детской какая","покажи влажность в гостиной","сколько градусов на улице","погода завтра","какая погода на улице","включи обогреватель в кабинете на двадцать три градуса","обогреватель в спальне выключи","кондиционер на кухне на двадцать градусов","выключи кондиционер в гостиной","поставь климат в спальне двадцать два","включи увлажнитель в детской на пятьдесят процентов","увлажнитель в спальне выключи","включи вентилятор в кабинете","вентилятор в детской выключи","включи тёплый пол в ванной","тёплый пол на кухне на двадцать пять градусов","выключи тёплый пол в коридоре","открой шторы в спальне","закрой шторы в гостиной","открой жалюзи в кабинете","жалюзи в детской закрой","открой замок на входной двери","закрой замок на входной двери","включи сигнализацию","выключи сигнализацию","поставь дом на охрану","сними дом с охраны","включи камеру на кухне","камера во дворе включи","покажи камеру в гостиной","выключи камеру в коридоре","запись с камеры за сегодня","включи уведомления с камеры на улице","датчик движения в коридоре сработал","проверь датчик протечки в ванной","датчик дыма на кухне в порядке","покажи датчики в квартире","включи розетку на кухне","розетку в гостиной выключи","включи робот пылесос на кухне","робот пылесос начни уборку в спальне","останови робот пылесос","пусть робот пылесос уберёт в гостиной","включи телевизор в гостиной","телевизор в спальне выключи","включи кофеварку на кухне","выключи чайник","включи стиральную машину","стиральная машина начни стирку","сколько энергии потратили сегодня","какой расход электричества на кухне","покажи счётчик воды","счётчик газа за месяц","поставь будильник на семь утра","таймер на десять минут","напомни полить цветы через час","выключи будильник на завтра"];
+const KEY = "zesp_dictation_idx";
+let idx = Math.min(parseInt(localStorage.getItem(KEY) || "0", 10) || 0, PHRASES.length - 1);
+let ws = null, wsReady = false;
+let lastMsgID = "";
+
+const $ = id => document.getElementById(id);
+
+function render() {
+  const p = PHRASES[idx];
+  $("phrase").textContent = p;
+  $("inline").textContent = p;
+  $("prog").textContent = (idx + 1) + " / " + PHRASES.length;
+  $("barfill").style.width = (100 * (idx + 1) / PHRASES.length).toFixed(1) + "%";
+  localStorage.setItem(KEY, String(idx));
+}
+
+function send(text) {
+  if (ws && wsReady) ws.send("asrDictation|" + text);
+}
+
+function connect() {
+  ws = new WebSocket("ws://" + location.hostname + ":8181");
+  ws.onopen = () => {
+    wsReady = true;
+    $("ws").textContent = "соединён";
+    $("ws").className = "muted ok";
+    send(PHRASES[idx]);
+    $("state").textContent = "ждём запись…";
+    $("state").className = "hint state wait";
+  };
+  ws.onclose = () => {
+    wsReady = false;
+    $("ws").textContent = "нет связи, переподключение…";
+    $("ws").className = "muted warn";
+    setTimeout(connect, 2000);
+  };
+  ws.onerror = () => { try { ws.close(); } catch (e) {} };
+}
+
+function normalize(s) { return (s || "").toLowerCase().replace(/[^а-яё ]/g, " ").replace(/\s+/g, " ").trim(); }
+
+// Выравнивание по словам + расстояние Левенштейна.
+// ops: match | sub (ref→hyp) | del (слово пропало) | ins (лишнее в hyp)
+function wordLev(ref, hyp) {
+  const R = normalize(ref).split(" ").filter(Boolean);
+  const H = normalize(hyp).split(" ").filter(Boolean);
+  const n = R.length, m = H.length;
+  const d = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = 0; i <= n; i++) d[i][0] = i;
+  for (let j = 0; j <= m; j++) d[0][j] = j;
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      const cost = R[i - 1] === H[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+    }
+  }
+  const ops = [];
+  let i = n, j = m;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && d[i][j] === d[i - 1][j - 1] + (R[i - 1] === H[j - 1] ? 0 : 1)) {
+      ops.push({ op: R[i - 1] === H[j - 1] ? "match" : "sub", ref: R[i - 1], hyp: H[j - 1] });
+      i--; j--;
+    } else if (i > 0 && d[i][j] === d[i - 1][j] + 1) {
+      ops.push({ op: "del", ref: R[i - 1] });
+      i--;
+    } else {
+      ops.push({ op: "ins", hyp: H[j - 1] });
+      j--;
+    }
+  }
+  ops.reverse();
+  const dist = d[n][m];
+  return { dist, wer: n ? dist / n : null, refWords: n, ops };
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function alignHTML(ops) {
+  return '<div class="align">' + ops.map(o => {
+    if (o.op === "match") return '<span class="w match">' + esc(o.ref) + '</span>';
+    if (o.op === "sub") return '<span class="w sub">' + esc(o.ref) + ' → ' + esc(o.hyp) + '</span>';
+    if (o.op === "del") return '<span class="w del">' + esc(o.ref) + '</span>';
+    return '<span class="w ins">+ ' + esc(o.hyp) + '</span>';
+  }).join("") + '</div>' +
+  '<div class="legend">зелёное — совпало, жёлтое — заменено, красное — пропало, серое — лишнее</div>';
+}
+
+async function poll() {
+  let m;
+  try {
+    const r = await fetch("/api/dictation/last?ts=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) return;
+    m = await r.json();
+  } catch (e) { return; }
+  if (!m || !m.msg_id) return;
+
+  const want = (m.dictation_text || "").trim();
+  const got = (m.local_text || "").trim();
+  const cur = PHRASES[idx];
+  const isOurs = want && normalize(want) === normalize(cur);
+  // Переключаемся только когда есть распознанный текст: пустой ответ значит
+  // «не расслышала», и фразу надо повторить, а не прыгать дальше.
+  const finished = !!got;
+
+  if (isOurs) {
+    const lev = wordLev(want, got);
+    const exact = lev.dist === 0 && got;
+    const werTxt = lev.wer === null ? "—" : (100 * lev.wer).toFixed(1) + "%";
+    $("result").innerHTML =
+      '<div><span class="k">ожидалось:</span> ' + esc(want) + '</div>' +
+      '<div><span class="k">услышала ASR:</span> <span class="' + (exact ? "ok" : "warn") + '">' + esc(got || "—") + '</span></div>' +
+      '<div><span class="k">левенштейн:</span> <span class="' + (exact ? "ok" : "warn") + '">' + lev.dist + '</span>' +
+        ' <span class="k">(WER ' + (exact ? "0%" : werTxt) + ', слов в эталоне: ' + lev.refWords + ')</span></div>' +
+      alignHTML(lev.ops) +
+      '<div><span class="k">сегментов в потоке:</span> ' + (m.opus_heads || 0) + '</div>';
+  }
+
+  if (isOurs && !got && m.closed && m.msg_id !== lastMsgID) {
+    lastMsgID = m.msg_id;
+    $("state").textContent = "не расслышала — повторите (или «Пропустить»)";
+    $("state").className = "hint state bad";
+  }
+
+  if (isOurs && finished && m.msg_id !== lastMsgID) {
+    lastMsgID = m.msg_id;
+    if (idx < PHRASES.length - 1) {
+      idx++;
+      render();
+      send(PHRASES[idx]);
+      $("state").textContent = "записано, следующая фраза";
+      $("state").className = "hint state ok";
+      setTimeout(() => {
+        if ($("state").textContent === "записано, следующая фраза") {
+          $("state").textContent = "ждём запись…";
+          $("state").className = "hint state wait";
+        }
+      }, 2000);
+    } else {
+      $("state").textContent = "список закончен";
+      $("state").className = "hint state ok";
+    }
+  }
+}
+
+$("back").onclick = () => {
+  idx = Math.max(0, idx - 1);
+  lastMsgID = "";
+  render(); send(PHRASES[idx]);
+  $("state").textContent = "повтор: ждём запись…";
+  $("state").className = "hint state wait";
+};
+$("skip").onclick = () => {
+  idx = Math.min(PHRASES.length - 1, idx + 1);
+  lastMsgID = "";
+  render(); send(PHRASES[idx]);
+  $("state").textContent = "ждём запись…";
+  $("state").className = "hint state wait";
+};
+$("clear").onclick = () => { send(""); $("state").textContent = "метка снята"; };
+
+// --- дампы: размер каталога, скачивание архива, очистка ---
+let dumpDir = "";
+
+function fmtMB(n) {
+  n = Number(n) || 0;
+  return n >= 10 ? n.toFixed(1) : n.toFixed(2);
+}
+
+async function refreshDump() {
+  try {
+    const r = await fetch("/api/dictation/dump?ts=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) return;
+    const s = await r.json();
+    dumpDir = s.dir || "";
+    $("dump").textContent = "дамп: " + (s.exchanges || 0) + " обменов, " +
+      fmtMB(s.used_mb) + " из " + Math.round(s.limit_mb || 0) + " МБ" +
+      (s.full ? " — предел, запись стоит" : "");
+    $("dump").className = s.full ? "muted bad" : "muted";
+    $("dumpSave").disabled = !s.exchanges;
+    $("dumpClear").disabled = !s.exchanges;
+  } catch (e) {}
+}
+
+$("dumpSave").onclick = () => {
+  $("state").textContent = "архив собирается…";
+  $("state").className = "hint state wait";
+  window.location.href = "/api/dictation/archive?ts=" + Date.now();
+};
+
+$("dumpClear").onclick = async () => {
+  if (!confirm("Удалить все папки обменов из " + (dumpDir || "каталога дампа") +
+      "?\nСначала скачайте архив — отменить нельзя.")) return;
+  try {
+    const r = await fetch("/api/dictation/clear", { method: "POST" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      $("state").textContent = "очистка не удалась: " + (j.error || r.status);
+      $("state").className = "hint state bad";
+    } else {
+      lastMsgID = "";
+      $("result").innerHTML = '<span class="muted">Дампы удалены: ' + (j.removed || 0) +
+        ' папок, освобождено ' + fmtMB(j.freed_mb) + ' МБ</span>';
+      $("state").textContent = "дампы очищены";
+      $("state").className = "hint state ok";
+    }
+  } catch (e) {
+    $("state").textContent = "очистка не удалась: " + e;
+    $("state").className = "hint state bad";
+  }
+  refreshDump();
+};
+
+render();
+connect();
+refreshDump();
+setInterval(poll, 1200);
+setInterval(refreshDump, 5000);
+</script>
+</body>
+</html>
