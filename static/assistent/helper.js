@@ -107,6 +107,48 @@ loadAgent=function(aname,cb){
     	agent.show();
       agent.animate();
       setTimeout(function(){agent.play('Wave')},600);
+      // Каждая анимация доигрывает весь цикл: новый play() во время неё не обрывает
+      // середину, а встаёт в очередь (один слот). Фоновую стойку (Stand/Idle) прерывать можно.
+      (function(){
+        var origPlay=agent.play.bind(agent);
+        var busyUntil=0,pendingName=null,pendingTimer=null;
+        agent.play=function(name){
+          var an=agent._animator||{};
+          var anims=(an._data&&an._data.animations)||{};
+          // Клик по спрайту: не одна фиксированная анимация, а случайная из выразительных.
+          if(name==='ClickedOn'){
+            var pool=['Wave','Shy','Pose','Emote','Explain','Congratulate','Listen','Thinking','Alert','Dance','Acknowledge'];
+            var avail=[];for(var k=0;k<pool.length;k++){if(anims[pool[k]])avail.push(pool[k])}
+            if(avail.length)name=avail[Math.floor(Math.random()*avail.length)];
+          }
+          if(!anims[name])return origPlay(name);
+          var now=Date.now(),cur=an.currentAnimationName;
+          var isIdle=(!cur||/^(Stand|Idle|Show|Hide)/i.test(cur));
+          if(!isIdle&&now<busyUntil){
+            pendingName=name;
+            if(pendingTimer)clearTimeout(pendingTimer);
+            pendingTimer=setTimeout(function(){
+              var n=pendingName;pendingName=null;pendingTimer=null;
+              if(n&&agent)agent.play(n);
+            },Math.max(0,busyUntil-now)+15);
+            return true;
+          }
+          var fr=(anims[name]&&anims[name].frames)||[];
+          var dur=0;for(var i=0;i<fr.length;i++)dur+=(fr[i].duration||0);
+          busyUntil=isIdle?0:(now+(dur||400));
+          return origPlay(name);
+        };
+        // Случайное поведение (двойной клик, если нет ClickedOn) — только из выразительных,
+        // без Hide/Move/Idle, иначе агент прячется или просто стоит.
+        agent.animate=function(){
+          var an=agent._animator||{};
+          var anims=(an._data&&an._data.animations)||{};
+          var pool=['Wave','Shy','Pose','Emote','Explain','Congratulate','Listen','Thinking','Alert','Dance','Acknowledge'];
+          var avail=[];for(var k=0;k<pool.length;k++){if(anims[pool[k]])avail.push(pool[k])}
+          if(!avail.length)return false;
+          return agent.play(avail[Math.floor(Math.random()*avail.length)]);
+        };
+      })();
       var _el=agent._el;if(_el){_el.style.position='fixed';_el.style.bottom='';_el.style.right='';var _zz=(window.getZoom?window.getZoom():1),_w=_el.offsetWidth||124,_h=_el.offsetHeight||124;_el.style.left=(window.innerWidth/_zz-_w-20)+'px';_el.style.top=(window.innerHeight/_zz-_h-20)+'px'};
       // --- zoom fix for clippy: the library computes position/drag in viewport px ---
       (function(){
@@ -356,6 +398,16 @@ window.processClippyMessage=async function(text){
  m.appendChild(ud); m.scrollTop=m.scrollHeight;
  // typing
  var wd=document.createElement('div'); wd.className='zc-wait'; wd.textContent='...'; m.appendChild(wd);
+ // пасхалка: «покажи сиськи» и родственные фразы — перехват до LLM
+ if(/покаж[а-яё]*\s+(сиськи|грудь|груди|титьки|буфера)|раздева[а-яё]*|раздень[а-яё]*|оголис[а-яё]*/i.test(text)){
+  wd.remove();
+  if(window.agent)window.agent.play('Shy');
+  var pd=document.createElement('div'); pd.className='zc-asst'; pd.textContent='Сначала сценарий «вечер», потом посмотрим 😏';
+  m.appendChild(pd); m.scrollTop=m.scrollHeight;
+  zc_tts('Сначала сценарий «вечер», потом посмотрим.');
+  if(agent&&agent._balloon)agent._balloon.reposition();
+  return;
+ }
  if(window.agent)window.agent.play('Thinking');
  if(window.agent&&window.agent._balloon)window.agent._balloon.reposition();
  // special commands

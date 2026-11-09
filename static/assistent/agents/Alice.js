@@ -1,11 +1,19 @@
-// Alice — ассистент ZESP в виде аниме-персонажа.
-// Спрайт-лист собран из rpg-спрайт-листа (покадровая нарезка) инструментами
-// tools/alicesprite: ccextract (компоненты) + compose (сборка 880x510, кадр 110x170).
-// Сетка 8 колонок; координаты = [col*110, row*170].
-var FW = 110, FH = 170;
+﻿// Alice — ассистент ZESP: управляющая/технический консультант.
+// Все 8 строк — кадры из видео Gemini (10 с, 720×1280, 720p chibi-секретарь):
+// зелёный chroma key вырезан, деспилл, единый масштаб 0.197, выравнивание по
+// стопам и базовой линии 236, кадр 160x240.
+// Сетка 24 колонки x 8 строк, кадр 160x240. Координаты = [col*160, row*240].
+// Строки: 0 idle (24), 1 listen, 2 think, 3 success, 4 error, 5 wave, 6 shy, 7 pose.
+// Error и Shy в источнике отсутствуют — временно дублируют Idle.
+// Строка 6 (shy) — отдельное видео Gemini 920bd0e6 (застёгивает блузку),
+// строка 4 (error) — b8517bde (пожимание плечами), строка 2 (think) — e2a7429a (палец у подбородка).
+var FW = 160, FH = 240;
+var R_IDLE = 0, R_LISTEN = 1, R_THINK = 2, R_SUCCESS = 3,
+    R_ERROR = 4, R_WAVE = 5, R_SHY = 6, R_POSE = 7;
+var IDLE_FRAMES = 24;
 
-function f(x, y, dur, opts) {
-  var fr = { duration: dur || 120, images: [[x, y]] };
+function f(c, r, dur, opts) {
+  var fr = { duration: dur || 200, images: [[c * FW, r * FH]] };
   if (opts && opts.exit !== undefined) fr.exitBranch = opts.exit;
   if (opts && opts.branch !== undefined) {
     fr.branching = { branches: [{ frameIndex: opts.branch, weight: opts.weight || 90 }] };
@@ -13,116 +21,61 @@ function f(x, y, dur, opts) {
   return fr;
 }
 
-// кадры
-var C = {
-  base: [0, 0],       // стоит
-  idle2: [110, 0],    // стоит, вторая фаза
-  walk1: [220, 0], walk2: [330, 0], walk3: [440, 0], walk4: [550, 0],
-  idle3: [660, 0], idle4: [770, 0],
-  emote1: [0, 170],   // руки к голове (удивление)
-  emote2: [110, 170],
-  pose1: [220, 170], pose2: [330, 170], pose3: [440, 170], pose4: [550, 170],
-  pose5: [660, 170], pose6: [770, 170],
-  pose7: [0, 340], pose8: [110, 340], pose9: [220, 340]
-};
-
 var A = {
   name: "Alice",
-  image: "/static/assistent/agents/alice.png",
+  image: "/static/assistent/agents/alice.png?v=11",
   config: {
     overlayCount: 1,
     framesize: [FW, FH],
     animations: {
-      Show: { frames: [f(C.base[0], C.base[1], 250), f(C.base[0], C.base[1], 150)] },
-      Hide: { frames: [f(C.base[0], C.base[1], 200)] },
+      Show: { frames: [f(0, R_IDLE, 260), f(1, R_IDLE, 320), f(0, R_IDLE, 280)] },
+      Hide: { frames: [f(0, R_IDLE, 260)] },
 
-      Wave: {
-        frames: [
-          f(C.base[0], C.base[1], 130),
-          f(C.pose7[0], C.pose7[1], 160),
-          f(C.base[0], C.base[1], 130),
-          f(C.pose8[0], C.pose8[1], 160),
-          f(C.base[0], C.base[1], 160)
-        ]
-      },
-      GetAttention: {
-        frames: [
-          f(C.base[0], C.base[1], 110),
-          f(C.emote1[0], C.emote1[1], 150),
-          f(C.base[0], C.base[1], 110),
-          f(C.emote1[0], C.emote1[1], 150),
-          f(C.base[0], C.base[1], 150)
-        ]
-      },
-      Congratulate: {
-        frames: [
-          f(C.pose1[0], C.pose1[1], 150),
-          f(C.pose2[0], C.pose2[1], 150),
-          f(C.pose4[0], C.pose4[1], 150),
-          f(C.pose7[0], C.pose7[1], 150),
-          f(C.pose1[0], C.pose1[1], 150),
-          f(C.base[0], C.base[1], 200)
-        ]
-      },
+      // две близкие стойки (руки вниз) — переключение почти незаметно
+      Stand: { frames: (function(){ var a=[]; for (var i=0;i<IDLE_FRAMES;i++) a.push(f(i, R_IDLE, 167)); return a; })() },
+      Emote: { frames: [f(0, R_IDLE, 600), f(1, R_POSE, 900), f(2, R_POSE, 900), f(1, R_POSE, 900)] },
 
-      IdleStand: {
-        frames: [
-          f(C.base[0], C.base[1], 450, { branch: 0, weight: 92 }),
-          f(C.idle2[0], C.idle2[1], 400),
-          f(C.idle3[0], C.idle3[1], 450),
-          f(C.idle4[0], C.idle4[1], 400)
-        ]
-      },
-      IdleEmote: {
-        frames: [
-          f(C.base[0], C.base[1], 300, { branch: 0, weight: 92 }),
-          f(C.emote1[0], C.emote1[1], 350),
-          f(C.emote2[0], C.emote2[1], 400),
-          f(C.pose3[0], C.pose3[1], 350)
-        ]
-      },
+      // рука у уха — 4 близкие фазы
+      Listen: { frames: [f(3, R_LISTEN, 550), f(4, R_LISTEN, 500), f(5, R_LISTEN, 500), f(6, R_LISTEN, 500), f(7, R_LISTEN, 450)] },
+      CheckingSomething: { frames: [f(3, R_LISTEN, 420), f(4, R_LISTEN, 420), f(5, R_LISTEN, 420)] },
 
-      MoveRight: { frames: [f(C.walk1[0], C.walk1[1], 130), f(C.walk2[0], C.walk2[1], 130), f(C.walk3[0], C.walk3[1], 130), f(C.walk4[0], C.walk4[1], 130)] },
-      MoveLeft: { frames: [f(C.walk2[0], C.walk2[1], 130), f(C.walk1[0], C.walk1[1], 130), f(C.walk4[0], C.walk4[1], 130), f(C.walk3[0], C.walk3[1], 130)] },
-      MoveUp: { frames: [f(C.walk1[0], C.walk1[1], 130), f(C.walk3[0], C.walk3[1], 130)] },
-      MoveDown: { frames: [f(C.walk2[0], C.walk2[1], 130), f(C.walk4[0], C.walk4[1], 130)] },
+      // палец у подбородка — 4 близкие фазы
+      Thinking: { frames: [f(1, R_THINK, 650), f(2, R_THINK, 600), f(3, R_THINK, 600), f(4, R_THINK, 550)] },
+      Processing: { frames: [f(1, R_THINK, 420), f(2, R_THINK, 420), f(3, R_THINK, 420), f(4, R_THINK, 420)] },
 
-      GestureRight: { frames: [f(C.pose5[0], C.pose5[1], 160), f(C.base[0], C.base[1], 150)] },
-      GestureLeft: { frames: [f(C.pose6[0], C.pose6[1], 160), f(C.base[0], C.base[1], 150)] },
-      GestureUp: { frames: [f(C.pose7[0], C.pose7[1], 170), f(C.base[0], C.base[1], 150)] },
-      GestureDown: { frames: [f(C.pose9[0], C.pose9[1], 170), f(C.base[0], C.base[1], 150)] },
+      Explain: { frames: [f(4, R_SUCCESS, 450), f(5, R_SUCCESS, 500), f(6, R_SUCCESS, 500)] },
+      Congratulate: { frames: [f(5, R_SUCCESS, 450), f(6, R_SUCCESS, 450), f(7, R_SUCCESS, 450), f(3, R_POSE, 700), f(0, R_IDLE, 300)] },
+      Acknowledge: { frames: [f(0, R_SUCCESS, 300), f(1, R_SUCCESS, 450), f(0, R_IDLE, 260)] },
 
-      ClickedOn: {
-        frames: [
-          f(C.emote1[0], C.emote1[1], 120),
-          f(C.emote2[0], C.emote2[1], 140),
-          f(C.emote1[0], C.emote1[1], 120),
-          f(C.base[0], C.base[1], 150)
-        ]
-      },
-      Processing: {
-        frames: [
-          f(C.base[0], C.base[1], 150, { branch: 0, weight: 85 }),
-          f(C.walk1[0], C.walk1[1], 160),
-          f(C.pose3[0], C.pose3[1], 160),
-          f(C.walk3[0], C.walk3[1], 160)
-        ]
-      },
-      Thinking: {
-        frames: [
-          f(C.base[0], C.base[1], 150, { branch: 0, weight: 85 }),
-          f(C.emote2[0], C.emote2[1], 250),
-          f(C.emote2[0], C.emote2[1], 300),
-          f(C.pose4[0], C.pose4[1], 250)
-        ]
-      },
+      Alert: { frames: [f(1, R_ERROR, 500), f(2, R_ERROR, 500), f(3, R_ERROR, 500)] },
 
-      LookUp: { frames: [f(C.pose7[0], C.pose7[1], 220), f(C.base[0], C.base[1], 150)] },
-      LookDown: { frames: [f(C.pose9[0], C.pose9[1], 250), f(C.base[0], C.base[1], 150)] },
-      LookLeft: { frames: [f(C.pose6[0], C.pose6[1], 250), f(C.base[0], C.base[1], 150)] },
-      LookRight: { frames: [f(C.pose5[0], C.pose5[1], 250), f(C.base[0], C.base[1], 150)] }
+      Wave: { frames: [f(1, R_WAVE, 240), f(2, R_WAVE, 260), f(3, R_WAVE, 260), f(4, R_WAVE, 260), f(5, R_WAVE, 260), f(6, R_WAVE, 260)] },
+
+      // смущение: прикрылась → отвернулась → выглянула
+      Shy: { frames: [f(2, R_SHY, 450), f(3, R_SHY, 550), f(4, R_SHY, 700), f(5, R_SHY, 700), f(6, R_SHY, 550), f(0, R_IDLE, 300)] },
+      ClickedOn: { frames: [f(4, R_SHY, 140), f(5, R_SHY, 150), f(6, R_SHY, 160), f(7, R_SHY, 160),
+                            f(8, R_SHY, 160), f(9, R_SHY, 160), f(10, R_SHY, 170), f(11, R_SHY, 170)] },
+
+      Pose: { frames: [f(0, R_POSE, 900), f(1, R_POSE, 900), f(2, R_POSE, 900)] },
+      Dance: { frames: [f(0, R_POSE, 500), f(1, R_POSE, 500), f(2, R_POSE, 500), f(1, R_POSE, 500)] },
+
+      GestureRight: { frames: [f(5, R_SUCCESS, 380), f(0, R_IDLE, 240)] },
+      GestureLeft: { frames: [f(2, R_ERROR, 380), f(0, R_IDLE, 240)] },
+      GestureUp: { frames: [f(8, R_THINK, 380), f(0, R_IDLE, 240)] },
+      GestureDown: { frames: [f(4, R_THINK, 380), f(0, R_IDLE, 240)] },
+
+      LookUp: { frames: [f(8, R_THINK, 380), f(0, R_IDLE, 240)] },
+      LookDown: { frames: [f(2, R_THINK, 380), f(0, R_IDLE, 240)] },
+      LookLeft: { frames: [f(4, R_LISTEN, 380), f(0, R_IDLE, 240)] },
+      LookRight: { frames: [f(6, R_LISTEN, 380), f(0, R_IDLE, 240)] },
+
+      MoveRight: { frames: [f(0, R_IDLE, 420)] },
+      MoveLeft: { frames: [f(0, R_IDLE, 420)] },
+      MoveUp: { frames: [f(0, R_IDLE, 420)] },
+      MoveDown: { frames: [f(0, R_IDLE, 420)] }
     }
   }
 };
 
 export { A as default };
+
