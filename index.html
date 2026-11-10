@@ -610,6 +610,8 @@ function bootAssistant() {
   });
 }
 bootAssistant.__force = function () { window._agentReady = false; bootAssistant(); };
+// 🤖 — фолбек: видна только пока спрайт не загружен (или загрузка упала).
+// Успешная загрузка прячет её из helper.js (successCb).
 document.getElementById('clippyTrigger').addEventListener('click', function () {
   if (window._agentReady) return;
   bootAssistant.__force();

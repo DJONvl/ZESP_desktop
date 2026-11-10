@@ -33,6 +33,16 @@ var A = {
 
       // две близкие стойки (руки вниз) — переключение почти незаметно
       Stand: { frames: (function(){ var a=[]; for (var i=0;i<IDLE_FRAMES;i++) a.push(f(i, R_IDLE, 167)); return a; })() },
+      // Idle — имя обязательно с префиксом "Idle": ClippyJS ищет idle-анимацию
+      // по префиксу (_isIdleAnimation/_getIdleAnimation) и включает её сама,
+      // когда очередь задач опустела. Без неё после любого жеста спрайт
+      // замирает на последнем кадре (D-F64). Последний кадр ветвится на 0 —
+      // дыхание зацикливается, пока не придёт следующий play().
+      Idle: { frames: (function(){
+        var a=[]; for (var i=0;i<IDLE_FRAMES;i++)
+          a.push(f(i, R_IDLE, 167, i===IDLE_FRAMES-1 ? { branch: 0, weight: 100 } : undefined));
+        return a;
+      })() },
       Emote: { frames: [f(0, R_IDLE, 600), f(1, R_POSE, 900), f(2, R_POSE, 900), f(1, R_POSE, 900)] },
 
       // рука у уха — 4 близкие фазы

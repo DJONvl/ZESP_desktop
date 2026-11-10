@@ -88,10 +88,13 @@ loadAgent=function(aname,cb){
   },50);
   return;
  }
- var trig=document.getElementById('clippyTrigger');if(trig)trig.style.display='none';
  _dropAgent();
+ // Круглая 🤖 — фолбек на случай, если спрайт не загрузился: пока идёт
+ // загрузка видна, после успеха прячется (см. successCb).
+ var trig=document.getElementById('clippyTrigger');if(trig)trig.style.display='flex';
  var _cont=document.querySelector('.assistagent');
  if(_cont)_cont.innerHTML=''
+ try{
  clippy.load({
     name: aname,
     selector: 'assistagent',
@@ -104,6 +107,8 @@ loadAgent=function(aname,cb){
     	}
     	console.log("Loaded!");
 		agent = loadedAgent;
+		// спрайт на месте — фолбек-кнопка больше не нужна
+		var _t=document.getElementById('clippyTrigger');if(_t)_t.style.display='none';
     	agent.show();
       agent.animate();
       setTimeout(function(){agent.play('Wave')},600);
@@ -160,20 +165,74 @@ loadAgent=function(aname,cb){
         agent.show=function(t){var r=origShow(t);fixAgent();return r};
         var origRepos=agent.reposition.bind(agent);
         agent.reposition=function(){if(gz()===1)return origRepos();var el=agent._el,w=el.offsetWidth||124,h=el.offsetHeight||124,l=parseFloat(el.style.left)||0,t=parseFloat(el.style.top)||0;el.style.left=Math.max(0,Math.min(l,vw()-w))+'px';el.style.top=Math.max(0,Math.min(t,vh()-h))+'px';if(agent._balloon)agent._balloon.reposition()};
-        agent._startDrag=function(e){this.pause();this._balloon.hide(true);this._zoff={sx:(e.pageX!==undefined?e.pageX:e.clientX),sy:(e.pageY!==undefined?e.pageY:e.clientY),bx:parseFloat(this._el.style.left)||this._el.offsetLeft||0,by:parseFloat(this._el.style.top)||this._el.offsetTop||0};this._offset={left:0,top:0};this._targetX=this._zoff.bx;this._targetY=this._zoff.by;this._moveHandle=this._dragMove.bind(this);this._upHandle=this._finishDrag.bind(this);window.addEventListener('mousemove',this._moveHandle);window.addEventListener('mouseup',this._upHandle);this._dragUpdateLoop=window.setTimeout(this._updateLocation.bind(this),10)};
+        agent._startDrag=function(e){this.pause();this._zoff={sx:(e.pageX!==undefined?e.pageX:e.clientX),sy:(e.pageY!==undefined?e.pageY:e.clientY),bx:parseFloat(this._el.style.left)||this._el.offsetLeft||0,by:parseFloat(this._el.style.top)||this._el.offsetTop||0};this._offset={left:0,top:0};this._targetX=this._zoff.bx;this._targetY=this._zoff.by;this._moveHandle=this._dragMove.bind(this);this._upHandle=this._finishDrag.bind(this);window.addEventListener('mousemove',this._moveHandle);window.addEventListener('mouseup',this._upHandle);this._dragUpdateLoop=window.setTimeout(this._updateLocation.bind(this),10)};
         agent._dragMove=function(t){try{t.preventDefault()}catch(e){}if(!this._zoff)return;var z=gz(),cx=(t.clientX!==undefined?t.clientX:t.pageX),cy=(t.clientY!==undefined?t.clientY:t.pageY);this._targetX=this._zoff.bx+(cx-this._zoff.sx)/z;this._targetY=this._zoff.by+(cy-this._zoff.sy)/z};
         var origFinish=agent._finishDrag.bind(agent);
         agent._finishDrag=function(){this._zoff=null;return origFinish()};
-        if(agent._balloon){var bal=agent._balloon,origBalR=bal.reposition.bind(bal);bal.reposition=function(){origBalR();var z=gz();if(z!==1&&bal._balloon){var b=bal._balloon;if(b.style.left)b.style.left=(parseFloat(b.style.left)/z)+'px';if(b.style.top)b.style.top=(parseFloat(b.style.top)/z)+'px'}}}
       })();
       // ── embed the chat into the balloon ──
       var bal=agent._balloon._balloon, cnt=agent._balloon._content;
       if(bal&&cnt){
-       bal.style.minWidth='300px';bal.style.maxWidth='360px';bal.style.background='#1a1a2e';bal.style.color='#e0e0e0';bal.style.border='1px solid #2a2a3a';bal.style.borderRadius='12px';bal.style.padding='0';bal.style.boxShadow='0 4px 20px rgba(0,0,0,0.5)';
-       bal.style.marginTop='40px';bal.style.marginLeft='10px';
+       bal.style.minWidth='0';bal.style.maxWidth='360px';bal.style.background='#1a1a2e';bal.style.color='#e0e0e0';bal.style.border='1px solid #2a2a3a';bal.style.borderRadius='12px';bal.style.padding='0';bal.style.boxShadow='0 4px 20px rgba(0,0,0,0.5)';
+       // Поля запрещены: библиотечные _position/_isOut их не учитывают и
+       // объявляют «за экраном» все позиции (D-F65).
+       bal.style.margin='0';
        bal.style.fontFamily="'Segoe UI',Tahoma,sans-serif";bal.style.fontSize='13px';bal.style.cursor='default';
        cnt.style.maxWidth='none';cnt.style.minWidth='auto';cnt.style.padding='0';cnt.style.lineHeight='1.4';
        cnt.innerHTML='<div id="zcMsgs" style="overflow-y:auto;padding:8px;min-height:60px;max-height:200px;scrollbar-width:thin;scrollbar-color:#2a2a3a #0f0f1a;"></div><div id="zcRow" style="display:flex;padding:6px 8px;border-top:1px solid #2a2a3a;gap:4px;"><input id="zcIn" placeholder="Напишите..." autocomplete="off" x-webkit-speech style="flex:1;background:#0f0f1a;border:1px solid #2a2a3a;padding:6px 10px;border-radius:8px;color:#fff;font-size:13px;outline:none;"><button id="zcSpk" style="background:#2a2a3a;border:none;padding:6px 8px;border-radius:8px;color:#aaa;cursor:pointer;font-size:13px;">🔊</button><button id="zcMic" style="background:#2a2a3a;border:none;padding:6px 8px;border-radius:8px;color:#aaa;cursor:pointer;font-size:13px;">🎤</button><button id="zcSend" style="background:#2a2a3a;border:none;padding:6px 8px;border-radius:8px;color:#aaa;cursor:pointer;font-size:13px;">➤</button></div>';
+       // ── геометрия панели: считаем сами, всегда внутри вьюпорта ──
+       // ClippyJS ставит balloon через _position/_isOut: они не знают про
+       // CSS-zoom и поля, а при узком окне объявляют «за экраном» все четыре
+       // позиции — панель уходит под нижнюю границу (D-F65). Плюс центр
+       // экрана при открытии давал скачок после первого сообщения (D-F66).
+       var zcPanel={open:false,dismissed:false};
+       var zcZoom=function(){return (window.getZoom?window.getZoom():1)||1};
+       var zcPlace=function(){
+         if(!bal||bal.hasAttribute('hidden'))return; // у скрытой мерять нечего
+         var z=zcZoom(),pad=8,vw=(window.innerWidth||0)/z,vh=(window.innerHeight||0)/z;
+         // ширину задаём явно: shrink-to-fit зависит от left и кламп не держится
+         var w=Math.min(360,Math.max(220,vw-pad*2));
+         bal.style.width=w+'px';
+         var h=bal.offsetHeight||0;
+         var r=_el.getBoundingClientRect();
+         var sx=r.left/z,sy=r.top/z,sw=r.width/z,sh=r.height/z;
+         var left=sx+sw-w, top=sy-h-12;       // над головой, право по правому краю
+         if(top<pad){                          // сверху не влезает — вбок
+           top=Math.max(pad,Math.min(vh-h-pad,sy+(sh-h)/2));
+           left=sx-w-10;
+           if(left<pad)left=sx+sw+10;
+         }
+         left=Math.max(pad,Math.min(vw-w-pad,left));
+         top=Math.max(pad,Math.min(vh-h-pad,top));
+         bal.style.left=left+'px';bal.style.top=top+'px';
+       };
+       var zcShow=function(focus){
+         if(!bal)return;
+         agent._balloon._hidden=false;        // этим флагом библиотека гасит показ
+         bal.removeAttribute('hidden');
+         zcPanel.open=true;zcPanel.dismissed=false;
+         zcPlace();
+         if(focus){var i=document.getElementById('zcIn');if(i)i.focus()}
+       };
+       var zcHide=function(){
+         if(!bal||bal.hasAttribute('hidden'))return;
+         bal.setAttribute('hidden','true');
+         zcPanel.open=false;zcPanel.dismissed=true;
+       };
+       var zcIsOpen=function(){return !!bal&&!bal.hasAttribute('hidden')};
+       var zcToggle=function(focus){if(!bal)return;if(zcIsOpen())zcHide();else zcShow(focus)};
+       window.zcToggleBalloon=function(){zcToggle(true)};
+       // библиотечные вызовы reposition (resize, drag, speak) ведут сюда
+       agent._balloon.reposition=function(){zcPlace()};
+       // клик по спрайту не открывает панель сам — только двойной клик
+       agent._balloon.show=function(){};
+       var _zcAgentRepos=agent.reposition.bind(agent);
+       agent.reposition=function(){var r=_zcAgentRepos();if(zcPanel.open)zcPlace();return r};
+       window.addEventListener('resize',function(){if(zcPanel.open)zcPlace()});
+       if(typeof window.setZoom==='function'){var _zcSetZoom=window.setZoom;window.setZoom=function(v){var r=_zcSetZoom(v);if(zcPanel.open)setTimeout(zcPlace,0);return r}}
+       // Сообщения добавляются не только из чат-флоу (ошибка микрофона, ошибка
+       // LLM) — панель растёт, и её надо возвращать к голове спрайта.
+       if(window.MutationObserver){new MutationObserver(function(){if(zcPanel.open)zcPlace()}).observe(document.getElementById('zcMsgs'),{childList:true})}
        // styles for the scrollbar in zcMsgs
        var st=document.createElement('style');st.textContent='#zcMsgs::-webkit-scrollbar{width:4px}#zcMsgs::-webkit-scrollbar-track{background:#0f0f1a}#zcMsgs::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:4px}#zcMsgs>div{padding:4px 8px;margin:2px 0;border-radius:8px;font-size:12px;white-space:pre-wrap;word-break:break-word;user-select:text;cursor:pointer;transition:opacity.15s}#zcMsgs>div.zc-user{background:#0d4a5c;color:#e0f0ff}#zcMsgs>div.zc-asst{background:#2a2a3a;color:#e0e0e0;border:1px solid #3a3a4a}#zcMsgs>div.zc-err{background:#3a1a1a;color:#f66;border:1px solid #5a2a2a}#zcMsgs>div.zc-wait{color:#888;font-style:italic}';bal.appendChild(st);
        // handlers
@@ -185,26 +244,53 @@ loadAgent=function(aname,cb){
        input.addEventListener('focus',function(){if(window.agent)window.agent.play('CheckingSomething')});
       var zsr=zc_initSR(),isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
        if(zsr&&!isMobile){zsr.onresult=function(e){console.log('SR result',e);input.value=e.results[e.results.length-1][0].transcript;zc_sendInBalloon()};zsr.onerror=function(e){console.error('SR error',e);var msg=document.getElementById('zcMsgs');if(msg&&!msg.querySelector('.zc-err.network-msg')){var d=document.createElement('div');d.className='zc-err network-msg';d.textContent='Микрофон: ошибка сети (SpeechRecognition требует интернет). Попробуйте ввести текст вручную.';msg.appendChild(d);msg.scrollTop=msg.scrollHeight}};zsr.onstart=function(){console.log('SR start')};zsr.onend=function(){console.log('SR end')};document.getElementById('zcMic').addEventListener('click',function(){if(window.agent)window.agent.play('CheckingSomething');input.focus();try{zsr.start();console.log('SR start called')}catch(e){console.error('SR start exception',e)}})}else{document.getElementById('zcMic').addEventListener('click',function(){console.log('No zsr or mobile',zsr,isMobile);if(window.agent)window.agent.play('CheckingSomething');input.focus()});document.getElementById('zcMic').style.display=''}
-       // double click/tap — show/hide the balloon
-        function toggleBal(){if(bal.hasAttribute('hidden')){bal.removeAttribute('hidden');requestAnimationFrame(function(){var zm=(window.getZoom?window.getZoom():1),vW=window.innerWidth/zm,vH=window.innerHeight/zm,bH=bal.offsetHeight||280;bal.style.left=Math.max(4,(vW-320)/2)+'px';bal.style.top=Math.max(4,(vH-bH)/2)+'px';input.focus()})}else bal.setAttribute('hidden','true')}
-       _el.addEventListener('dblclick',toggleBal);
+       // двойной клик по персонажу — открыть/закрыть панель (одинарный не
+       // открывает: библиотека на mouseup сама показывала balloon — show()
+       // заглушен выше). Закрыть можно ещё кликом мимо и Esc.
+       _el.addEventListener('dblclick',function(){zcToggle(true)});
        var _lt=0,_lx=0,_ly=0;
        _el.addEventListener('touchstart',function(e){_lx=e.touches[0].clientX;_ly=e.touches[0].clientY},true);
-       _el.addEventListener('touchend',function(e){var c=e.changedTouches[0],dx=Math.abs(c.clientX-_lx),dy=Math.abs(c.clientY-_ly);if(dx>15||dy>15)return;var n=Date.now();if(n-_lt<400){_lt=0;toggleBal()}else _lt=n},true);
+       _el.addEventListener('touchend',function(e){var c=e.changedTouches[0],dx=Math.abs(c.clientX-_lx),dy=Math.abs(c.clientY-_ly);if(dx>15||dy>15)return;var n=Date.now();if(n-_lt<400){_lt=0;zcToggle(true)}else _lt=n},true);
+       document.addEventListener('mousedown',function(e){
+         if(!zcPanel.open)return;
+         if(bal.contains(e.target)||_el.contains(e.target))return;
+         var t=document.getElementById('clippyTrigger');if(t&&t.contains(e.target))return;
+         zcHide();
+       });
+       document.addEventListener('keydown',function(e){if(e.key==='Escape'&&zcPanel.open)zcHide()});
        // click on a message — copy it
        document.getElementById('zcMsgs').addEventListener('click',function(e){var d=e.target.closest('.zc-user,.zc-asst');if(d){navigator.clipboard.writeText(d.textContent);d.style.opacity='0.5';setTimeout(function(){d.style.opacity='1'},200)}});
       }
       // hide the old overlay
       var ov=document.getElementById('clippyOverlay');if(ov)ov.style.display='none';
-      // intercept speak — render into the chat instead of the balloon
-      agent.speak=function(t){if(t!=null&&document.getElementById('zcMsgs')){var m=document.getElementById('zcMsgs'),d=document.createElement('div');d.className='zc-asst';d.textContent=String(t);m.appendChild(d);m.scrollTop=m.scrollHeight}};
+      // intercept speak — render into the chat instead of the balloon.
+      // Панель при этом НЕ показываем: после загрузки она скрыта, пока её не
+      // вызовут двойным кликом. Приветствие просто ждёт внутри.
+      agent.speak=function(t){
+        if(t==null)return;
+        var m=document.getElementById('zcMsgs');if(!m)return;
+        var d=document.createElement('div');d.className='zc-asst';d.textContent=String(t);
+        m.appendChild(d);m.scrollTop=m.scrollHeight;
+      };
       if(typeof cb==='function')cb(agent);
     },
     failCb: (e) => {
-    	if(gen===_agentGen)window._agentReady=false; // разрешаем повторный запуск (кнопка 🤖)
+    	if(gen===_agentGen){
+    		window._agentReady=false; // разрешаем повторный запуск (кнопка 🤖)
+    		var t=document.getElementById('clippyTrigger');if(t)t.style.display='flex'; // спрайта нет — показать фолбек
+    	}
     	console.error(e)
     }
   })
+ }catch(e){
+  // clippy.load бросает синхронно на неизвестном имени персонажа — failCb
+  // в этом случае не вызывается, поэтому фолбек включаем здесь же.
+  if(gen===_agentGen){
+   window._agentReady=false;
+   var tf=document.getElementById('clippyTrigger');if(tf)tf.style.display='flex';
+  }
+  console.error('loadAgent:',e);
+ }
 }
 togglAgent=function(){
 	if(!window.agent)return;
