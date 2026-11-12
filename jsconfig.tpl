@@ -94,6 +94,24 @@
     "z2m_ip": "192.168.1.1",
     "z2m_port": "8090"
   },
+  "Cluster": {
+    "enable": "1",
+    "role": {
+      "val": "standalone",
+      "list": [
+        "standalone",
+        "hub",
+        "leaf"
+      ]
+    },
+    "name": "",
+    "priority": "100",
+    "port": "8182",
+    "peers": []
+  },
+  "BLE": {
+    "enable": "1"
+  },
   "Ya": {
     "ya_Enable": "0",
     "ac_id": "",

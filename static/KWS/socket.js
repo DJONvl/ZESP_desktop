@@ -302,6 +302,10 @@ function parseSocket(msg) {
 			new Toast({ title: 'success', text: z[1], theme: 'light', autohide: true, interval: 3500 });
 			eventE.emit('bindStatus', z[1]);
 		}
+		// Прогресс обновления нод кластера: clusterUpdate|<nodeID>|<text>
+		if (z[0] === "clusterUpdate") {
+			try { eventE.emit('clusterUpdate', { node: z[1] || '', msg: z.slice(2).join('|') }); } catch (e) {}
+		}
 		
 		if (z[0] === "notify") {
 			const notifyText = z[1] || '';

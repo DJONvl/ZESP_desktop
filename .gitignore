@@ -16,6 +16,13 @@ _devicesjs.txt
 
 # локальные данные и бэкапы (не в git)
 jsconfig.txt.bak*
+cluster_node.json
+cluster_node.json.broken-*
+cluster_files.json
+cluster_services.json
+cluster_services.json.broken-*
+cluster_services.local.json
+cluster_services.local.json.broken-*
 alice/
 _shortcuts_crop.png
 _trash_on_grass.png

@@ -32,6 +32,8 @@ body.light .dm-table .parent-row{background:#e4e9f2}
 .dm-table .col-name{min-width:120px}
 .dm-table .col-state{min-width:190px}
 .dm-table .col-location{min-width:110px;white-space:nowrap}
+.dm-table .col-owner{max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dm .owner-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;flex:0 0 auto}
 .dm-table .col-ieee{width:140px;white-space:nowrap;color:var(--faint);font-size:12px}
 .dm .expand-icon{display:inline-block;width:16px;cursor:pointer;font-size:12px;margin-right:4px;user-select:none;color:var(--accent)}
 .dm .editable-cell{cursor:pointer;position:relative}
@@ -699,6 +701,22 @@ body.light .dm-table .parent-row{background:#e4e9f2}
   function evm(id, val) { if (window.widgetEvnt) widgetEvnt(id, val); }
   window.evm = evm;
 
+  // ── owner (кластер) ──
+  // Своё устройство приходит без _ownerName; у чужих — имя хаба.
+  var LOCAL_OWNER_TEXT = 'ZESP хаб';
+  function ownerLabel(d) { return (d && d._ownerName) || LOCAL_OWNER_TEXT; }
+  function ownerHue(id) {
+    var s = String(id || 'local');
+    if (s === 'local') return 210;
+    var h = 0;
+    for (var i = 0; i < s.length; i++) h = (h * 33 + s.charCodeAt(i)) % 360;
+    return h;
+  }
+  function ownerCellHTML(d) {
+    var hue = ownerHue(d && d._owner);
+    return '<span class="owner-dot" style="background:hsl(' + hue + ',65%,55%)"></span>' + escapeHtml(ownerLabel(d));
+  }
+
   // ── table ──
   function genTable() {
     var html = '<table class="dm-table"><thead><tr>' +
@@ -706,6 +724,7 @@ body.light .dm-table .parent-row{background:#e4e9f2}
       thSort('col-name', 'Name', t('th.name', 'Name')) +
       '<th class="col-state">State</th>' +
       thSort('col-location', 'Location', t('th.location', 'Location')) +
+      thSort('col-owner', '_ownerName', t('th.owner', 'Хаб')) +
       thSort('col-ieee', 'IEEE', t('th.ieee', 'IEEE')) + '</tr></thead><tbody>';
     var f = st.filter.toLowerCase();
     var list = deviceList.slice();
@@ -713,8 +732,8 @@ body.light .dm-table .parent-row{background:#e4e9f2}
     if (st.sort && st.sort.key) {
       var k = st.sort.key, dir = st.sort.dir;
       list.sort(function (a, b) {
-        var va = (a[k] == null ? '' : a[k]).toString().toLowerCase();
-        var vb = (b[k] == null ? '' : b[k]).toString().toLowerCase();
+        var va = (k === '_ownerName' ? ownerLabel(a) : (a[k] == null ? '' : a[k])).toString().toLowerCase();
+        var vb = (k === '_ownerName' ? ownerLabel(b) : (b[k] == null ? '' : b[k])).toString().toLowerCase();
         return va < vb ? -dir : va > vb ? dir : 0;
       });
     }
@@ -722,7 +741,8 @@ body.light .dm-table .parent-row{background:#e4e9f2}
       var d = list[i];
       if (f) {
         if (!(d.Name || '').toLowerCase().includes(f) && !(d.Location || '').toLowerCase().includes(f) &&
-            !(d.IEEE || '').toLowerCase().includes(f) && !(d.DevType || '').toLowerCase().includes(f)) continue;
+            !(d.IEEE || '').toLowerCase().includes(f) && !(d.DevType || '').toLowerCase().includes(f) &&
+            !ownerLabel(d).toLowerCase().includes(f)) continue;
       }
       visible++;
       var ex = !!st.expanded[d.IEEE];
@@ -732,6 +752,7 @@ body.light .dm-table .parent-row{background:#e4e9f2}
         '<td class="col-state"><div class="dm-status">' + statusHtml(d) +
         '<div onclick="dm.cmMnu(this.id)" id="cm_' + escapeHtml(d.IEEE) + '" class="menu-dots" title="' + t('cm.hint', 'Меню устройства') + '">...</div></div></td>' +
         '<td class="col-location editable-cell" data-ieee="' + escapeHtml(d.IEEE) + '" data-key="~" data-field="location"><span class="cell-value">' + escapeHtml(d.Location || '—') + '</span></td>' +
+        '<td class="col-owner">' + ownerCellHTML(d) + '</td>' +
         '<td class="col-ieee">' + escapeHtml(d.IEEE) + '</td></tr>';
       if (d.Report && ex) {
         for (var key in d.Report) {
@@ -746,6 +767,7 @@ body.light .dm-table .parent-row{background:#e4e9f2}
             '<td class="col-name editable-cell" data-ieee="' + escapeHtml(d.IEEE) + '" data-key="' + escapeHtml(key) + '" data-field="name"><span class="cell-value">' + escapeHtml(v.label) + '</span></td>' +
             '<td class="col-state widget-cell">' + widgetHtml(d, key, v) + '</td>' +
             '<td class="col-location editable-cell" data-ieee="' + escapeHtml(d.IEEE) + '" data-key="' + escapeHtml(key) + '" data-field="location"><span class="cell-value" style="' + locStyle + '">' + escapeHtml(locDisp) + '</span></td>' +
+            '<td class="col-owner"></td>' +
             '<td class="col-ieee"></td></tr>';
         }
       }
