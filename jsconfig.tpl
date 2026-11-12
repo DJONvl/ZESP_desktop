@@ -96,6 +96,7 @@
   },
   "Cluster": {
     "enable": "1",
+    "secret": "123456",
     "role": {
       "val": "standalone",
       "list": [

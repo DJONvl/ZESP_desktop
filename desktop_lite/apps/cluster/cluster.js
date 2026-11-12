@@ -93,24 +93,9 @@
     '<div id="cl_svc" class="cl-list"></div></div>' +
     '</div>' +
     '<div id="cl_status" class="cl-status"></div>' +
-    '<div id="cl_add_modal" class="cl-modal hidden"><div class="cl-box">' +
-    '<h3>Добавить ноду</h3><div id="cl_add_sub" class="cl-hint"></div>' +
-    '<label for="cl_add_code">Код с ноды</label>' +
-    '<input id="cl_add_code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">' +
-    '<div class="cl-hint">Код виден на <code>/setup</code> этой ноды или в логе при старте.</div>' +
-    '<div id="cl_add_err" class="cl-err"></div>' +
-    '<div class="cl-box-actions"><button onclick="clCloseAdd()">Отмена</button>' +
-    '<button id="cl_add_ok" class="cl-primary" onclick="clAdd()">Добавить</button></div>' +
-    '</div></div>' +
-    '<div id="cl_code_modal" class="cl-modal hidden"><div class="cl-box">' +
-    '<h3>Код этой ноды</h3><div id="cl_code_sub" class="cl-hint"></div>' +
-    '<div id="cl_code_val" class="cl-bigcode">—</div>' +
-    '<div class="cl-hint" style="text-align:center">Введите его в окне «Кластер» на мастере.</div>' +
-    '<div class="cl-box-actions"><button class="cl-primary" onclick="clCloseCode()">Готово</button></div>' +
-    '</div></div>' +
     '</div>';
 
-  var cl_state = { data: null, services: null, timer: null, fast: 0, addPeer: null, flashTimer: 0, node: null, selected: {}, progress: {}, updateH: null };
+  var cl_state = { data: null, services: null, timer: null, flashTimer: 0, node: null, selected: {}, progress: {}, updateH: null };
 
   // ── утилиты ──────────────────────────────────────────────────────────────
   function clEsc(s) {
@@ -176,16 +161,6 @@
     }).catch(function () {});
   };
 
-  function clFastPoll() {
-    if (cl_state.fast) clearTimeout(cl_state.fast);
-    var n = 0;
-    (function tick() {
-      clRefresh();
-      n++;
-      if (n < 5) cl_state.fast = setTimeout(tick, 1000);
-    })();
-  }
-
   // ── рендер ───────────────────────────────────────────────────────────────
   function clRender() {
     var d = cl_state.data;
@@ -211,8 +186,6 @@
       '<div class="cl-idline">nodeID <code>' + clEsc(String(self.node || '').slice(0, 8)) + '…</code>' +
       '<button class="cl-mini" onclick="clCopyNode()" title="Копировать nodeID">⧉</button></div>' +
       '<div class="cl-actions">' +
-      '<button onclick="clShowCode()">Показать мой код</button>' +
-      '<a href="/setup" target="_blank" rel="noopener">Настройки</a>' +
       '<button onclick="clRefresh()">Обновить</button>' +
       '</div>';
     var selfEl = document.getElementById('cl_self');
@@ -241,7 +214,7 @@
             var canUpdate = updatable && p.node !== d.masterId && (p.ver || '') !== selfVer;
             return clCard(p, true, d.masterId, canUpdate, selfVer);
           }).join('')
-        : '<div class="cl-empty">Пока никого. Добавьте ноду из колонки «Найденные» по коду с неё.</div>';
+        : '<div class="cl-empty">Пока никого. Ноды с тем же паролем кластера подключаются автоматически.</div>';
     }
 
     var fEl = document.getElementById('cl_found');
@@ -587,7 +560,7 @@
       : '';
     var actions = paired
       ? '<button onclick="clOpenUi(\'' + clEsc(host) + '\',\'' + clEsc(httpPort) + '\')">Открыть интерфейс ↗</button>'
-      : '<button class="cl-primary" onclick="clOpenAdd(\'' + clEsc(p.node) + '\')">Добавить</button>';
+      : '';
     var prog = cl_state.progress[p.node] || '';
     return '' +
       '<div class="cl-card">' +
@@ -656,98 +629,6 @@
     window.open('http://' + host + ':' + (port || '8081'), '_blank', 'noopener');
   };
 
-  window.clShowCode = function () {
-    clFetchJSON('/api/cluster/code').then(function (d) {
-      if (d.paired) {
-        clFlash('Эта нода уже в кластере. Выйти можно на странице /setup.');
-        return;
-      }
-      var v = document.getElementById('cl_code_val');
-      var s = document.getElementById('cl_code_sub');
-      if (v) v.textContent = d.code || '—';
-      if (s) s.textContent = 'Действует ещё ~' + (d.left || 0) + ' мин. Код одноразовый.';
-      var m = document.getElementById('cl_code_modal');
-      if (m) m.classList.remove('hidden');
-    }).catch(function (e) {
-      if (e.status === 403) clFlash('Код виден только при открытии окна с самой ноды. Удалённо: /setup?token=… (токен в логе).', false);
-      else clFlash(e.message, false);
-    });
-  };
-
-  window.clCloseCode = function () {
-    var m = document.getElementById('cl_code_modal');
-    if (m) m.classList.add('hidden');
-  };
-
-  window.clOpenAdd = function (nodeId) {
-    var d = cl_state.data;
-    var peer = null;
-    if (d) {
-      for (var i = 0; i < d.peers.length; i++) {
-        if (d.peers[i].node === nodeId) { peer = d.peers[i]; break; }
-      }
-    }
-    if (!peer) { clFlash('Нода пропала из сети', false); return; }
-    cl_state.addPeer = peer;
-    var sub = document.getElementById('cl_add_sub');
-    if (sub) sub.innerHTML = '<b>' + clEsc(peer.name) + '</b> · ' + clEsc(clHost(peer.addr)) + ':' + clEsc(peer.http || '8081') + ' · ' + clEsc(peer.ver || '');
-    var err = document.getElementById('cl_add_err');
-    if (err) err.textContent = '';
-    var inp = document.getElementById('cl_add_code');
-    if (inp) inp.value = '';
-    var m = document.getElementById('cl_add_modal');
-    if (m) m.classList.remove('hidden');
-    if (inp) setTimeout(function () { inp.focus(); }, 50);
-  };
-
-  window.clCloseAdd = function () {
-    var m = document.getElementById('cl_add_modal');
-    if (m) m.classList.add('hidden');
-    cl_state.addPeer = null;
-  };
-
-  window.clAdd = function () {
-    var peer = cl_state.addPeer;
-    var inp = document.getElementById('cl_add_code');
-    var err = document.getElementById('cl_add_err');
-    var ok = document.getElementById('cl_add_ok');
-    if (!peer || !inp) return;
-    var code = String(inp.value || '').replace(/\D/g, '');
-    if (code.length !== 6) {
-      if (err) err.textContent = 'Код — 6 цифр';
-      return;
-    }
-    if (err) err.textContent = '';
-    if (ok) { ok.disabled = true; ok.textContent = 'Соединяюсь…'; }
-    clFetchJSON('/api/cluster/invite', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ peer: peer.node, code: code })
-    }).then(function () {
-      if (ok) { ok.disabled = false; ok.textContent = 'Добавить'; }
-      clCloseAdd();
-      clFlash('Нода «' + (peer.name || peer.node) + '» добавлена. Ждём подтверждения…');
-      clFastPoll();
-    }).catch(function (e) {
-      if (ok) { ok.disabled = false; ok.textContent = 'Добавить'; }
-      var msg = e.message || 'Ошибка';
-      if (e.status === 403) msg = 'Неверный или просроченный код';
-      else if (e.status === 429) msg = 'Слишком много попыток, подождите 5 минут';
-      else if (e.status === 409) msg = 'Нода уже в другом кластере — сначала выйдите из него на самой ноде';
-      else if (e.status === 404) msg = 'Нода пропала из сети';
-      if (err) err.textContent = msg;
-    });
-  };
-
-  // Enter в поле кода отправляет форму.
-  document.addEventListener('keydown', function (e) {
-    if (e.key !== 'Enter') return;
-    var m = document.getElementById('cl_add_modal');
-    if (!m || m.classList.contains('hidden')) return;
-    var inp = document.getElementById('cl_add_code');
-    if (inp && document.activeElement === inp) { e.preventDefault(); clAdd(); }
-  });
-
   // ── регистрация окна ─────────────────────────────────────────────────────
   window.WinEngine && window.WinEngine.register({
     id: 'cluster',
@@ -781,10 +662,9 @@
     },
     destroy: function () {
       if (cl_state.timer) clearInterval(cl_state.timer);
-      if (cl_state.fast) clearTimeout(cl_state.fast);
       if (cl_state.flashTimer) clearTimeout(cl_state.flashTimer);
       if (window.eventE && cl_state.updateH) eventE.off('clusterUpdate', cl_state.updateH);
-      cl_state = { data: null, services: null, timer: null, fast: 0, addPeer: null, flashTimer: 0, node: null, selected: {}, progress: {}, updateH: null };
+      cl_state = { data: null, services: null, timer: null, flashTimer: 0, node: null, selected: {}, progress: {}, updateH: null };
     }
   });
 })();
