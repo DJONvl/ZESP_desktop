@@ -49,7 +49,9 @@
   // цвет кружка раздела: тот же оттенок, что у приложения на рабочем столе
   var TAB_COLORS = {
     APP:           ['#5b9cff', '#2f74ee', '#1b51c7'],
+    BLE:           ['#5b9cff', '#2f74ee', '#1b51c7'],
     Brain:         ['#a78bfa', '#7c4dd6', '#52309a'],
+    Cluster:       ['#4fc98c', '#12945c', '#0a6b42'],
     HomeAssistant: ['#3ec6d8', '#0891b2', '#066b83'],
     MQTT:          ['#e05aa6', '#c0267a', '#8a1a55'],
     Telegram_Bot:  ['#5fc3ea', '#2a9fd6', '#1a7099'],
@@ -58,6 +60,12 @@
     ZIGBEE:        ['#4fc98c', '#12945c', '#0a6b42'],
     ZIGBEE2MQTT:   ['#8b96a4', '#5b6675', '#39424d']
   };
+  // Имя секции конфига не всегда совпадает с именем файла иконки: Cluster → cluster.svg.
+  // На Linux регистр важен (Windows прощает), поэтому соответствие задаём явно.
+  var SECTION_ICONS = { Cluster: 'cluster' };
+  function sectionIcon(name) {
+    return '/static/icons/' + (SECTION_ICONS[name] || name) + '.svg';
+  }
   function tabColors(name) {
     var c = TAB_COLORS[name];
     if (!c) return '';
@@ -123,10 +131,19 @@
 
     var sections = Object.keys(st.cfg);
     menu.innerHTML = sections.map(function (s) {
-      return '<div class="s-tab" data-tab="' + s + '"' + tabColors(s) + '><img src="/static/icons/' + s + '.svg"><span>' + s + '</span></div>';
+      return '<div class="s-tab" data-tab="' + s + '"' + tabColors(s) + '><img src="' + sectionIcon(s) + '" alt=""><span>' + s + '</span></div>';
     }).join('');
     menu.querySelectorAll('img').forEach(function (img) {
-      img.addEventListener('error', function () { img.remove(); });
+      // Нет своей иконки — общий значок приложения; совсем без картинки вкладка выглядит сломанной.
+      img.addEventListener('error', function onIconError() {
+        img.removeEventListener('error', onIconError);
+        if (!img.dataset.fallback) {
+          img.dataset.fallback = '1';
+          img.src = '/static/icons/APP.svg';
+        } else {
+          img.remove();
+        }
+      });
     });
 
     content.innerHTML = sections.map(function (s) {

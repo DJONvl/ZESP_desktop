@@ -1,0 +1,21 @@
+{
+  "id": "gigaam",
+  "title": "GigaAM v3 (RU, ONNX)",
+  "kind": "asr",
+  "port": 5015,
+  "publicPort": 6015,
+  "server": "gigaam_server.py",
+  "platforms": ["windows", "linux"],
+  "note": "модель скачается при первом запуске",
+  "install": {
+    "pip": ["onnx-asr[cpu,hub]", "onnxruntime", "numpy", "aiohttp", "soundfile", "soxr", "av"]
+  },
+  "env": {
+    "ASR_MODEL": "gigaam-v3-e2e-rnnt",
+    "ASR_MODEL_VARIANT": "e2e-rnnt",
+    "ASR_DEVICE": "cpu",
+    "ASR_QUANT": "auto",
+    "PORT": "5015"
+  },
+  "preprocess": { "normalize": true, "targetDbfs": -20, "maxGainDb": 20 }
+}

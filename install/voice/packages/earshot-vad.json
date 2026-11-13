@@ -1,0 +1,23 @@
+{
+  "id": "earshot-vad",
+  "title": "Earshot VAD (быстрый, для тестов)",
+  "kind": "vad",
+  "port": 18094,
+  "publicPort": 18194,
+  "server": "earshot_vad_server.py",
+  "platforms": ["windows", "linux"],
+  "note": "без модели, ~95 КБ",
+  "install": {
+    "pip": ["earshot", "numpy", "av"]
+  },
+  "env": {
+    "VAD_PORT": "18094",
+    "VAD_AGC": "1",
+    "VAD_MAX_GAIN": "300",
+    "VAD_AGC_DECAY": "0.999",
+    "VAD_GAIN": "1",
+    "VAD_THRESH": "0.5",
+    "VAD_SILENCE": "0.8",
+    "VAD_NOSPEECH": "4.0"
+  }
+}

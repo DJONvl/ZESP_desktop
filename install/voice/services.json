@@ -1,0 +1,65 @@
+{
+  "advertiseHost": "",
+  "identity": {
+    "id": "pc-master",
+    "name": "Мастер-ПК"
+  },
+  "manifest": {
+    "host": "0.0.0.0",
+    "port": 8099,
+    "path": "/manifest.json"
+  },
+  "mdns": {
+    "enabled": true,
+    "serviceType": "_zesp-svc._tcp.local."
+  },
+  "services": [
+    {
+      "id": "silero",
+      "kind": "tts",
+      "adapter": "openai",
+      "healthUrl": "http://127.0.0.1:5016/health",
+      "target": "127.0.0.1:5016",
+      "listen": { "host": "0.0.0.0", "port": 6016 },
+      "path": "/v1/audio/speech",
+      "priority": 10,
+      "httpMode": "tts",
+      "sampleRate": 24000,
+      "voiceModes": ["preset"],
+      "formats": ["pcm_f32le", "wav"],
+      "langs": ["ru"],
+      "voiceLabels": {
+        "aidar": { "label": "Айдар", "gender": "m", "lang": "ru" },
+        "baya": { "label": "Бая", "gender": "f", "lang": "ru" },
+        "kseniya": { "label": "Ксения", "gender": "f", "lang": "ru" },
+        "eugene": { "label": "Юджин", "gender": "m", "lang": "ru" },
+        "xenia": { "label": "Ксения", "gender": "f", "lang": "ru" }
+      }
+    },
+    {
+      "id": "gigaam",
+      "kind": "asr",
+      "adapter": "openai",
+      "healthUrl": "http://127.0.0.1:5015/health",
+      "target": "127.0.0.1:5015",
+      "listen": { "host": "0.0.0.0", "port": 6015 },
+      "path": "/v1/audio/transcriptions",
+      "priority": 10,
+      "httpMode": "asr",
+      "langs": ["ru"],
+      "modelLabel": "GigaAM v3",
+      "streaming": false
+    },
+    {
+      "id": "silero-vad",
+      "kind": "vad",
+      "adapter": "tcp",
+      "healthMode": "tcp",
+      "healthUrl": "tcp:127.0.0.1:18091",
+      "target": "127.0.0.1:18091",
+      "listen": { "host": "0.0.0.0", "port": 18191 },
+      "priority": 10,
+      "streaming": true
+    }
+  ]
+}

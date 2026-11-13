@@ -1,0 +1,45 @@
+{
+  "id": "tone",
+  "title": "T-one (RU, телефония, KenLM)",
+  "kind": "asr",
+  "port": 5022,
+  "publicPort": 6022,
+  "server": "tone_server.py",
+  "platforms": ["windows", "linux"],
+  "note": "Python 3.11 + модель 5,1 ГБ",
+  "install": {
+    "python": "3.11",
+    "venv": "venv311",
+    "pip": ["kenlm", "onnxruntime", "huggingface_hub", "numpy", "aiohttp", "soundfile", "soxr", "av", "pygtrie", "opuslib"],
+    "pipNoDeps": ["pyctcdecode"],
+    "download": [
+      {
+        "url": "https://github.com/voicekit-team/T-one/archive/refs/heads/main.zip",
+        "file": "T-one.zip",
+        "dir": "engines",
+        "unzipDir": "engines",
+        "env": "TONE_DIR",
+        "envValue": "engines/T-one-main"
+      },
+      {
+        "url": "https://huggingface.co/t-tech/T-one/resolve/main/model.onnx",
+        "file": "model.onnx",
+        "dir": "models/t-one"
+      },
+      {
+        "url": "https://huggingface.co/t-tech/T-one/resolve/main/kenlm.bin",
+        "file": "kenlm.bin",
+        "dir": "models/t-one"
+      }
+    ]
+  },
+  "env": {
+    "TONE_MODEL": "t-one",
+    "TONE_DEVICE": "cpu",
+    "TONE_DECODER": "beam",
+    "TONE_LOCAL_DIR": "models/t-one",
+    "TONE_GAIN": "2.5",
+    "PORT": "5022"
+  },
+  "preprocess": { "normalize": true, "targetDbfs": -20, "maxGainDb": 20 }
+}

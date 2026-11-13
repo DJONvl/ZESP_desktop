@@ -1,0 +1,36 @@
+{
+  "id": "vosk",
+  "title": "Vosk (RU, CPU, лёгкий)",
+  "kind": "asr",
+  "port": 5018,
+  "publicPort": 6018,
+  "server": "vosk_server.py",
+  "platforms": ["windows", "linux"],
+  "note": "модель 87 МБ",
+  "install": {
+    "pip": ["vosk", "opuslib", "numpy", "aiohttp", "soundfile", "soxr", "av"],
+    "download": [
+      {
+        "url": "https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip",
+        "file": "vosk-model-small-ru-0.22.zip",
+        "unzipDir": "models",
+        "env": "VOSK_MODEL_DIR",
+        "envValue": "models/vosk-model-small-ru-0.22"
+      }
+    ]
+  },
+  "env": {
+    "VOSK_MODEL": "vosk-model-small-ru-0.22",
+    "PORT": "5018"
+  },
+  "optional": {
+    "fullModel": {
+      "url": "https://alphacephei.com/vosk/models/vosk-model-ru-0.42.zip",
+      "file": "vosk-model-ru-0.42.zip",
+      "unzipDir": "models",
+      "env": "VOSK_MODEL_DIR",
+      "envValue": "models/vosk-model-ru-0.42"
+    }
+  },
+  "preprocess": { "normalize": true, "targetDbfs": -20, "maxGainDb": 20 }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "silero",
+  "title": "Silero TTS v5 (RU)",
+  "kind": "tts",
+  "port": 5016,
+  "publicPort": 6016,
+  "server": "silero_server.py",
+  "platforms": ["windows", "linux"],
+  "note": "модель ~145 МБ",
+  "install": {
+    "pip": ["torch", "scipy", "numpy", "aiohttp", "soundfile", "soxr"],
+    "download": [
+      {
+        "url": "https://models.silero.ai/models/tts/ru/v5_ru.pt",
+        "file": "v5_ru.pt",
+        "dir": "models",
+        "env": "SILERO_MODEL_PATH",
+        "envValue": "models/v5_ru.pt"
+      }
+    ]
+  },
+  "env": {
+    "SILERO_MODEL": "silero-v5-ru",
+    "SILERO_RATE": "24000",
+    "SILERO_DEVICE": "cpu",
+    "PORT": "5016"
+  }
+}

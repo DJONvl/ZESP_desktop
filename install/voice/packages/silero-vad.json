@@ -1,0 +1,30 @@
+{
+  "id": "silero-vad",
+  "title": "Silero VAD (конец фразы)",
+  "kind": "vad",
+  "port": 18093,
+  "publicPort": 18193,
+  "server": "vad_server.py",
+  "platforms": ["windows", "linux"],
+  "note": "модель ~2 МБ",
+  "install": {
+    "pip": ["sherpa-onnx", "numpy", "av"],
+    "download": [
+      {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+        "file": "silero_vad.onnx",
+        "dir": "models",
+        "env": "VAD_MODEL",
+        "envValue": "models/silero_vad.onnx"
+      }
+    ]
+  },
+  "env": {
+    "VAD_PORT": "18093",
+    "VAD_GAIN": "8",
+    "VAD_THRESH": "0.5",
+    "VAD_SILENCE": "0.8",
+    "VAD_NOSPEECH": "4.0",
+    "VAD_SKIP": "0.7"
+  }
+}
