@@ -45,11 +45,13 @@
     '.cl-node-meta{color:var(--faint);font-size:11px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
     '.cl-node-caps{color:var(--muted);font-size:11px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
     '.cl-node-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}' +
-    '.cl-chklbl{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);cursor:pointer;user-select:none}' +
-    '.cl-chk{width:13px;height:13px;accent-color:var(--accent);cursor:pointer}' +
-    '.cl-prog{color:var(--accent);font-size:11px;margin-top:4px}' +
-    '.cl-selbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 12px;border-top:1px solid var(--border);background:var(--bg3);flex-wrap:wrap;font-size:12px;color:var(--muted);flex-shrink:0}' +
-    '.cl-selbar b{color:var(--text)}' +
+    '.cl-prog{margin-top:6px;max-width:240px}' +
+    '.cl-bar{height:4px;border-radius:2px;background:var(--bg3);overflow:hidden}' +
+    '.cl-bar-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .25s}' +
+    '.cl-bar.done .cl-bar-fill{background:var(--green)}' +
+    '.cl-bar.bad .cl-bar-fill{background:var(--red)}' +
+    '.cl-bar.indet .cl-bar-fill{width:35%!important;animation:clIndet 1.2s ease-in-out infinite}' +
+    '@keyframes clIndet{0%{margin-left:-35%}100%{margin-left:100%}}' +
     '.cl-empty{color:var(--faint);font-size:12px;line-height:1.5;padding:6px 0}' +
     '.cl-empty code{color:var(--muted);background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:0 4px}' +
     '.cl-live-grid{display:flex;flex-direction:column}' +
@@ -88,7 +90,6 @@
     '<button id="cl_tab_found" class="cl-tab" onclick="clSetTab(\'found\')">Найденные <span id="cl_n_found" class="cl-count">0</span></button>' +
     '</div>' +
     '<div id="cl_nodes" class="cl-list"></div>' +
-    '<div id="cl_selbar" class="cl-selbar" style="display:none"></div>' +
     '</div>' +
     '<div class="cl-panel">' +
     '<div class="cl-phead"><span>Сервисы</span>' +
@@ -104,8 +105,8 @@
 
   var cl_state = {
     data: null, services: null, timer: null, flashTimer: 0, node: null,
-    selected: {}, progress: {}, updateH: null, tab: 'paired', ro: null,
-    openLive: null, outsideH: null
+    progress: {}, updateH: null, tab: 'paired', ro: null,
+    openLive: null, outsideH: null, latest: '', latestAt: 0
   };
 
   // ── утилиты ──────────────────────────────────────────────────────────────
@@ -163,6 +164,56 @@
     return bits.join(' · ');
   }
 
+  function clProgInfo(msg) {
+    if (!msg) return null;
+    msg = String(msg);
+    if (msg.indexOf('restart|') === 0) return { pct: null, text: msg.slice(8) || 'перезапуск…' };
+    var m = /updateProgress\|downPercent\|(\d+)/.exec(msg);
+    if (m) return { pct: parseInt(m[1], 10), text: 'обновление ' + m[1] + '%' };
+    if (/updateProgress\|downStart/.test(msg)) return { pct: null, text: 'загрузка обновления…' };
+    if (/updateProgress\|downComplete/.test(msg)) return { pct: 100, text: 'загрузка завершена' };
+    if (/updateProgress\|checksumOk/.test(msg)) return { pct: 100, text: 'контрольная сумма верна' };
+    if (/updateProgress\|step\|install/.test(msg)) return { pct: 100, text: 'установка' };
+    if (/updateProgress\|step\|restartNeeded/.test(msg)) return { pct: 100, text: 'нужен перезапуск' };
+    if (/updateProgress\|step\|replaceDone/.test(msg)) return { pct: 100, text: 'файл заменён, нужен перезапуск' };
+    if (/^готово/.test(msg)) return { pct: 100, text: 'готово', done: true };
+    if (/^ошибка/i.test(msg)) return { pct: 100, text: msg, bad: true };
+    if (/Checking for updates/.test(msg)) return { pct: null, text: 'проверка обновлений…' };
+    if (/Local version is up-to-date/.test(msg)) return { pct: 100, text: 'уже обновлено', done: true };
+    if (/Current version/.test(msg)) return { pct: null, text: 'есть новая версия' };
+    return { pct: null, text: msg };
+  }
+
+  function clProgBusy(msg) {
+    if (!msg) return false;
+    msg = String(msg);
+    if (msg.indexOf('restart|') === 0) return true;
+    if (/downStart|downPercent|Checking for updates|step\|install/.test(msg)) return true;
+    return false;
+  }
+
+  function clProgBar(msg) {
+    var p = clProgInfo(msg);
+    if (!p) return '';
+    var cls = 'cl-bar' + (p.done ? ' done' : p.bad ? ' bad' : p.pct == null ? ' indet' : '');
+    var w = p.pct == null ? 35 : Math.max(2, Math.min(100, p.pct));
+    return '<div class="cl-prog" title="' + clEsc(p.text) + '"><div class="' + cls + '">' +
+      '<div class="cl-bar-fill" style="width:' + w + '%"></div></div></div>';
+  }
+
+  function clSetNodeProgress(node, msg) {
+    var row = null;
+    try { row = document.querySelector('.cl-node[data-node="' + node + '"]'); } catch (e) {}
+    if (!row) return;
+    var old = row.querySelector('.cl-prog');
+    var html = clProgBar(msg);
+    if (old) {
+      if (html) old.outerHTML = html; else old.parentNode.removeChild(old);
+    } else if (html) {
+      row.insertAdjacentHTML('beforeend', html);
+    }
+  }
+
   function clCapsTitle(caps) {
     if (!caps) return '';
     var bits = [];
@@ -214,7 +265,21 @@
       cl_state.services = d;
       clRenderServices(false);
     }).catch(function () {});
+    clRefreshLatest(false);
   };
+
+  // Тег последнего релиза GitHub: нужен для кнопок «Обновить». Кэш на клиенте
+  // 5 минут, на сервере — 10 (окно опрашивает info каждые 5 с).
+  function clRefreshLatest(force) {
+    if (!force && cl_state.latestAt && Date.now() - cl_state.latestAt < 5 * 60 * 1000) return;
+    clFetchJSON('/api/cluster/update/check').then(function (d) {
+      cl_state.latest = (d && d.tag) ? String(d.tag) : '';
+      cl_state.latestAt = Date.now();
+      if (cl_state.data) clRenderNodes(cl_state.data);
+    }).catch(function () {
+      cl_state.latestAt = Date.now();
+    });
+  }
 
   // ── эта нода и ноды ──────────────────────────────────────────────────────
   function clRender() {
@@ -273,10 +338,19 @@
     var tabs = document.getElementById('cl_tabs');
     if (tabs) tabs.style.display = found.length ? 'flex' : 'none';
 
-    // Выбор не должен переживать исчезнувшую ноду.
-    var sel = {};
-    peers.forEach(function (p) { if (cl_state.selected[p.node]) sel[p.node] = true; });
-    cl_state.selected = sel;
+    // Успешно обновившаяся нода пришла с версией latest — прогресс больше не нужен.
+    Object.keys(cl_state.progress).forEach(function (nodeID) {
+      for (var i = 0; i < peers.length; i++) {
+        if (peers[i].node !== nodeID) continue;
+        var doneVersion = cl_state.latest && peers[i].ver === cl_state.latest;
+        var restarted = String(cl_state.progress[nodeID] || '').indexOf('restart|') === 0 &&
+          peers[i].uptime > 0 && peers[i].uptime < 120;
+        if (doneVersion || restarted) {
+          delete cl_state.progress[nodeID];
+          return;
+        }
+      }
+    });
 
     var tab = cl_state.tab === 'found' ? 'found' : 'paired';
     var tabPaired = document.getElementById('cl_tab_paired');
@@ -294,30 +368,19 @@
           : 'Пока только эта нода.') + '</div>';
     }
 
-    var bar = document.getElementById('cl_selbar');
-    if (bar) {
-      var nsel = Object.keys(cl_state.selected).length;
-      if (nsel) {
-        bar.style.display = 'flex';
-        bar.innerHTML = '<span>Выбрано: <b>' + nsel + '</b></span>' +
-          '<span class="cl-row">' +
-          '<button class="cl-btn sm primary" onclick="clUpdateSelected()">Обновить до ' + clEsc(d.self.ver || '') + '</button>' +
-          '<button class="cl-btn sm" onclick="clClearSelected()">Снять</button></span>';
-      } else {
-        bar.style.display = 'none';
-        bar.innerHTML = '';
-      }
-    }
   }
 
   function clNodeCard(p, d, paired) {
     var host = clHost(p.addr);
     var port = p.http || '8081';
     var isMaster = !!(d.masterId && d.masterId === p.node);
-    var selfVer = d.self.ver || '';
-    var updatable = selfVer !== '' && selfVer.indexOf('dev') !== 0 &&
-      p.node !== d.masterId && (p.ver || '') !== selfVer;
-    var canUpdate = paired && updatable;
+    var selfIsMaster = !!(d.masterId && d.self && d.masterId === d.self.node);
+    var latest = cl_state.latest || '';
+    var progMsg = cl_state.progress[p.node] || '';
+    var busy = clProgBusy(progMsg);
+    var canUpdate = paired && selfIsMaster && latest !== '' && p.node !== d.masterId &&
+      (p.ver || '') !== latest && !busy;
+    var canRestart = paired && selfIsMaster && p.node !== d.masterId && !busy;
     var badge = isMaster ? '<span class="cl-badge master">Мастер</span>' : '';
     var meta = [clRoleLabel(p.role), p.ver || '—', host + ':' + port, clAgo(p.lastSeen)].join(' · ');
     var tip = [clRoleTitle(p.role)];
@@ -328,16 +391,18 @@
 
     var actions = '';
     if (canUpdate) {
-      actions += '<label class="cl-chklbl" title="Нода отстаёт: ' + clEsc(p.ver || '') + ' → ' + clEsc(selfVer) + '">' +
-        '<input type="checkbox" class="cl-chk"' + (cl_state.selected[p.node] ? ' checked' : '') +
-        ' onchange="clToggle(\'' + clEsc(p.node) + '\',this.checked)"> обновить</label>';
+      actions += '<button class="cl-btn sm" title="Обновить до ' + clEsc(latest) + '" ' +
+        'onclick="clUpdateNode(\'' + clEsc(p.node) + '\')">Обновить</button>';
+    }
+    if (canRestart) {
+      actions += '<button class="cl-btn sm" title="Перезапустить ноду" ' +
+        'onclick="clRestartNode(\'' + clEsc(p.node) + '\')">Рестарт</button>';
     }
     actions += '<button class="cl-btn sm" title="Открыть веб-интерфейс" onclick="clOpenUi(\'' +
       clEsc(host) + '\',\'' + clEsc(port) + '\')">Открыть ↗</button>';
 
-    var prog = cl_state.progress[p.node] || '';
     return '' +
-      '<div class="cl-node">' +
+      '<div class="cl-node" data-node="' + clEsc(p.node) + '">' +
       '<div class="cl-node-head">' +
       '<span class="cl-dot ' + (paired ? 'ok' : 'warn') + '"></span>' +
       '<span class="cl-node-name" title="' + clEsc(p.name || '') + '">' + clEsc(p.name || '—') + '</span>' +
@@ -345,7 +410,7 @@
       '<span class="cl-node-actions">' + actions + '</span></div>' +
       '<div class="cl-node-meta" title="' + clEsc(tip.filter(Boolean).join(' · ')) + '">' + clEsc(meta) + '</div>' +
       (capsText ? '<div class="cl-node-caps" title="' + clEsc(capsTitle) + '">' + clEsc(capsText) + '</div>' : '') +
-      (prog ? '<div class="cl-prog">' + clEsc(prog) + '</div>' : '') +
+      clProgBar(progMsg) +
       '</div>';
   }
 
@@ -354,37 +419,56 @@
     if (cl_state.data) clRenderNodes(cl_state.data);
   };
 
-  window.clToggle = function (nodeId, on) {
-    if (on) {
-      cl_state.selected[nodeId] = true;
-    } else {
-      delete cl_state.selected[nodeId];
-    }
+  window.clUpdateNode = function (node) {
+    if (!node) return;
+    cl_state.progress[node] = 'updateProgress|downStart';
     if (cl_state.data) clRenderNodes(cl_state.data);
-  };
-
-  window.clClearSelected = function () {
-    cl_state.selected = {};
-    if (cl_state.data) clRenderNodes(cl_state.data);
-  };
-
-  window.clUpdateSelected = function () {
-    var nodes = Object.keys(cl_state.selected);
-    if (!nodes.length) {
-      clFlash('Отметьте ноды для обновления', false);
-      return;
-    }
-    cl_state.progress = {};
     clFetchJSON('/api/cluster/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nodes: nodes })
+      body: JSON.stringify({ nodes: [node] })
     }).then(function (d) {
-      clFlash('Обновление отправлено: ' + (d.sent || 0) + ' нод, версия ' + (d.tag || ''));
-      cl_state.selected = {};
+      if (!d.sent) {
+        delete cl_state.progress[node];
+        clFlash('Нода недоступна по каналу /peer — команда не ушла', false);
+      } else {
+        cl_state.progress[node] = 'updateProgress|downStart';
+        clFlash('Обновление отправлено: ' + (d.tag || cl_state.latest));
+      }
       if (cl_state.data) clRenderNodes(cl_state.data);
     }).catch(function (e) {
+      delete cl_state.progress[node];
       clFlash('Ошибка обновления: ' + e.message, false);
+      if (cl_state.data) clRenderNodes(cl_state.data);
+    });
+  };
+
+  window.clRestartNode = function (node) {
+    if (!node) return;
+    cl_state.progress[node] = 'restart|перезапуск…';
+    if (cl_state.data) clRenderNodes(cl_state.data);
+    clFetchJSON('/api/cluster/restart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nodes: [node] })
+    }).then(function (d) {
+      if (!d.sent) {
+        delete cl_state.progress[node];
+        clFlash('Нода недоступна по каналу /peer — команда не ушла', false);
+      } else {
+        clFlash('Команда перезапуска отправлена');
+      }
+      if (cl_state.data) clRenderNodes(cl_state.data);
+      setTimeout(function () {
+        if (String(cl_state.progress[node] || '').indexOf('restart|') === 0) {
+          delete cl_state.progress[node];
+          if (cl_state.data) clRenderNodes(cl_state.data);
+        }
+      }, 30000);
+    }).catch(function (e) {
+      delete cl_state.progress[node];
+      clFlash('Ошибка перезапуска: ' + e.message, false);
+      if (cl_state.data) clRenderNodes(cl_state.data);
     });
   };
 
@@ -790,10 +874,11 @@
       cl_state.node = node;
       cl_state.data = null;
       cl_state.services = null;
-      cl_state.selected = {};
       cl_state.progress = {};
       cl_state.tab = 'paired';
       cl_state.openLive = null;
+      cl_state.latest = '';
+      cl_state.latestAt = 0;
       clWatchWidth(node);
 
       cl_state.outsideH = function (ev) {
@@ -808,8 +893,13 @@
       // Прогресс обновления нод приходит из wsSend мастера.
       cl_state.updateH = function (ev) {
         if (!ev || !ev.node) return;
+        var had = !!cl_state.progress[ev.node];
         cl_state.progress[ev.node] = ev.msg;
-        if (cl_state.data) clRenderNodes(cl_state.data);
+        if (cl_state.data && (!had || /restartNeeded|replaceDone|^готово|^ошибка/.test(ev.msg))) {
+          clRenderNodes(cl_state.data);
+        } else {
+          clSetNodeProgress(ev.node, ev.msg);
+        }
       };
       if (window.eventE) eventE.on('clusterUpdate', cl_state.updateH);
       clRefresh();
@@ -824,8 +914,8 @@
       clUnwatchWidth();
       cl_state = {
         data: null, services: null, timer: null, flashTimer: 0, node: null,
-        selected: {}, progress: {}, updateH: null, tab: 'paired', ro: null,
-        openLive: null, outsideH: null
+        progress: {}, updateH: null, tab: 'paired', ro: null,
+        openLive: null, outsideH: null, latest: '', latestAt: 0
       };
     }
   });

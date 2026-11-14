@@ -6,6 +6,7 @@
   "tb.bind": "🔗 Bind",
   "tb.init": "♻️ Инит",
   "tb.search": "Поиск...",
+  "tb.local": "Только свои",
   "tb.expand": "⤢ Все",
   "th.dt": "DT",
   "th.name": "Name",

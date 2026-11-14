@@ -15,6 +15,8 @@
 .dm-search{flex:1;min-width:0;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:6px 26px 6px 10px;font-size:13px;outline:none}
 .dm-search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--faint);font-size:14px;line-height:1;display:none;user-select:none}
 .dm-search-clear:hover{color:var(--red)}
+.dm-local{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none;white-space:nowrap;flex-shrink:0}
+.dm-local input{accent-color:var(--accent);cursor:pointer}
 .dm-btn{background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:6px;padding:5px 9px;font-size:12px;cursor:pointer}
 .dm-btn:hover{border-color:var(--accent);background:var(--hover)}
 .dm-table-wrap{flex:1;min-height:0;overflow:auto;position:relative}
@@ -691,7 +693,7 @@ body.light .dm-table .parent-row{background:#e4e9f2}
   }
 
   // ── state ──
-  var st = { filter: '', expanded: {}, editing: null, secTimer: null, scanSec: 0, sort: null };
+  var st = { filter: '', localOnly: false, expanded: {}, editing: null, secTimer: null, scanSec: 0, sort: null };
 
   function thSort(cls, key, label) {
     var arr = (st.sort && st.sort.key === key) ? (st.sort.dir === 1 ? ' ▲' : ' ▼') : '';
@@ -739,6 +741,9 @@ body.light .dm-table .parent-row{background:#e4e9f2}
     }
     for (var i = 0; i < list.length; i++) {
       var d = list[i];
+      // Чужие устройства приходят из кластера с _owner (nodeID владельца).
+      // «Только свои» прячет их, оставляя только локальную Zigbee-сеть.
+      if (st.localOnly && d._owner) continue;
       if (f) {
         if (!(d.Name || '').toLowerCase().includes(f) && !(d.Location || '').toLowerCase().includes(f) &&
             !(d.IEEE || '').toLowerCase().includes(f) && !(d.DevType || '').toLowerCase().includes(f) &&
@@ -1450,6 +1455,10 @@ dm.setBleTpl = function (dev, adr, name) {
     st.searchTimer = setTimeout(function () { st.searchTimer = null; renderTable(); }, 180);
   };
   dm.clearSearch = function () { var i = document.getElementById('dm_search'); if (i) i.value = ''; dm.search(''); };
+  dm.localOnly = function (on) {
+    st.localOnly = !!on;
+    renderTable();
+  };
 
   // ── sorting ──
   dm.sortBy = function (key) {
@@ -1493,6 +1502,7 @@ dm.setBleTpl = function (dev, adr, name) {
         '<div class="dm-toolbar">' +
           '<span class="dm-search-wrap"><input class="dm-search" id="dm_search" placeholder="Поиск..." data-i18n-ph="tb.search" oninput="dm.search(this.value)">' +
           '<span class="dm-search-clear" id="dm_search_clear" title="Очистить" onclick="dm.clearSearch()">✕</span></span>' +
+          '<label class="dm-local" title="Скрыть устройства, пришедшие из кластера"><input type="checkbox" id="dm_local_only" onchange="dm.localOnly(this.checked)"><span data-i18n="tb.local">Только свои</span></label>' +
           '<button class="dm-btn" id="dm_expand_btn" data-i18n="tb.expand" onclick="dm.toggleAll()">⤢ Все</button>' +
         '</div>' +
         '<div class="dm-table-wrap" id="dm_table_wrap"></div>' +

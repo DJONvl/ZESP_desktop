@@ -6,6 +6,7 @@
   "tb.bind": "🔗 Bind",
   "tb.init": "♻️ Init",
   "tb.search": "Search...",
+  "tb.local": "Local only",
   "tb.expand": "⤢ All",
   "th.dt": "DT",
   "th.name": "Name",

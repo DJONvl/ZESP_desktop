@@ -179,7 +179,7 @@ loadAgent=function(aname,cb){
        bal.style.margin='0';
        bal.style.fontFamily="'Segoe UI',Tahoma,sans-serif";bal.style.fontSize='13px';bal.style.cursor='default';
        cnt.style.maxWidth='none';cnt.style.minWidth='auto';cnt.style.padding='0';cnt.style.lineHeight='1.4';
-       cnt.innerHTML='<div id="zcMsgs" style="overflow-y:auto;padding:8px;min-height:60px;max-height:200px;scrollbar-width:thin;scrollbar-color:#2a2a3a #0f0f1a;"></div><div id="zcRow" style="display:flex;padding:6px 8px;border-top:1px solid #2a2a3a;gap:4px;"><input id="zcIn" placeholder="Напишите..." autocomplete="off" x-webkit-speech style="flex:1;background:#0f0f1a;border:1px solid #2a2a3a;padding:6px 10px;border-radius:8px;color:#fff;font-size:13px;outline:none;"><button id="zcSpk" style="background:#2a2a3a;border:none;padding:6px 8px;border-radius:8px;color:#aaa;cursor:pointer;font-size:13px;">🔊</button><button id="zcMic" style="background:#2a2a3a;border:none;padding:6px 8px;border-radius:8px;color:#aaa;cursor:pointer;font-size:13px;">🎤</button><button id="zcSend" style="background:#2a2a3a;border:none;padding:6px 8px;border-radius:8px;color:#aaa;cursor:pointer;font-size:13px;">➤</button></div>';
+       cnt.innerHTML='<div id="zcMsgs" style="overflow-y:auto;padding:8px;min-height:60px;max-height:200px;scrollbar-width:thin;scrollbar-color:#2a2a3a #0f0f1a;"></div><div id="zcMicBar"><div class="zc-bar-track"><i class="zc-bar-fill"></i></div><span class="zc-bar-db">—</span></div><div id="zcRow" style="display:flex;padding:6px 8px;border-top:1px solid #2a2a3a;gap:4px;"><button id="zcMic" style="background:#2a2a3a;border:none;padding:6px 8px;border-radius:8px;color:#aaa;cursor:pointer;font-size:13px;" title="Сказать голосом">🎤</button><input id="zcIn" placeholder="Напишите..." autocomplete="off" x-webkit-speech style="flex:1;min-width:0;background:#0f0f1a;border:1px solid #2a2a3a;padding:6px 10px;border-radius:8px;color:#fff;font-size:13px;outline:none;"><button id="zcSend" style="background:#2a2a3a;border:none;padding:6px 8px;border-radius:8px;color:#aaa;cursor:pointer;font-size:13px;" title="Отправить">➤</button><button id="zcSpk" style="background:#2a2a3a;border:none;padding:6px 8px;border-radius:8px;color:#aaa;cursor:pointer;font-size:13px;" title="Озвучка ответов">🔊</button></div>';
        // ── геометрия панели: считаем сами, всегда внутри вьюпорта ──
        // ClippyJS ставит balloon через _position/_isOut: они не знают про
        // CSS-zoom и поля, а при узком окне объявляют «за экраном» все четыре
@@ -213,6 +213,9 @@ loadAgent=function(aname,cb){
          zcPanel.open=true;zcPanel.dismissed=false;
          zcPlace();
          if(focus){var i=document.getElementById('zcIn');if(i)i.focus()}
+         // Микрофон недоступен — сразу предлагаем скрипт политики, а не
+         // «ошибку сети» после нажатия на 🎤 (D-F79).
+         if(focus&&zcMicState()!=='ok')zcMicHelp();
        };
        var zcHide=function(){
          if(!bal||bal.hasAttribute('hidden'))return;
@@ -234,16 +237,32 @@ loadAgent=function(aname,cb){
        // LLM) — панель растёт, и её надо возвращать к голове спрайта.
        if(window.MutationObserver){new MutationObserver(function(){if(zcPanel.open)zcPlace()}).observe(document.getElementById('zcMsgs'),{childList:true})}
        // styles for the scrollbar in zcMsgs
-       var st=document.createElement('style');st.textContent='#zcMsgs::-webkit-scrollbar{width:4px}#zcMsgs::-webkit-scrollbar-track{background:#0f0f1a}#zcMsgs::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:4px}#zcMsgs>div{padding:4px 8px;margin:2px 0;border-radius:8px;font-size:12px;white-space:pre-wrap;word-break:break-word;user-select:text;cursor:pointer;transition:opacity.15s}#zcMsgs>div.zc-user{background:#0d4a5c;color:#e0f0ff}#zcMsgs>div.zc-asst{background:#2a2a3a;color:#e0e0e0;border:1px solid #3a3a4a}#zcMsgs>div.zc-err{background:#3a1a1a;color:#f66;border:1px solid #5a2a2a}#zcMsgs>div.zc-wait{color:#888;font-style:italic}';bal.appendChild(st);
+       var st=document.createElement('style');st.textContent='#zcMsgs::-webkit-scrollbar{width:4px}#zcMsgs::-webkit-scrollbar-track{background:#0f0f1a}#zcMsgs::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:4px}#zcMsgs>div{padding:4px 8px;margin:2px 0;border-radius:8px;font-size:12px;white-space:pre-wrap;word-break:break-word;user-select:text;cursor:pointer;transition:opacity.15s}#zcMsgs>div.zc-user{background:#0d4a5c;color:#e0f0ff}#zcMsgs>div.zc-asst{background:#2a2a3a;color:#e0e0e0;border:1px solid #3a3a4a}#zcMsgs>div.zc-err{background:#3a1a1a;color:#f66;border:1px solid #5a2a2a}#zcMsgs>div.zc-wait{color:#888;font-style:italic}#zcMsgs>div.zc-mic-fix{background:#16202c;border:1px solid #2f4a66;color:#cfe0f5;cursor:default;line-height:1.45}#zcMsgs>div.zc-mic-fix .zc-mic-head{color:#ff9b9b;font-weight:600;margin-bottom:3px}#zcMsgs>div.zc-mic-fix .zc-mic-btn{display:inline-block;margin:8px 0 4px;padding:6px 11px;border-radius:7px;background:#12395c;border:1px solid #2a5d8f;color:#8fc6ff;text-decoration:none;font-size:12px;cursor:pointer}#zcMsgs>div.zc-mic-fix .zc-mic-btn:hover{border-color:#4c9aff;color:#cfe6ff}#zcMsgs>div.zc-mic-fix .zc-mic-btn:disabled{opacity:.55;cursor:default}#zcMsgs>div.zc-mic-fix .zc-mic-status{color:#8fc6ff;font-size:11px;margin-top:2px}#zcMsgs>div.zc-mic-fix .zc-mic-hint{color:#8b96a5;font-size:11px;margin-top:5px;white-space:normal}#zcMsgs>div.zc-mic-level{display:none}#zcMicBar{display:none;align-items:center;gap:6px;padding:6px 8px 0}#zcMicBar.on{display:flex}#zcMicBar .zc-bar-track{flex:1;height:6px;border-radius:4px;background:#0f0f1a;border:1px solid #2a2a3a;overflow:hidden}#zcMicBar .zc-bar-fill{display:block;height:100%;width:0;background:linear-gradient(90deg,#2f81f7,#7ee787);transition:width .08s linear}#zcMicBar.low .zc-bar-fill{background:linear-gradient(90deg,#8a6d1f,#e3b341)}#zcMicBar.low .zc-bar-track{border-color:#8a6d1f}#zcMicBar .zc-bar-db{min-width:56px;text-align:right;color:#8b96a5;font-size:11px;font-variant-numeric:tabular-nums}';bal.appendChild(st);
        // handlers
        document.getElementById('zcSend').addEventListener('click',zc_sendInBalloon);
        document.getElementById('zcSpk').addEventListener('click',function(){zc_ttsOn=!zc_ttsOn;this.textContent=zc_ttsOn?'🔊':'🔇'});
        var input=document.getElementById('zcIn');
        input.addEventListener('keydown',function(e){if(e.key==='Enter')zc_sendInBalloon()});
-       input.addEventListener('webkitspeechchange',function(){setTimeout(zc_sendInBalloon,300)});
+       // webkitspeechchange (x-webkit-speech) в современных Chrome не приходит;
        input.addEventListener('focus',function(){if(window.agent)window.agent.play('CheckingSomething')});
-      var zsr=zc_initSR(),isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-       if(zsr&&!isMobile){zsr.onresult=function(e){console.log('SR result',e);input.value=e.results[e.results.length-1][0].transcript;zc_sendInBalloon()};zsr.onerror=function(e){console.error('SR error',e);var msg=document.getElementById('zcMsgs');if(msg&&!msg.querySelector('.zc-err.network-msg')){var d=document.createElement('div');d.className='zc-err network-msg';d.textContent='Микрофон: ошибка сети (SpeechRecognition требует интернет). Попробуйте ввести текст вручную.';msg.appendChild(d);msg.scrollTop=msg.scrollHeight}};zsr.onstart=function(){console.log('SR start')};zsr.onend=function(){console.log('SR end')};document.getElementById('zcMic').addEventListener('click',function(){if(window.agent)window.agent.play('CheckingSomething');input.focus();try{zsr.start();console.log('SR start called')}catch(e){console.error('SR start exception',e)}})}else{document.getElementById('zcMic').addEventListener('click',function(){console.log('No zsr or mobile',zsr,isMobile);if(window.agent)window.agent.play('CheckingSomething');input.focus()});document.getElementById('zcMic').style.display=''}
+       // Микрофон: браузер отдаёт речь только в secure context (https,
+       // localhost или origin из политики OverrideSecurityRestrictionsOnInsecureOrigin).
+       // На http://<нода>:8081 вместо «ошибки сети» показываем блок с
+       // генератором политики — сеть тут ни при чём (D-F79).
+       var zsr=zc_initSR();
+       window.zc_sr=zsr;   // для отладки/тестов: window.zc_sr.onresult({results:[…]})
+       if(zsr){
+         zsr.onresult=zc_srResult;
+         zsr.onstart=function(){console.log('SR start');zcFinalBuf='';if(zcFinalTimer){clearTimeout(zcFinalTimer);zcFinalTimer=0}zcMicMeterStart()};
+         zsr.onend=function(){console.log('SR end');zcMicMeterSummary();zcMicMeterStop();if(zcFinalBuf)zc_flushFinal()};
+         zsr.onerror=zc_srError;
+       }
+       document.getElementById('zcMic').addEventListener('click',function(){
+         if(zcMicState()!=='ok'){if(window.agent)window.agent.play('Alert');zcMicHelp();return}
+         if(window.agent)window.agent.play('CheckingSomething');
+         input.focus();
+         try{zsr.start()}catch(e){console.error('SR start exception',e);zcMicHelp()}
+       });
        // двойной клик по персонажу — открыть/закрыть панель (одинарный не
        // открывает: библиотека на mouseup сама показывала balloon — show()
        // заглушен выше). Закрыть можно ещё кликом мимо и Esc.
@@ -398,8 +417,13 @@ async function zc_askOpenAI(text,cfg){
 }
 
 var ttsQueue = Promise.resolve();
+// zcSpeaking — пока ассистент говорит, микрофон не принимаем: на виртуальном
+// устройстве ввода (Steam Streaming Microphone) браузер слышит собственную
+// озвучку и уходит в петлю «ответ → распознан → ответ» (D-F81).
+var zcSpeaking = false;
 function zc_tts(txt){
   ttsQueue = ttsQueue.then(async () => {
+    zcSpeaking = true;
     try{
       const r = await fetch('/api/alice/tts', {
         method: 'POST',
@@ -421,6 +445,8 @@ function zc_tts(txt){
         u.lang = 'ru-RU'; u.rate = 0.9;
         window.speechSynthesis.speak(u);
       }
+    } finally {
+      zcSpeaking = false;
     }
   }).catch(e => console.error('tts queue:', e));
   return ttsQueue;
@@ -465,15 +491,383 @@ var zc_sr=null;
 function zc_initSR(){
   var R = (window.webkitSpeechRecognition || window.SpeechRecognition);
   if(!R)return null;
-  var sr=new R(); sr.lang='ru-RU'; sr.continuous=true; sr.interimResults=true;
+  var sr=new R(); sr.lang='ru-RU';
+  // Одна фраза на нажатие. С continuous=true микрофон оставался открытым и
+  // после финала, а Chrome дробил одну фразу на несколько финалов
+  // («как дела» → «дела»), каждый уходил в чат отдельным сообщением (D-F81).
+  sr.continuous=false;
+  sr.interimResults=true;
   return sr;
 }
+
+// ── Отправка фразы: только финал, партиалы — в поле ввода ──────────────────
+// Раньше zsr.onresult отправлял КАЖДОЕ событие, включая interim, поэтому одна
+// фраза давала 4–6 сообщений и 4–6 ответов («привет» → «привет как» →
+// «привет как дела»). Теперь промежуточный текст только накапливается в
+// #zcIn, а в чат/бэк уходит единственный финальный результат.
+//
+// Склейка финалов: Chrome может финализировать фразу кусками («включи свет
+// в спальне» → «включи свет» + «в спальне»). Финалы собираются в буфер и
+// уходят одним сообщением, если между ними меньше ZC_FINAL_WAIT мс. Если
+// человек делает паузу дольше — это уже отдельная команда и отдельное
+// сообщение. На onend буфер отправляется сразу, не дожидаясь окна.
+var zc_srLast={text:'',at:0};
+var ZC_FINAL_WAIT=800;
+var zcFinalBuf='',zcFinalTimer=0;
+
+function zc_flushFinal(){
+  if(zcFinalTimer){clearTimeout(zcFinalTimer);zcFinalTimer=0}
+  var text=zcFinalBuf.trim();zcFinalBuf='';
+  if(!text)return;
+  if(zcSpeaking){           // идёт озвучка ответа — не слушаем сами себя
+    var ip=document.getElementById('zcIn');if(ip)ip.value='';
+    return;
+  }
+  var now=Date.now();
+  if(text===zc_srLast.text&&now-zc_srLast.at<3000)return;  // тот же финал ещё раз
+  zc_srLast.text=text;zc_srLast.at=now;
+  var inp=document.getElementById('zcIn');if(inp)inp.value='';
+  try{if(window.zc_sr)window.zc_sr.stop()}catch(err){}
+  window.processClippyMessage(text);
+}
+
+function zc_srResult(e){
+  var rs=(e&&e.results)||[],finals=[],interims=[];
+  for(var i=0;i<rs.length;i++){
+    var r=rs[i],t=(r&&r[0]&&r[0].transcript)||'';
+    t=t.trim();if(!t)continue;
+    if(r.isFinal)finals.push(t);else interims.push(t);
+  }
+  var inp=document.getElementById('zcIn');
+  // партиал копится в строке ввода — человек видит, что его слышат
+  if(inp)inp.value=finals.concat(interims).join(' ');
+  if(!finals.length)return;
+  zcFinalBuf=(zcFinalBuf?zcFinalBuf+' ':'')+finals.join(' ');
+  if(zcFinalTimer)clearTimeout(zcFinalTimer);
+  zcFinalTimer=setTimeout(zc_flushFinal,ZC_FINAL_WAIT);
+}
+
+// ── Микрофон: secure context, подсказка и генератор политики браузера ──────
+// Речь браузер отдаёт только в secure context: https, localhost или origin из
+// политики OverrideSecurityRestrictionsOnInsecureOrigin. ZESP работает по http,
+// поэтому на http://<нода>:8081 без политики микрофон недоступен. Скрипт для
+// политики собирается здесь же — адреса нод берутся из /api/cluster/info, так
+// что новая нода попадает в файл без пересборки (D-F79).
+function zcMicState(){
+  if(/[?&]micblocked=1/.test(location.search))return'insecure'; // предпросмотр блока без снятия политики
+  if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent))return'mobile';
+  if(!window.isSecureContext)return'insecure';
+  if(!(window.webkitSpeechRecognition||window.SpeechRecognition))return'unsupported';
+  return'ok';
+}
+
+// zcMicOrigins — список http-origin'ов: эта страница, localhost и все ноды
+// кластера (addr — UDP-порт обнаружения, веб-порт лежит в p.http).
+function zcMicOrigins(){
+  var list=[],seen={};
+  function add(o){
+    if(!o)return;
+    o=String(o);
+    if(o.charAt(o.length-1)!=='/')o+='/';
+    if(seen[o])return;
+    seen[o]=1;list.push(o);
+  }
+  var port=location.port||'8081';
+  add(location.origin);
+  add('http://localhost:'+port);
+  add('http://127.0.0.1:'+port);
+  return fetch('/api/cluster/info',{cache:'no-store'}).then(function(r){
+    return r.ok?r.json():null;
+  }).then(function(d){
+    var n=0;
+    ((d&&d.peers)||[]).forEach(function(p){
+      if(!p||!p.addr)return;
+      var host=String(p.addr).split(':')[0];
+      add('http://'+host+':'+(p.http||'8081'));
+      n++;
+    });
+    return{origins:list,nodes:n};
+  }).catch(function(e){
+    console.warn('cluster info:',e);
+    return{origins:list,nodes:0};
+  });
+}
+
+// zcMicPolicyText — текст PowerShell-скрипта. Шапка объясняет, что это и
+// зачем, чтобы файл не запускали вслепую.
+function zcMicPolicyText(origins){
+  var L=[];
+  L.push('# zesp-mic-policy.ps1 — разрешить микрофон на http-страницах ZESP.');
+  L.push('#');
+  L.push('# ЧТО ЭТО. Скрипт прописывает адреса узлов ZESP в политику браузера');
+  L.push('# OverrideSecurityRestrictionsOnInsecureOrigin (Chrome и Edge,');
+  L.push('# HKLM\\SOFTWARE\\Policies). Политика объявляет эти адреса доверенными, и');
+  L.push('# обычный http://<узел>:8081 работает как https — сертификат не нужен.');
+  L.push('#');
+  L.push('# ЗАЧЕМ. Микрофон (распознавание речи, getUserMedia) браузер отдаёт только');
+  L.push('# в secure context: https, localhost или origin из этой политики. ZESP');
+  L.push('# работает по http, поэтому без политики кнопка микрофона в диалоге');
+  L.push('# ассистента не работает, а в чате появляется «ошибка сети» — на самом');
+  L.push('# деле браузер вообще не даёт доступ к микрофону.');
+  L.push('#');
+  L.push('# КАК ЗАПУСТИТЬ.');
+  L.push('#   1. Правой кнопкой по файлу -> «Выполнить с PowerShell».');
+  L.push('#      Если Windows не даёт, откройте PowerShell от имени администратора и');
+  L.push('#      выполните: powershell -NoProfile -ExecutionPolicy Bypass -File .\\zesp-mic-policy.ps1');
+  L.push('#   2. Полностью закройте браузер (все окна) и откройте снова: политика');
+  L.push('#      читается только при старте.');
+  L.push('#   3. Откройте диалог ассистента и нажмите микрофон — браузер один раз');
+  L.push('#      спросит доступ, нажмите «Разрешить».');
+  L.push('#');
+  L.push('# ПРОВЕРКА. chrome://policy -> OverrideSecurityRestrictionsOnInsecureOrigin');
+  L.push('# Скрипт только добавляет адреса: уже прописанные остаются, поэтому');
+  L.push('# вторая ручная правка (другой сетевой интерфейс ноды) не потеряется.');
+  L.push('# ОТКАТ (PowerShell от администратора):');
+  L.push("#   Remove-Item 'HKLM:\\SOFTWARE\\Policies\\Google\\Chrome\\OverrideSecurityRestrictionsOnInsecureOrigin' -Recurse");
+  L.push("#   Remove-Item 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Edge\\OverrideSecurityRestrictionsOnInsecureOrigin' -Recurse");
+  L.push('#');
+  L.push('# Файл собран в диалоге ассистента ZESP '+new Date().toLocaleString('ru-RU')+'.');
+  L.push('# Адресов в наборе: '+origins.length+'. Появится новая нода — скачайте файл заново.');
+  L.push('');
+  L.push("$ErrorActionPreference = 'Stop'");
+  L.push('');
+  L.push('$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)');
+  L.push('if (-not $isAdmin) {');
+  L.push("    Write-Host 'Нужны права администратора: правой кнопкой по файлу -> «Выполнить с PowerShell».' -ForegroundColor Red");
+  L.push('    exit 1');
+  L.push('}');
+  L.push('');
+  L.push('# Адреса узлов кластера ZESP (http-origin, порт веба).');
+  L.push('$origins = @(');
+  origins.forEach(function(o){L.push("    '"+o+"'")});
+  L.push(')');
+  L.push('');
+  L.push('$roots = @(');
+  L.push("    'HKLM:\\SOFTWARE\\Policies\\Google\\Chrome',");
+  L.push("    'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Edge'");
+  L.push(')');
+  L.push('');
+  L.push('foreach ($root in $roots) {');
+  L.push("    $key = Join-Path $root 'OverrideSecurityRestrictionsOnInsecureOrigin'");
+  L.push('    if (-not (Test-Path $key)) { New-Item -Path $key -Force | Out-Null }');
+  L.push('    $item = Get-Item $key');
+  L.push('    # браузер видит только адрес, по которому открыта страница, а у ноды их');
+  L.push('    # может быть несколько (LAN, Wi-Fi) — прежние значения не выбрасываем.');
+  L.push('    $all = @($item.GetValueNames() | ForEach-Object { [string]$item.GetValue($_) }) + $origins');
+  L.push('    $all = @($all | Where-Object { $_ } | Select-Object -Unique)');
+  L.push('    $item.GetValueNames() | ForEach-Object {');
+  L.push('        Remove-ItemProperty -Path $key -Name $_ -ErrorAction SilentlyContinue');
+  L.push('    }');
+  L.push('    $i = 1');
+  L.push('    foreach ($o in $all) {');
+  L.push('        New-ItemProperty -Path $key -Name "$i" -Value $o -PropertyType String -Force | Out-Null');
+  L.push('        $i++');
+  L.push('    }');
+  L.push('    Write-Host "OK $key"');
+  L.push('    $item = Get-Item $key');
+  L.push('    $item.GetValueNames() | Sort-Object { [int]$_ } | ForEach-Object {');
+  L.push('        Write-Host ("   " + $_ + " = " + $item.GetValue($_))');
+  L.push('    }');
+  L.push('}');
+  L.push('');
+  L.push("Write-Host ''");
+  L.push('Write-Host \'Готово. Полностью закройте браузер и откройте снова.\'');
+  L.push("Write-Host 'Проверка: chrome://policy -> OverrideSecurityRestrictionsOnInsecureOrigin'");
+  return L.join('\r\n')+'\r\n';
+}
+
+// zcMicDownload — собрать текст и отдать файл через Blob (бэкенд не нужен).
+function zcMicDownload(){
+  return zcMicOrigins().then(function(info){
+    // BOM: без него PowerShell 5.1 читает UTF-8 как ANSI и ломает русский текст.
+    var txt='\ufeff'+zcMicPolicyText(info.origins);
+    var blob=new Blob([txt],{type:'text/plain;charset=utf-8'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;a.download='zesp-mic-policy.ps1';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(url)},20000);
+    info.origins=info.origins;
+    return info;
+  });
+}
+
+// zcMicHelp — блок в чате вместо «ошибки сети»: почему микрофон недоступен и
+// кнопка скачивания скрипта. Показывается при открытии панели и по клику 🎤.
+function zcMicHelp(){
+  var m=document.getElementById('zcMsgs');if(!m)return;
+  if(document.getElementById('zcMicHelp')){m.scrollTop=m.scrollHeight;return}
+  var st=zcMicState();
+  if(st==='ok')return;
+  function el(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
+  var d=el('div');d.id='zcMicHelp';d.className='zc-mic-fix';
+  if(st==='insecure'){
+    d.appendChild(el('div','zc-mic-head','Микрофон заблокирован: страница открыта по http ('+location.host+').'));
+    d.appendChild(el('div','','Браузер разрешает микрофон только на https или localhost. Скрипт ниже добавит адреса всех узлов вашего кластера в политику браузера — https и сертификат не нужны.'));
+    var btn=el('button','zc-mic-btn','⬇ Скачать zesp-mic-policy.ps1');
+    btn.type='button';
+    var status=el('div','zc-mic-status','');
+    btn.addEventListener('click',function(){
+      btn.disabled=true;status.textContent='Собираю адреса узлов из кластера…';
+      zcMicDownload().then(function(info){
+        status.textContent='Файл сохранён: адресов '+info.origins.length+(info.nodes?' (узлов кластера: '+info.nodes+')':'')+'.';
+        btn.disabled=false;
+      }).catch(function(e){
+        console.error('mic policy:',e);
+        status.textContent='Не удалось собрать файл: '+e.message;
+        btn.disabled=false;
+      });
+    });
+    d.appendChild(btn);d.appendChild(status);
+    d.appendChild(el('div','zc-mic-hint','1) По скачанному файлу: правой кнопкой → «Выполнить с PowerShell» (нужен администратор; если Windows блокирует запуск — Свойства файла → «Разблокировать»). 2) Полностью закройте браузер и откройте снова. 3) Нажмите 🎤 — браузер один раз спросит доступ.'));
+  }else if(st==='unsupported'){
+    d.appendChild(el('div','zc-mic-head','Этот браузер не умеет распознавать речь.'));
+    d.appendChild(el('div','','Кнопка микрофона работает только в Chrome и Edge: движок распознавания есть только у Chromium.'));
+  }else{
+    d.appendChild(el('div','zc-mic-head','Микрофон в диалоге на мобильных отключён.'));
+    d.appendChild(el('div','','Введите команду текстом или скажите её колонке: «Алиса, …».'));
+  }
+  m.appendChild(d);
+  // Блок выше окна сообщений (200 px): показываем его начало, а не хвост,
+  // иначе первая строка «Микрофон заблокирован…» остаётся за кадром.
+  m.style.maxHeight='320px';
+  m.scrollTop=Math.max(0,m.scrollHeight-d.offsetHeight-4);
+}
+
+// zc_srError — разные причины молчания микрофона звучат по-разному. Раньше
+// любая ошибка показывалась как «ошибка сети», из-за чего блокировку
+// микрофона на http принимали за отсутствие интернета.
+function zc_srError(e){
+  console.error('SR error',e);
+  zcMicMeterSummary();zcMicMeterStop();
+  var code=(e&&e.error)||'',txt='';
+  if(code==='not-allowed'||code==='service-not-allowed')txt='Доступ к микрофону запрещён. Разрешите его: значок замка/настроек в адресной строке → Микрофон → «Разрешить» (или chrome://settings/content/microphone).';
+  else if(code==='network')txt='Сервис распознавания не отвечает: браузер отправляет звук в облако Google, нужен доступ в интернет именно к нему.';
+  else if(code==='no-speech')txt='Ничего не услышал. Смотрите полосу уровня над полем ввода: если она стоит пустой и справа «—», микрофон молчит — дело в устройстве ввода, а не в распознавании.';
+  else if(code==='audio-capture')txt='Микрофон не найден или занят другим приложением.';
+  else if(code==='aborted')return;
+  else txt='Ошибка распознавания: '+(code||'неизвестно');
+  var msg=document.getElementById('zcMsgs');
+  if(msg&&!msg.querySelector('.zc-sr-err')){
+    var d=document.createElement('div');d.className='zc-err zc-sr-err';d.textContent=txt;
+    msg.appendChild(d);msg.scrollTop=msg.scrollHeight;
+  }
+  if(code==='not-allowed'||code==='service-not-allowed')zcMicHelp();
+}
+
+// ── Индикатор уровня микрофона ─────────────────────────────────────────────
+// «Ничего не услышал» не объясняет причину: устройство ввода может быть не тем
+// (веб-камера вместо гарнитуры), выключенным или занятым. Пока идёт
+// распознавание, над строкой ввода показываем горизонтальную полосу уровня
+// (RMS из getUserMedia) и цифру справа. Если за 3 с не было ни одного кадра
+// громче −55 дБ — подсказываем про устройство ввода, а не про интернет (D-F80).
+var zcMicMeter={stream:null,ac:null,timer:0,startedAt:0,peak:-160,warned:false,hideTimer:0};
+
+function zcMicBar(){
+  var el=document.getElementById('zcMicBar');
+  if(!el)return null;
+  return {el:el,fill:el.querySelector('.zc-bar-fill'),db:el.querySelector('.zc-bar-db')};
+}
+
+// −60…0 дБ → 0…100 % ширины; тише −60 — полоса пустая.
+function zcMicLevelSet(db,peak){
+  var b=zcMicBar();if(!b)return;
+  var pct=Math.max(0,Math.min(100,(db+60)/60*100));
+  b.fill.style.width=pct.toFixed(1)+'%';
+  b.db.textContent=(db<-60?'тишина':Math.round(db)+' дБ');
+  var was=b.el.className;
+  b.el.className='on'+(peak<-55?' low':'');
+  // полоса появляется — панель стала выше на её высоту, переставляем к спрайту
+  if(was!=='on'&&was!=='on low'&&window.agent&&agent._balloon)agent._balloon.reposition();
+}
+
+function zcMicMeterStop(){
+  var m=zcMicMeter;
+  if(m.timer){clearInterval(m.timer);m.timer=0}
+  if(m.stream){m.stream.getTracks().forEach(function(t){try{t.stop()}catch(e){}});m.stream=null}
+  if(m.ac){try{m.ac.close()}catch(e){};m.ac=null}
+  m.startedAt=0;
+  var b=zcMicBar();if(!b)return;
+  if(m.hideTimer)clearTimeout(m.hideTimer);
+  // короткая задержка, чтобы полоса не мигала между фразами
+  m.hideTimer=setTimeout(function(){
+    var bb=zcMicBar();if(!bb)return;
+    bb.el.className='';bb.fill.style.width='0';bb.db.textContent='—';
+    if(window.agent&&agent._balloon)agent._balloon.reposition();
+  },700);
+}
+
+function zcMicMeterStart(){
+  var m=zcMicMeter;
+  if(m.stream||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return;
+  if(!zcMicBar())return;                       // панель ещё не построена
+  var AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC)return;
+  if(m.hideTimer){clearTimeout(m.hideTimer);m.hideTimer=0}
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(st){
+    m.stream=st;m.startedAt=Date.now();m.peak=-160;m.warned=false;
+    var ac=new AC();m.ac=ac;
+    var src=ac.createMediaStreamSource(st);
+    var an=ac.createAnalyser();an.fftSize=2048;
+    src.connect(an);
+    var buf=new Float32Array(an.fftSize);
+    zcMicLevelSet(-160,m.peak);
+    m.timer=setInterval(function(){
+      an.getFloatTimeDomainData(buf);
+      var sum=0;
+      for(var i=0;i<buf.length;i++)sum+=buf[i]*buf[i];
+      var rms=Math.sqrt(sum/buf.length);
+      var db=rms>0?20*Math.log10(rms):-160;
+      if(db>m.peak)m.peak=db;
+      zcMicLevelSet(db,m.peak);
+      if(!m.warned&&Date.now()-m.startedAt>3000&&m.peak<-55){
+        m.warned=true;
+        var msg=document.getElementById('zcMsgs');
+        if(msg){
+          var w=document.createElement('div');
+          w.className='zc-err zc-mic-silent';
+          w.textContent='Микрофон молчит: за 3 секунды уровень ниже −55 дБ (полоса над полем ввода пустая). Проверьте устройство ввода: Windows → Параметры → Звук → Ввод (и «Устройство ввода по умолчанию»), затем chrome://settings/content/microphone для этого сайта.';
+          msg.appendChild(w);msg.scrollTop=msg.scrollHeight;
+        }
+      }
+    },120);
+  }).catch(function(e){
+    console.warn('mic meter:',e);
+  });
+}
+
+// Итоговый максимум за попытку — цифрой справа, полосу гасим.
+function zcMicMeterSummary(){
+  var m=zcMicMeter,peak=m.peak;
+  var b=zcMicBar();
+  if(b&&peak>-160){
+    b.db.textContent=Math.round(peak)+' дБ';
+    b.fill.style.width=Math.max(0,Math.min(100,(peak+60)/60*100)).toFixed(1)+'%';
+  }
+  return peak;
+}
+
 
 function zc_sendInBalloon(){
  var inp=document.getElementById('zcIn');if(!inp)return;
  var t=inp.value.trim();if(!t)return;
  inp.value='';
  window.processClippyMessage(t);
+}
+
+// zc_voice — парсер команд дома на сервере (`voicecmd`, без LLM):
+// POST /api/voice {text} -> {ok, reply}. ok=true — фраза разобрана как
+// команда/вопрос по устройствам, reply уже готов; ok=false — не наша фраза.
+async function zc_voice(text){
+  var ctl=typeof AbortController!=='undefined'?new AbortController():null;
+  var timer=ctl?setTimeout(function(){ctl.abort()},8000):0;
+  try{
+    var r=await fetch('/api/voice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text}),signal:ctl?ctl.signal:undefined});
+    if(!r.ok)throw new Error(r.status+' '+r.statusText);
+    return await r.json();
+  }finally{
+    if(timer)clearTimeout(timer);
+  }
 }
 
 window.processClippyMessage=async function(text){
@@ -517,6 +911,20 @@ window.processClippyMessage=async function(text){
     var md=document.createElement('div');md.className='zc-asst';md.textContent=mr;
     m.appendChild(md);m.scrollTop=m.scrollHeight;return;
    }
+    // команды дома разбирает серверный парсер voicecmd — до LLM и без сети.
+    // ok=false значит «фраза не про дом»: уходим в LLM/фолбек ниже.
+    try{
+      var vc=await zc_voice(text);
+      if(vc&&vc.ok){
+        wd.remove();
+        if(window.agent)window.agent.play(window.agent.hasAnimation('Explain')?'Explain':'Wave');
+        var vd=document.createElement('div');vd.className='zc-asst';vd.textContent=vc.reply;
+        m.appendChild(vd);m.scrollTop=m.scrollHeight;
+        if(vc.reply)zc_tts(vc.reply);
+        if(agent&&agent._balloon)agent._balloon.reposition();
+        return;
+      }
+    }catch(e){console.warn('voice parser:',e)}
     try{
      var resp;
      try{resp=await zc_askBrain(text)}catch(e){resp=zc_fb(text,[])}
