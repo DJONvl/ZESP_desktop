@@ -693,7 +693,7 @@ body.light .dm-table .parent-row{background:#e4e9f2}
   }
 
   // ── state ──
-  var st = { filter: '', localOnly: false, expanded: {}, editing: null, secTimer: null, scanSec: 0, sort: null };
+  var st = { filter: '', localOnly: false, expanded: {}, editing: null, secTimer: null, scanSec: 0, sort: null, selfName: '', renderPending: false };
 
   function thSort(cls, key, label) {
     var arr = (st.sort && st.sort.key === key) ? (st.sort.dir === 1 ? ' ▲' : ' ▼') : '';
@@ -704,9 +704,19 @@ body.light .dm-table .parent-row{background:#e4e9f2}
   window.evm = evm;
 
   // ── owner (кластер) ──
-  // Своё устройство приходит без _ownerName; у чужих — имя хаба.
+  // Своё устройство приходит без _ownerName, поэтому имя хаба для него
+  // берём у своей ноды: /api/cluster/info → self.name (D-F82).
+  // Литерал — только запасной вариант (кластер выключен или имя не пришло).
   var LOCAL_OWNER_TEXT = 'ZESP хаб';
-  function ownerLabel(d) { return (d && d._ownerName) || LOCAL_OWNER_TEXT; }
+  function localOwnerName() {
+    if (st.selfName) return st.selfName;
+    try {
+      var c = window.jsconfig && jsconfig.Cluster;
+      if (c && c.name) return c.name;
+    } catch (e) {}
+    return LOCAL_OWNER_TEXT;
+  }
+  function ownerLabel(d) { return (d && d._ownerName) || localOwnerName(); }
   function ownerHue(id) {
     var s = String(id || 'local');
     if (s === 'local') return 210;
@@ -717,6 +727,22 @@ body.light .dm-table .parent-row{background:#e4e9f2}
   function ownerCellHTML(d) {
     var hue = ownerHue(d && d._owner);
     return '<span class="owner-dot" style="background:hsl(' + hue + ',65%,55%)"></span>' + escapeHtml(ownerLabel(d));
+  }
+
+  // loadSelfName — имя своей ноды для колонки «Хаб». Сервер отдаёт его в
+  // /api/cluster/info (self.name); jsconfig.Cluster.name — запасной источник,
+  // потому что смена имени применяется к identity только после рестарта.
+  function loadSelfName() {
+    try {
+      if (!window.fetch) return;
+      fetch('/api/cluster/info', { cache: 'no-store' })
+        .then(function (r) { return r.json(); })
+        .then(function (info) {
+          var n = info && info.self && info.self.name;
+          if (n && n !== st.selfName) { st.selfName = n; renderTable(); }
+        })
+        .catch(function () {});
+    } catch (e) {}
   }
 
   // ── table ──
@@ -784,10 +810,21 @@ body.light .dm-table .parent-row{background:#e4e9f2}
   function renderTable() {
     var wrap = document.getElementById('dm_table_wrap');
     if (!wrap) return;
+    // Пока ячейка в режиме правки, полный innerHTML выбивает input из DOM:
+    // приходит blur → повторный commit и NotFoundError. Откладываем до
+    // завершения правки (D-F82).
+    if (st.editing) { st.renderPending = true; return; }
     var res = genTable();
     wrap.innerHTML = res.html;
     var stc = document.getElementById('dm_st_count');
     if (stc) stc.textContent = t('st.devices', 'Устройств: {a} / {b}', { a: res.visible, b: deviceList.length });
+  }
+
+  // flushRender — применить отложенную перерисовку после правки.
+  function flushRender() {
+    if (!st.renderPending || st.editing) return;
+    st.renderPending = false;
+    renderTable();
   }
 
   // Лёгкий 5-секундный тик: только статусы parent-row (точка + ago),
@@ -916,15 +953,30 @@ body.light .dm-table .parent-row{background:#e4e9f2}
   function cancelEdit() {
     if (!st.editing) return;
     var ed = st.editing;
-    ed.cell.innerHTML = '<span class="cell-value">' + escapeHtml(ed.old || '—') + '</span>';
+    // Сбрасываем ДО innerHTML: удаление input вызовет blur → commit, а он
+    // должен увидеть, что правка уже закрыта (D-F82).
     st.editing = null;
+    ed.cell.innerHTML = '<span class="cell-value">' + escapeHtml(ed.old || '—') + '</span>';
+    flushRender();
   }
 
   function doSaveEdit(ed, nv) {
-    if (nv === ed.old) { cancelEdit(); return; }
+    // Второй commit (Enter + blur, или blur при уже закрытой правке) — no-op.
+    // ed здесь — новый литерал из commit, поэтому сверяем ячейку, а не объект.
+    if (!st.editing || st.editing.cell !== ed.cell) return;
+    st.editing = null;
+    if (nv === ed.old) {
+      ed.cell.innerHTML = '<span class="cell-value">' + escapeHtml(ed.old || '—') + '</span>';
+      flushRender();
+      return;
+    }
     var idx = -1;
     for (var i = 0; i < deviceList.length; i++) if (deviceList[i].IEEE == ed.ieee) { idx = i; break; }
-    if (idx === -1) { cancelEdit(); return; }
+    if (idx === -1) {
+      ed.cell.innerHTML = '<span class="cell-value">' + escapeHtml(ed.old || '—') + '</span>';
+      flushRender();
+      return;
+    }
     var d = deviceList[idx], changed = false;
     if (ed.field === 'location') {
       if (ed.key === '~') { if (d.Location !== nv) { d.Location = nv; changed = true; } }
@@ -938,7 +990,7 @@ body.light .dm-table .parent-row{background:#e4e9f2}
       WSsend('SaveJson|/Devices/' + d.IEEE + '|' + JSON.stringify(d));
     }
     ed.cell.innerHTML = '<span class="cell-value">' + escapeHtml(nv || '—') + '</span>';
-    st.editing = null;
+    flushRender();
   }
 
   // ── context menu ──
@@ -1571,6 +1623,7 @@ dm.setBleTpl = function (dev, adr, name) {
       if (window.eventE) eventE.on('bindStatus', dm.onBindStatus);
       if (window.eventE) eventE.on('joinNoTemplate', dm.onJoinNoTemplate);
       if (window.websocket && websocket.readyState === 1) window.WSsend('getDeviceList');
+      loadSelfName();
       renderTable();
       node.addEventListener('contextmenu', function (e) {
         var dots = e.target.closest('.menu-dots');
