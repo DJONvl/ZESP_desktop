@@ -70,7 +70,6 @@
   "had.empty": "Ничего не найдено — чужих discovery-конфигов на брокере нет.",
   "had.add": "Добавить",
   "had.hide": "Игнорировать",
-  "had.del": "Удалить",
   "ble.addr": "Address",
   "ble.local": "Local Name",
   "ble.err_tpl": "Ошибка шаблонов: {msg}",

@@ -1212,7 +1212,11 @@ dm.setBleTpl = function (dev, adr, name) {
   dm.hadAllowAll = function () {
     (st.hadLast || []).forEach(function (d) { WSsend('had_allow|' + d.ieee); });
   };
-  // "in base" section: HAD from deviceList, deletion — force (from base + file).
+  // "in base" section: HAD из deviceList — только просмотр. Удаление
+  // намеренно не дублируется здесь: у него два режима (Del — с сохранением
+  // профиля в Devices/{IEEE}, Clean — со стиранием), и одна кнопка без
+  // выбора молча стирала архив правок. Удалять — из контекстного меню
+  // списка устройств, где видны оба режима.
   dm.renderHadBase = function () {
     var box = document.getElementById('had_base'); if (!box) return;
     var list = (typeof deviceList !== 'undefined' ? deviceList : []).filter(function (d) { return d && d.DevType === 'HAD'; });
@@ -1221,12 +1225,10 @@ dm.setBleTpl = function (dev, adr, name) {
     list.forEach(function (d) {
       html += '<div class="dm-listrow">' +
         '<div class="dm-grow"><b>' + hadEsc(d.Name || d.IEEE) + '</b>' +
-        '<div class="dm-sub">' + hadEsc(d.ModelId || '') + ' · ' + hadEsc(d.IEEE) + '</div></div>' +
-        '<button class="dm-btn" onclick="dm.hadDel(\'' + hadEsc(d.IEEE) + '\')">' + t('had.del', 'Удалить') + '</button></div>';
+        '<div class="dm-sub">' + hadEsc(d.ModelId || '') + ' · ' + hadEsc(d.IEEE) + '</div></div></div>';
     });
     box.innerHTML = html;
   };
-  dm.hadDel = function (ieee) { WSsend('removeDevice||' + ieee + '|force'); };
   // ── LG NetCast TV: поиск и привязка ──
   function lgtvStatus(html) { var e = document.getElementById('lgtv_status'); if (e) e.innerHTML = html; }
   dm.lgtvUI = function () {
