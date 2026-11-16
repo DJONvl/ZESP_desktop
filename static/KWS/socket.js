@@ -381,6 +381,31 @@ function parseSocket(msg) {
 		
 		
 		
+		// ── ASR: установка/обновление демона (asrinstall) ────────────────────
+		if (z[0] === "asrProgress") {
+			switch (z[1]) {
+				case "start":
+					updateProgress.show();
+					updateProgress.setText('Обновление ASR' + (z[2] ? ': ' + z[2] : ''));
+					updateProgress.updateProgress(0);
+					break
+				case "percent":
+					if (z[3]) updateProgress.setText('ASR: ' + z[3] + '...');
+					updateProgress.updateProgress(z[2]);
+					break
+				case "done":
+					updateProgress.setText('ASR обновлён' + (z[2] ? ': ' + z[2] : ''));
+					updateProgress.updateProgress(100);
+					setTimeout(() => updateProgress.hide(), 3000);
+					break
+				case "error":
+					updateProgress.setText('ASR: ' + String(z[2] || 'ошибка').slice(0, 90));
+					updateProgress.updateProgress(0);
+					setTimeout(() => updateProgress.hide(), 6000);
+					break
+			}
+		}
+
 		// ── Automation engine messages ────────────────────────────────────────────
 		// debug|text — log from the automation console_log block
 		if (z[0] === "debug") {
