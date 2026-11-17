@@ -752,6 +752,7 @@ if (typeof eventE !== 'undefined') {
   eventE.on('aliceAsr', function (d) {
     if (!d) return;
     if (d.text) txt.textContent = d.text;
+    else if (d.empty) txt.textContent = 'Не расслышала';
     else if (!box.classList.contains('on')) txt.textContent = 'Слушаю…';
     box.classList.add('on');
     if (timer) clearTimeout(timer);

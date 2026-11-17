@@ -167,9 +167,9 @@
       "val": "off",
       "list": ["off", "local", "transit", "mixed"]
     },
-    "Alice_STT": "",
-    "Alice_VAD": "",
-    "Alice_TTS": "",
+    "Alice_STT": { "val": "internal", "list": ["internal"] },
+    "Alice_VAD": { "val": "internal", "list": ["internal"] },
+    "Alice_TTS": { "val": "internal", "list": ["internal"] },
     "Alice_BRAIN": "",
     "Alice_DeepSeekKey": "",
     "Alice_MusicPublic": "",

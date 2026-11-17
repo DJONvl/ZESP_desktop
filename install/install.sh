@@ -321,12 +321,15 @@ write_etc() { # write_etc PATH (stdin -> файл), умеет ro-rootfs
   cat > "$path"
   chmod 755 "$path"
   # Старые init-скрипты ZESP не должны запускаться параллельно с новым.
+  # Бэкап не нужен: это наши же файлы от прежних установок, на чистой системе их нет.
+  # Важно удалять, а не переименовывать: имя с префиксом S<NN> всё равно
+  # попадёт под маску /etc/init.d/S??* и rcS запустит его.
   if [ -n "$DROP_INIT" ]; then
     for f in $DROP_INIT; do
       [ "/etc/init.d/$f" = "$path" ] && continue
       if [ -f "/etc/init.d/$f" ]; then
-        mv "/etc/init.d/$f" "/etc/init.d/$f.bak-$(date +%Y%m%d%H%M%S)"
-        say "old init disabled: /etc/init.d/$f"
+        rm -f "/etc/init.d/$f"
+        say "old init removed: /etc/init.d/$f"
       fi
     done
   fi

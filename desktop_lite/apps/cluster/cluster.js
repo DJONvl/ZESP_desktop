@@ -498,10 +498,13 @@
     });
 
     box.innerHTML = clLiveBlock(groups);
+    // Выбора сервисов здесь больше нет — только список найденного.
     var allBtn = document.getElementById('cl_all_btn');
-    if (allBtn) allBtn.style.display = clHasLocal() ? '' : 'none';
+    if (allBtn) allBtn.style.display = 'none';
   }
 
+  // Список сервисов — только для просмотра: что реально видно по mDNS.
+  // Выбор голосового сервиса теперь на вкладке Alice в настройках ноды.
   function clLiveBlock(groups) {
     var titles = {
       tts: 'Синтез речи', asr: 'Распознавание речи',
@@ -511,9 +514,25 @@
     Object.keys(groups || {}).forEach(function (k) {
       if (kinds.indexOf(k) < 0 && (groups[k] || []).length) kinds.push(k);
     });
-    return '<div class="cl-live-grid">' +
-      kinds.map(function (k) { return clLiveCard(k, titles[k] || k.toUpperCase(), groups); }).join('') +
-      '</div>';
+    return '<div class="cl-live-grid">' + kinds.map(function (k) {
+      var arr = ((groups || {})[k] || []).slice().sort(function (a, b) {
+        var an = String(a.p.name || a.p.id), bn = String(b.p.name || b.p.id);
+        if (an !== bn) return an.localeCompare(bn);
+        return String(a.s.id || '').localeCompare(String(b.s.id || ''));
+      });
+      var rows = arr.length ? arr.map(function (it) {
+        var name = String(it.s.id || k);
+        var meta = (it.p.name || it.p.id) + (it.p.online === false ? ' · офлайн' : '');
+        return '<div class="cl-opt" style="cursor:default;pointer-events:none">' +
+          '<span class="cl-opt-name">' + clEsc(name) + '</span>' +
+          '<span class="cl-opt-meta">' + clEsc(meta) + '</span></div>';
+      }).join('') : '<div class="cl-live-none">не найден</div>';
+      return '<div class="cl-live-card">' +
+        '<div class="cl-live-row" style="cursor:default">' +
+        '<span class="cl-live-kind">' + clEsc(titles[k] || k.toUpperCase()) + '</span>' +
+        '<span class="cl-live-val">' + (arr.length ? arr.length + ' в сети' : '—') + '</span>' +
+        '</div><div class="cl-live-opts">' + rows + '</div></div>';
+    }).join('') + '</div>';
   }
 
   function clLiveCard(kind, title, groups) {

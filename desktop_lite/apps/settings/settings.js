@@ -152,7 +152,57 @@
       return '<div class="s-pane" data-pane="' + s + '">' + rows + '</div>';
     }).join('');
 
-    if (sections.length) selectTab(node, sections[0]);
+    if (sections.length) selectTab(node, st.active && sections.indexOf(st.active) >= 0 ? st.active : sections[0]);
+    if (st.cfg.Alice && !st._aliceSvcLoaded) {
+      st._aliceSvcLoaded = true;
+      loadAliceServices(node);
+    }
+  }
+
+  function aliceKind(prop) {
+    if (prop === 'Alice_STT') return 'asr';
+    if (prop === 'Alice_VAD') return 'vad';
+    if (prop === 'Alice_TTS') return 'tts';
+    return '';
+  }
+
+  // Селект выбора сервиса: "Интернал" всегда первый, дальше — то, что нашлось
+  // в mDNS. В конфиг пишется только val ("internal" или URL), лист не храним.
+  function aliceFieldHtml(section, prop, val) {
+    var cur = (val && typeof val === 'object') ? String(val.val == null ? '' : val.val) : String(val == null ? '' : val);
+    var svcs = (window._aliceServices && window._aliceServices[aliceKind(prop)]) || [];
+    var opts = [{ v: 'internal', t: 'Интернал' }];
+    svcs.forEach(function (s) { opts.push({ v: s.url, t: s.label }); });
+    var html = opts.map(function (o) {
+      return '<div class="s-opt' + (o.v === cur ? ' cur' : '') + '" data-val="' + esc(o.v) + '">' + esc(o.t) + '</div>';
+    }).join('');
+    return '<div class="s-group"><label>' + prop + '</label>' +
+      '<div class="s-combo"><input data-cfg="' + section + '.' + prop + '" value="' + esc(cur) + '" autocomplete="off">' +
+      '<button type="button" class="s-pick" tabindex="-1" title="Выбрать из списка">▾</button>' +
+      '<div class="s-drop" hidden>' + html + '</div></div></div>';
+  }
+
+  var aliceSvcLoading = false;
+  function loadAliceServices(node) {
+    if (aliceSvcLoading) return;
+    aliceSvcLoading = true;
+    fetch('/api/cluster/services').then(function (r) { return r.json(); }).then(function (d) {
+      var map = { tts: [], asr: [], vad: [] };
+      (d.providers || []).forEach(function (p) {
+        ((p.manifest && p.manifest.services) || []).forEach(function (s) {
+          var kind = String(s.kind || '').toLowerCase();
+          var url = String(s.url || '');
+          if (!map[kind] || !url) return;
+          map[kind].push({
+            url: url,
+            label: s.id + ' · ' + (p.name || p.id) + (p.online === false ? ' (недоступен)' : '')
+          });
+        });
+      });
+      window._aliceServices = map;
+      aliceSvcLoading = false;
+      if (node._state) render(node, node._state.cfg);
+    }).catch(function () { aliceSvcLoading = false; });
   }
 
   function fieldHtml(section, prop, val) {
@@ -161,6 +211,8 @@
       var blabel = (val && val.label) || prop;
       return '<div class="s-group s-btn-row"><button data-action="' + act + '">' + esc(blabel) + '</button></div>';
     }
+    // Alice_STT/VAD/TTS: комбо, список достраивается из mDNS + "Интернал".
+    if (section === 'Alice' && aliceKind(prop)) return aliceFieldHtml(section, prop, val);
     if (val && typeof val === 'object' && 'val' in val) {
       var list = val.list || [];
       var cur = String(val.val == null ? '' : val.val);
