@@ -152,6 +152,10 @@
     },
     "opencode_url": "http://192.168.1.150:4096",
     "opencode_model": "opencode-go/qwen3.7-plus",
+    "opencode_password": "",
+    "opencode_agent": "",
+    "opencode_mcp": "0",
+    "opencode_mcp_url": "",
     "openai_url": "https://api.openai.com/v1/chat/completions",
     "openai_model": "gpt-4o",
     "openai_key": "",
@@ -191,9 +195,6 @@
     "Alice_ASRDumpMB": "10",
     "Alice_FallbackSound": "",
     "Alice_Rate_Alt_User": "",
-    "Alice_Rate_Alt_Names": "",
-    "Alice_BrainURL": "",
-    "Alice_BrainModel": "",
-    "Alice_BrainMCP": "0"
+    "Alice_Rate_Alt_Names": ""
   }
 }

@@ -328,92 +328,46 @@ agentHelp=function(key){
 	window.agent.speak(helpJson[key])
 }
 
-// === Clippy LLM Integration ===
-var zc_autoAddr='http://'+location.hostname+':8765/mcp';
-var ZC={mcpUrl:zc_autoAddr};
-var zc_ocSession=null;
+// === Clippy LLM Integration: единый мозг на сервере (/api/brain/*) ===
+// Браузер не знает ни провайдера, ни ключей: один POST на сервер, где живёт
+// общий сервис internal/brain — тот же, что отвечает голосовой Алисе.
+// Контекст диалога держит сервер (у каждой вкладки свой client-id).
 var zc_ttsOn=true;
+var ZC={};
+var zc_clientId=(function(){try{var k='zc_client',v=localStorage.getItem(k);if(!v){v=Math.random().toString(36).slice(2,10);localStorage.setItem(k,v)}return v}catch(e){return'default'}})();
 
-// defaults if jsconfig.Brain is missing
+// defaults if jsconfig.Brain is missing (нужны только для показа модели)
 var zc_defaults={
  provider:{val:'none',list:['none','opencode','openai','deepseek','ollama']},
- opencode_url:'http://'+location.hostname+':4096',opencode_model:'opencode-go/qwen3.7-plus',
+ opencode_url:'http://'+location.hostname+':4096',opencode_model:'opencode-go/qwen3.7-plus',opencode_password:'',
  openai_url:'https://api.openai.com/v1/chat/completions',openai_model:'gpt-4o',openai_key:'',
  deepseek_url:'https://api.deepseek.com/v1/chat/completions',deepseek_model:'deepseek-chat',deepseek_key:'',
  ollama_url:'http://localhost:11434/v1/chat/completions',ollama_model:'llama3',
- system_prompt:'Ты — ассистент умного дома. Отвечай ТОЛЬКО итоговой фразой без объяснений. Не говори "хорошо, я понял", не перечисляй шаги. Инструменты ZESP доступны.'
+ system_prompt:'Ты — ассистент умного дома. Отвечай ТОЛЬКО итоговой фразой без объяснений.'
 };
 
 function zc_load(){
  var b=window.jsconfig&&window.jsconfig.Brain?window.jsconfig.Brain:zc_defaults;
- var oldP=zc_provider(),oldM=zc_cfg().model;
  for(var k in b)ZC[k]=b[k];
- ZC.mcpUrl=zc_autoAddr;
- // reset the session when the provider or model changes
- if(zc_ocSession&&(oldP!==zc_provider()||oldM!==zc_cfg().model))zc_ocSession=null;
 }
-function zc_provider(){var p=ZC.provider;return(typeof p==='object'?p.val:p)||'opencode'}
+function zc_provider(){var p=ZC.provider;return(typeof p==='object'?p.val:p)||'none'}
+function zc_cfg(){var p=zc_provider();return{provider:p,model:ZC[p+'_model']||''}}
 
-function zc_cfg(){
- var p=zc_provider();
- return{provider:p,url:ZC[p+'_url']||'',model:ZC[p+'_model']||'',key:ZC[p+'_key']||''};
-}
-
-async function zc_mcp(m,p){
- var r=await fetch(ZC.mcpUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:Date.now(),method:m,params:p})});
- return await r.json();
+// zc_brain — единственная точка общения с мозгом.
+async function zc_brainAsk(text){
+ var r=await fetch('/api/brain/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,client:zc_clientId})});
+ var d=await r.json().catch(function(){return{}});
+ if(!r.ok||d.error)throw new Error(d.error||('HTTP '+r.status));
+ return d.text||'Нет ответа';
 }
 
-async function zc_devs(){
- var r=await zc_mcp('tools/call',{name:'list_devices',arguments:{}});
- var t=r&&r.result&&r.result.content&&r.result.content[0]?r.result.content[0].text:'';
- var m=t.match(/\[\s*\{[\s\S]*\}\s*\]/);
- return m?JSON.parse(m[0]):[];
-}
-
-// dumb proxy via the backend
-async function zc_proxy(url,method,body,headers){
- var r=await fetch('/brain/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:url,method:method||'GET',body:body,headers:headers})});
- if(!r.ok)throw new Error(r.status+' '+r.statusText);
- return await r.json();
+async function zc_brainReset(){
+ try{await fetch('/api/brain/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({client:zc_clientId})})}catch(e){}
+ return'Готово, начинаем с чистого листа.';
 }
 
 async function zc_askBrain(text){
- var cfg=zc_cfg();
- if(cfg.provider==='opencode')return await zc_askOpenCode(text,cfg);
- if(cfg.provider!=='none')return await zc_askOpenAI(text,cfg);
- return zc_fb(text,[]);
-}
-
-async function zc_askOpenCode(text,cfg){
- if(!zc_ocSession){
-  try{await zc_proxy(cfg.url+'/mcp','POST',{name:'zesp',config:{type:'remote',url:ZC.mcpUrl}})}catch(e){}
-  var sd=await zc_proxy(cfg.url+'/session','POST');
-  zc_ocSession=sd.id;
- }
- // Режем по ПЕРВОМУ слэшу: у моделей бывает свой слэш (openai/gpt-oss-20b).
- var _mi=String(cfg.model||'').indexOf('/'),mobj={providerID:_mi<0?'':cfg.model.slice(0,_mi),modelID:_mi<0?cfg.model:cfg.model.slice(_mi+1)};
- var system=ZC.system_prompt;
- try{
-  var d=await zc_mcp('tools/call',{name:'list_devices',arguments:{}});
-  var t=d&&d.result&&d.result.content&&d.result.content[0]?d.result.content[0].text:'';
-  if(t)system+='\n\nУстройства:\n'+t;
- }catch(e){}
- var rd=await zc_proxy(cfg.url+'/session/'+zc_ocSession+'/message','POST',{model:mobj,system:system,parts:[{type:'text',text:text}]});
- if(rd.parts)return rd.parts.filter(function(p){return p.type==='text'&&p.text}).map(function(p){return p.text}).join('\n');
- return rd.error||'Нет ответа';
-}
-
-async function zc_askOpenAI(text,cfg){
- var system=ZC.system_prompt;
- try{
-  var d=await zc_mcp('tools/call',{name:'list_devices',arguments:{}});
-  var t=d&&d.result&&d.result.content&&d.result.content[0]?d.result.content[0].text:'';
-  if(t)system+='\n\nУстройства:\n'+t;
- }catch(e){}
- var h={};if(cfg.key)h['Authorization']='Bearer '+cfg.key;
- var rd=await zc_proxy(cfg.url,'POST',{model:cfg.model,messages:[{role:'system',content:system},{role:'user',content:text}],max_tokens:500,temperature:0.3},h);
- return rd.choices&&rd.choices[0]&&rd.choices[0].message?rd.choices[0].message.content:'Нет ответа';
+ try{return await zc_brainAsk(text)}catch(e){return zc_fb(text,[])}
 }
 
 var ttsQueue = Promise.resolve();
@@ -453,25 +407,29 @@ function zc_tts(txt){
 }
 
 async function zc_switchModel(idx){
- if(zc_provider()!=='opencode')return'Смена моделей только для OpenCode';
  try{
-  var d=await zc_proxy(zc_cfg().url+'/config/providers','GET');
-  var cur=0,pick=null;
-  (d.providers||[]).forEach(function(p){for(var k in p.models){cur++;if(cur===idx)pick=p.id+'/'+k}});
+  var r=await fetch('/api/brain/models');
+  var d=await r.json();
+  if(!r.ok||d.error)throw new Error(d.error||('HTTP '+r.status));
+  var pick=(d.models||[])[idx-1];
   if(!pick)return'Модель №'+idx+' не найдена';
-  ZC.opencode_model=pick;
-  if(window.jsconfig&&window.jsconfig.Brain)window.jsconfig.Brain.opencode_model=pick;
+  // конфиг один: пишем в Brain.<provider>_model
+  var key=zc_provider()+'_model';
+  ZC[key]=pick.id;
+  if(window.jsconfig&&window.jsconfig.Brain)window.jsconfig.Brain[key]=pick.id;
   try{if(typeof WSsend!=='undefined')WSsend('SaveJson|/jsconfig.txt|'+JSON.stringify(window.jsconfig))}catch(e){}
-  return'✅ Модель: '+pick;
+  return'✅ Модель: '+pick.id;
  }catch(e){return'Ошибка: '+e.message}
 }
 
 async function zc_models(){
- if(zc_provider()!=='opencode')return'Список моделей только для OpenCode. Текущая: '+zc_cfg().model;
  try{
-  var d=await zc_proxy(zc_cfg().url+'/config/providers','GET');
-  var all=[],idx=0,_cm=String(zc_cfg().model||''),curModel=_cm.indexOf('/')<0?_cm:_cm.slice(_cm.indexOf('/')+1);
-  (d.providers||[]).forEach(function(p){for(var k in p.models){idx++;var m=p.models[k];all.push(idx+'. '+p.id+'/'+k+' - '+m.name+(k===curModel?' ★':''))}});
+  var r=await fetch('/api/brain/models');
+  var d=await r.json();
+  if(!r.ok||d.error)throw new Error(d.error||('HTTP '+r.status));
+  var all=[],_cm=String(zc_cfg().model||''),_ci=_cm.indexOf('#');
+  if(_ci>=0)_cm=_cm.slice(0,_ci);
+  (d.models||[]).forEach(function(m,i){all.push((i+1)+'. '+m.id+' - '+(m.name||'')+(m.id===_cm?' ★':''))});
   return'Модели:\n'+all.join('\n');
  }catch(e){return'Ошибка: '+e.message}
 }
